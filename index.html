@@ -209,6 +209,52 @@
       align-items: center; justify-content: center;
       background: rgba(4,7,13,0.9); z-index: 20; text-align: center; padding: 30px;
     }
+
+    /* API Key Setup */
+    .api-overlay {
+      position: fixed; inset: 0;
+      background: rgba(4,7,13,0.97);
+      z-index: 30;
+      display: flex; align-items: center; justify-content: center;
+      flex-direction: column; gap: 18px; padding: 30px;
+      text-align: center;
+    }
+    .api-overlay h2 { color: var(--accent); letter-spacing: 4px; font-size: 18px; }
+    .api-overlay p { color: #7fa0b5; font-size: 14px; max-width: 420px; line-height: 1.6; }
+    .api-overlay input {
+      background: rgba(8,18,28,0.8);
+      border: 1px solid rgba(56,217,255,0.35);
+      border-radius: 10px;
+      padding: 14px 20px;
+      color: #eafaff;
+      font-size: 15px;
+      width: min(380px, 90vw);
+      outline: none;
+      letter-spacing: 1px;
+    }
+    .api-overlay input:focus { border-color: var(--accent); }
+    .api-overlay button {
+      background: var(--accent);
+      color: #04121a;
+      border: none;
+      border-radius: 10px;
+      padding: 13px 36px;
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+      letter-spacing: 2px;
+    }
+    .api-overlay .skip-btn {
+      background: transparent;
+      color: #4f6b80;
+      font-size: 12px;
+      padding: 6px 12px;
+      font-weight: 400;
+      letter-spacing: 1px;
+    }
+    .api-overlay .api-hint {
+      font-size: 11px; color: #3a5060;
+    }
   </style>
 </head>
 <body>
@@ -240,6 +286,19 @@
   </div>
 
   <div class="hint">Klicke auf den Orb oder das Mikrofon und sprich · Chrome/Edge empfohlen</div>
+
+  <!-- API Key Setup Overlay -->
+  <div class="api-overlay" id="apiOverlay">
+    <h2>JARVIS · AKTIVIERUNG</h2>
+    <p>Gib deinen <strong style="color:#eafaff">Anthropic API Key</strong> ein, damit JARVIS mit echter KI antworten kann.<br/>
+    Der Key wird nur lokal in deinem Browser gespeichert und nirgendwo hochgeladen.</p>
+    <input type="password" id="apiKeyInput" placeholder="sk-ant-..." autocomplete="off" />
+    <button id="apiSaveBtn">JARVIS STARTEN</button>
+    <button class="skip-btn" id="apiSkipBtn">Ohne KI starten (Demo-Modus)</button>
+    <div class="api-hint">
+      Key holen: <span style="color:#38d9ff">console.anthropic.com</span> → API Keys → Create Key
+    </div>
+  </div>
 
   <div class="unsupported" id="unsupported">
     <div>

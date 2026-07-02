@@ -1,5 +1,5 @@
-/* JARVIS — Sprachlogik: Web Speech API (Erkennung + Ausgabe),
-   Mikrofon-Pegel für den Orb, Ziel-Erkennung & Dialog via n8n/Claude. */
+/* JARVIS — Sprachlogik mit direkter Claude-API-Integration im Browser.
+   API Key wird einmalig eingegeben und in localStorage gespeichert. */
 (function () {
   const micBtn = document.getElementById('micBtn');
   const textInput = document.getElementById('textInput');
@@ -9,6 +9,10 @@
   const goalText = document.getElementById('goalText');
   const unsupported = document.getElementById('unsupported');
   const orbCanvas = document.getElementById('orb');
+  const apiOverlay = document.getElementById('apiOverlay');
+  const apiKeyInput = document.getElementById('apiKeyInput');
+  const apiSaveBtn = document.getElementById('apiSaveBtn');
+  const apiSkipBtn = document.getElementById('apiSkipBtn');
 
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
   const synth = window.speechSynthesis;
@@ -16,6 +20,26 @@
   let listening = false;
   let interimBubble = null;
   let deVoice = null;
+  let ANTHROPIC_KEY = localStorage.getItem('jarvis_api_key') || '';
+
+  // ---------- API Key Setup ----------
+  function initApiOverlay() {
+    if (ANTHROPIC_KEY) { apiOverlay.style.display = 'none'; return; }
+    apiOverlay.style.display = 'flex';
+    apiSaveBtn.addEventListener('click', () => {
+      const k = apiKeyInput.value.trim();
+      if (!k.startsWith('sk-')) { apiKeyInput.style.borderColor = '#ff5c7a'; return; }
+      ANTHROPIC_KEY = k;
+      localStorage.setItem('jarvis_api_key', k);
+      apiOverlay.style.display = 'none';
+      greetOnce();
+    });
+    apiSkipBtn.addEventListener('click', () => {
+      apiOverlay.style.display = 'none';
+      greetOnce();
+    });
+    apiKeyInput.addEventListener('keydown', e => { if (e.key === 'Enter') apiSaveBtn.click(); });
+  }
 
   // ---------- Sprachausgabe ----------
   function pickVoice() {
@@ -24,18 +48,14 @@
            || voices.find(v => /de(-|_)?/i.test(v.lang))
            || voices[0] || null;
   }
-  if (synth) {
-    pickVoice();
-    synth.onvoiceschanged = pickVoice;
-  }
+  if (synth) { pickVoice(); synth.onvoiceschanged = pickVoice; }
 
   function speak(text) {
     if (!synth) return;
     synth.cancel();
     const u = new SpeechSynthesisUtterance(text);
     if (deVoice) u.voice = deVoice;
-    u.lang = 'de-DE';
-    u.rate = 1.02; u.pitch = 0.9;
+    u.lang = 'de-DE'; u.rate = 1.02; u.pitch = 0.9;
     u.onstart = () => setState('speaking');
     u.onend = () => setState(listening ? 'listening' : 'idle');
     synth.speak(u);
@@ -53,97 +73,153 @@
     b.className = 'bubble ' + who + (interim ? ' interim' : '');
     b.textContent = text;
     dialog.appendChild(b);
-    while (dialog.children.length > 8) dialog.removeChild(dialog.firstChild);
+    while (dialog.children.length > 10) dialog.removeChild(dialog.firstChild);
     return b;
   }
 
-  function jarvisSay(text) {
-    addBubble(text, 'jarvis');
-    speak(text);
-  }
+  function jarvisSay(text) { addBubble(text, 'jarvis'); speak(text); }
 
-  // ---------- Ziel- & Dialoglogik ----------
-  const N8N_WEBHOOK = 'https://falca.app.n8n.cloud/webhook/orb-goal';
+  // ---------- Ziel-Panel ----------
+  const state = { goal: null };
 
-  const state = { goal: null, plan: null };
-
-  function parseAmount(text) {
-    const m = text.replace(/\./g, '').match(/(\d[\d\s]*)\s*(€|euro|eur)?/i);
-    if (m && /€|euro|eur/i.test(text)) {
-      const n = parseInt(m[1].replace(/\s/g, ''), 10);
-      if (!isNaN(n)) return n;
-    }
-    return null;
-  }
-
-  function setGoal(goalText_display, raw, schritte, realisierbarkeit) {
-    state.goal = { display: goalText_display, raw, schritte: schritte || [], realisierbarkeit };
-    goalText.innerHTML = goalText_display;
+  function setGoal(displayHtml, raw, schritte, realisierbarkeit) {
+    state.goal = { displayHtml, raw, schritte: schritte || [], realisierbarkeit };
+    let html = displayHtml;
     if (realisierbarkeit != null) {
-      goalText.innerHTML += ` <span style="font-size:12px;color:#6f8aa0;letter-spacing:2px"> · ${realisierbarkeit}% realisierbar</span>`;
+      html += ` <span style="font-size:11px;color:#6f8aa0;letter-spacing:2px"> · ${realisierbarkeit}% realisierbar</span>`;
     }
+    goalText.innerHTML = html;
     goalPanel.classList.add('show');
   }
 
-  async function callN8N(goalText) {
-    const resp = await fetch(N8N_WEBHOOK, {
+  // ---------- Claude direkt ----------
+  async function askClaude(userMessage) {
+    if (!ANTHROPIC_KEY) return null;
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ goal: goalText }),
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': ANTHROPIC_KEY,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true',
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-6',
+        max_tokens: 1024,
+        system: `Du bist JARVIS, ein intelligenter KI-Assistent im Stil von Iron Man. Du antwortest kurz, präzise und auf Deutsch.
+Wenn der Nutzer ein Ziel nennt (z.B. Geld verdienen, etwas erreichen), antworte NUR mit diesem JSON (kein weiterer Text):
+{
+  "typ": "ziel",
+  "analyse": "Kurze Analyse des Ziels (1-2 Sätze)",
+  "schritte": ["Schritt 1", "Schritt 2", "Schritt 3"],
+  "realisierbarkeit": 85,
+  "antwort": "Kurze gesprochene Antwort (1-2 Sätze, direkt und motivierend)"
+}
+Bei normalen Fragen oder Gesprächen antworte mit:
+{
+  "typ": "chat",
+  "antwort": "Deine Antwort hier"
+}`,
+        messages: [{ role: 'user', content: userMessage }],
+      }),
     });
-    if (!resp.ok) throw new Error('n8n ' + resp.status);
-    return resp.json();
+    if (!res.ok) {
+      if (res.status === 401) {
+        localStorage.removeItem('jarvis_api_key');
+        ANTHROPIC_KEY = '';
+        throw new Error('invalid_key');
+      }
+      throw new Error('api_error_' + res.status);
+    }
+    const data = await res.json();
+    const text = data.content?.[0]?.text || '';
+    try { return JSON.parse(text); }
+    catch { return { typ: 'chat', antwort: text }; }
   }
 
+  // ---------- Lokaler Demo-Modus Fallback ----------
+  function localRespond(text) {
+    const lower = text.toLowerCase();
+    const amountMatch = text.replace(/\./g, '').match(/(\d[\d\s]*)\s*(€|euro|eur)/i);
+    const amount = amountMatch ? parseInt(amountMatch[1].replace(/\s/g, ''), 10) : null;
+
+    if (/^(hallo|hey|hi|jarvis|guten)/.test(lower)) {
+      return { typ: 'chat', antwort: 'Guten Tag. Ich bin JARVIS im Demo-Modus. Füge einen API Key hinzu für echte KI-Antworten.' };
+    }
+    if (amount) {
+      return {
+        typ: 'ziel',
+        analyse: `${amount.toLocaleString('de-DE')} € ist ein erreichbares Ziel mit der richtigen Strategie.`,
+        schritte: [
+          `Freelance-Aufträge über Plattformen — ca. ${Math.ceil(amount / 50)} Aufträge à 50 €`,
+          'Digitales Produkt erstellen und mehrfach verkaufen (E-Book, Vorlage, Kurs)',
+          'Micro-Angebot definieren und 5 potenzielle Kunden direkt ansprechen',
+        ],
+        realisierbarkeit: 78,
+        antwort: `Ziel gesetzt: ${amount.toLocaleString('de-DE')} Euro. Ich habe 3 Schritte vorbereitet. Sage "Plan zeigen" für Details.`,
+      };
+    }
+    return {
+      typ: 'ziel',
+      analyse: 'Ziel aufgenommen.',
+      schritte: ['Ziel konkretisieren', 'Ersten Schritt heute umsetzen', 'Fortschritt täglich messen'],
+      realisierbarkeit: 80,
+      antwort: `Ich habe dein Ziel notiert. Sage "Plan zeigen" für die nächsten Schritte.`,
+    };
+  }
+
+  // ---------- Hauptlogik ----------
   async function respond(text) {
     setState('thinking');
     const lower = text.toLowerCase();
 
-    // Begrüßung — lokal, kein API-Call nötig
-    if (/^(hallo|hey|hi|jarvis|guten (tag|morgen|abend))\b/.test(lower) && !/\d/.test(text)) {
-      jarvisSay('Guten Tag. Ich bin JARVIS. Nenne mir dein Ziel — zum Beispiel: Ich möchte 500 Euro verdienen.');
+    // Lokale Schnellbefehle
+    if (/^(hallo|hey|hi|jarvis|guten)\b/.test(lower) && !/\d/.test(text) && !ANTHROPIC_KEY) {
+      jarvisSay('Guten Tag. Ich bin JARVIS. Nenne mir dein Ziel.');
       return;
     }
-
-    // Plan zeigen (bereits gesetzt)
-    if (/plan|schritte|zeig/.test(lower) && state.goal && state.goal.schritte.length) {
+    if (/^(plan|schritte|zeig)/.test(lower) && state.goal?.schritte?.length) {
       const list = state.goal.schritte.map((s, i) => `${i + 1}. ${s}`).join('\n');
       addBubble('Plan:\n' + list, 'jarvis');
-      speak('Hier sind die Schritte: ' + state.goal.schritte.join('. '));
+      speak('Hier sind deine Schritte: ' + state.goal.schritte.join('. '));
       return;
     }
-
-    // Status lokal
-    if (/^(status|wie weit|fortschritt)\b/.test(lower)) {
-      jarvisSay(state.goal
-        ? `Aktuelles Ziel: ${state.goal.raw}. ${state.goal.realisierbarkeit != null ? state.goal.realisierbarkeit + ' Prozent Realisierbarkeit.' : ''}`
-        : 'Es ist noch kein Ziel gesetzt. Nenne mir eines.');
+    if (/^(status|wie weit|fortschritt)/.test(lower)) {
+      jarvisSay(state.goal ? `Aktuelles Ziel: ${state.goal.raw}.` : 'Kein Ziel gesetzt. Nenne mir eines.');
       return;
     }
-
-    // Danke / Ende — lokal
     if (/^(danke|stop|ende|tschüss)/.test(lower)) {
-      jarvisSay('Immer zu Diensten. Ich bin bereit, wenn du mich brauchst.');
+      jarvisSay('Immer zu Diensten. Ich stehe bereit.');
       return;
     }
 
-    // Alles andere → n8n / Claude analysieren lassen
+    // Claude oder Demo
+    let result;
     try {
-      const data = await callN8N(text);
-      // data: { goal, analyse, schritte, realisierbarkeit, antwort }
-      const amount = parseAmount(text);
-      const displayHtml = amount
-        ? `JARVIS-Ziel: <span class="goal-amount">${amount.toLocaleString('de-DE')} €</span>`
-        : `Ziel: <strong style="color:#eafaff">${text}</strong>`;
-
-      setGoal(displayHtml, text, data.schritte, data.realisierbarkeit);
-
-      // Dialog: Analyse als Bubble, dann Antwort sprechen
-      if (data.analyse) addBubble('Analyse: ' + data.analyse, 'jarvis');
-      jarvisSay(data.antwort || 'Ziel aufgenommen. Sage "Plan zeigen" für die Schritte.');
+      result = ANTHROPIC_KEY ? await askClaude(text) : localRespond(text);
     } catch (err) {
-      console.warn('n8n Fehler', err);
-      jarvisSay('Ich konnte das Ziel gerade nicht analysieren. Bitte versuche es erneut.');
+      if (err.message === 'invalid_key') {
+        jarvisSay('Der API Key ist ungültig. Bitte lade die Seite neu und gib einen gültigen Key ein.');
+      } else {
+        jarvisSay('Verbindungsfehler. Bitte versuche es erneut.');
+      }
+      setState('idle');
+      return;
+    }
+
+    if (!result) { jarvisSay('Kein API Key vorhanden. Lade die Seite neu, um einen einzugeben.'); return; }
+
+    if (result.typ === 'ziel') {
+      const amountMatch = text.replace(/\./g, '').match(/(\d[\d\s]*)\s*(€|euro|eur)/i);
+      const amount = amountMatch ? parseInt(amountMatch[1].replace(/\s/g, ''), 10) : null;
+      const displayHtml = amount
+        ? `Ziel: <span class="goal-amount">${amount.toLocaleString('de-DE')} €</span>`
+        : `Ziel: <strong style="color:#eafaff">${text.slice(0, 60)}</strong>`;
+      setGoal(displayHtml, text, result.schritte, result.realisierbarkeit);
+      if (result.analyse) addBubble('Analyse: ' + result.analyse, 'jarvis');
+      jarvisSay(result.antwort);
+    } else {
+      jarvisSay(result.antwort);
     }
   }
 
@@ -151,10 +227,10 @@
     text = text.trim();
     if (!text) return;
     addBubble(text, 'user');
-    respond(text); // async, Fehler intern behandelt
+    respond(text);
   }
 
-  // ---------- Mikrofon-Pegel → Orb ----------
+  // ---------- Mikrofon-Pegel ----------
   let audioCtx = null, analyser = null, micData = null, rafId = null;
   async function startMicMeter() {
     try {
@@ -169,12 +245,11 @@
         analyser.getByteFrequencyData(micData);
         let sum = 0;
         for (let i = 0; i < micData.length; i++) sum += micData[i];
-        const level = (sum / micData.length) / 128;
-        window.Orb && window.Orb.setAudioLevel(level);
+        window.Orb && window.Orb.setAudioLevel((sum / micData.length) / 128);
         rafId = requestAnimationFrame(tick);
       };
       tick();
-    } catch (e) { /* Mikro-Pegel optional */ }
+    } catch (e) {}
   }
   function stopMicMeter() {
     if (rafId) cancelAnimationFrame(rafId);
@@ -188,7 +263,6 @@
     recognition.lang = 'de-DE';
     recognition.interimResults = true;
     recognition.continuous = false;
-
     recognition.onresult = (ev) => {
       let interim = '', final = '';
       for (let i = ev.resultIndex; i < ev.results.length; i++) {
@@ -216,6 +290,7 @@
   }
 
   function toggleListen() {
+    if (apiOverlay.style.display !== 'none') return;
     if (!recognition) { textInput.focus(); return; }
     if (listening) { recognition.stop(); return; }
     synth && synth.cancel();
@@ -226,7 +301,6 @@
     try { recognition.start(); } catch (e) {}
   }
 
-  // ---------- Events ----------
   micBtn.addEventListener('click', toggleListen);
   orbCanvas.addEventListener('click', toggleListen);
   textInput.addEventListener('keydown', (e) => {
@@ -236,11 +310,15 @@
   initRecognition();
   setState('idle');
 
-  // Begrüßung nach erster Nutzer-Interaktion (Autoplay-Policy)
   let greeted = false;
   function greetOnce() {
     if (greeted) return; greeted = true;
-    jarvisSay('Systeme online. Ich bin JARVIS. Wie kann ich dir heute helfen?');
+    const mode = ANTHROPIC_KEY ? 'KI-Modus aktiv' : 'Demo-Modus';
+    jarvisSay(`Systeme online. ${mode}. Ich bin JARVIS. Wie kann ich dir heute helfen?`);
   }
-  window.addEventListener('pointerdown', greetOnce, { once: true });
+
+  initApiOverlay();
+  if (ANTHROPIC_KEY) {
+    window.addEventListener('pointerdown', greetOnce, { once: true });
+  }
 })();
