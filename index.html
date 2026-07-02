@@ -146,6 +146,21 @@
       color: #bfe3f5;
     }
     .bubble.interim { opacity: .55; font-style: italic; }
+
+    /* Leads (echte Kontakte aus n8n) */
+    .leads-bubble { max-width: 100%; width: 100%; max-height: 26vh; overflow-y: auto; }
+    .leads-head {
+      font-size: 11px; letter-spacing: 2px; text-transform: uppercase;
+      color: var(--accent); margin-bottom: 8px;
+    }
+    .lead-row {
+      padding: 7px 0;
+      border-top: 1px solid rgba(56,217,255,0.10);
+    }
+    .lead-name { color: #eafaff; font-size: 14px; font-weight: 600; }
+    .lead-meta { color: #7fa0b5; font-size: 12px; margin-top: 2px; }
+    .lead-link { color: var(--accent); font-size: 12px; text-decoration: none; }
+    .lead-link:hover { text-decoration: underline; }
     @keyframes rise { from { opacity: 0; transform: translateY(12px);} to {opacity:1; transform:none;} }
 
     /* Controls */

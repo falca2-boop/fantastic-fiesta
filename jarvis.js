@@ -24,6 +24,11 @@
   let ANTHROPIC_KEY = (window.JARVIS_CONFIG && window.JARVIS_CONFIG.anthropicKey)
     || localStorage.getItem('jarvis_api_key') || '';
 
+  // n8n-Webhook: JARVIS führt echte Aktionen aus (KI-Analyse + Lead-Generierung
+  // über OpenStreetMap). Standardpfad; überschreibbar via config.js.
+  const N8N_WEBHOOK = (window.JARVIS_CONFIG && window.JARVIS_CONFIG.n8nWebhook)
+    || 'https://falca.app.n8n.cloud/webhook/orb-goal';
+
   // ---------- API Key Setup ----------
   function initApiOverlay() {
     if (ANTHROPIC_KEY) { apiOverlay.style.display = 'none'; return; }
@@ -80,6 +85,69 @@
   }
 
   function jarvisSay(text) { addBubble(text, 'jarvis'); speak(text); }
+
+  // ---------- Leads-Darstellung (echte Kontakte aus n8n) ----------
+  function renderLeads(leads, ort, branche) {
+    const b = document.createElement('div');
+    b.className = 'bubble jarvis leads-bubble';
+    const head = document.createElement('div');
+    head.className = 'leads-head';
+    head.textContent = `${leads.length} Leads gefunden` +
+      (branche ? ` · ${branche}` : '') + (ort ? ` · ${ort}` : '');
+    b.appendChild(head);
+
+    leads.forEach(l => {
+      const row = document.createElement('div');
+      row.className = 'lead-row';
+      const name = document.createElement('div');
+      name.className = 'lead-name';
+      name.textContent = l.name;
+      row.appendChild(name);
+
+      const meta = document.createElement('div');
+      meta.className = 'lead-meta';
+      const parts = [];
+      if (l.adresse) parts.push(l.adresse);
+      if (l.telefon) parts.push('☎ ' + l.telefon);
+      if (l.email) parts.push('✉ ' + l.email);
+      meta.textContent = parts.join('  ·  ');
+      row.appendChild(meta);
+
+      if (l.website) {
+        const a = document.createElement('a');
+        a.className = 'lead-link';
+        a.href = l.website; a.target = '_blank'; a.rel = 'noopener';
+        a.textContent = l.website.replace(/^https?:\/\//, '');
+        row.appendChild(a);
+      }
+      b.appendChild(row);
+    });
+
+    dialog.appendChild(b);
+    while (dialog.children.length > 10) dialog.removeChild(dialog.firstChild);
+    return b;
+  }
+
+  // ---------- JARVIS via n8n (echte Aktionen) ----------
+  async function askN8n(text) {
+    const res = await fetch(N8N_WEBHOOK, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ goal: text }),
+    });
+    if (!res.ok) throw new Error('n8n_' + res.status);
+    const d = await res.json();
+    return {
+      typ: 'ziel',
+      analyse: d.analyse,
+      schritte: d.schritte || [],
+      realisierbarkeit: d.realisierbarkeit,
+      antwort: d.antwort || 'Ziel verarbeitet.',
+      leads: d.leads || [],
+      lead_ort: d.lead_ort,
+      lead_branche: d.lead_branche,
+    };
+  }
 
   // ---------- Ziel-Panel ----------
   const state = { goal: null };
@@ -195,10 +263,14 @@ Bei normalen Fragen oder Gesprächen antworte mit:
       return;
     }
 
-    // Claude oder Demo
+    // n8n (echte Aktionen) → Claude → Demo, in dieser Reihenfolge
     let result;
     try {
-      result = ANTHROPIC_KEY ? await askClaude(text) : localRespond(text);
+      try {
+        result = await askN8n(text);
+      } catch (n8nErr) {
+        result = ANTHROPIC_KEY ? await askClaude(text) : localRespond(text);
+      }
     } catch (err) {
       if (err.message === 'invalid_key') {
         jarvisSay('Der API Key ist ungültig. Bitte lade die Seite neu und gib einen gültigen Key ein.');
@@ -219,6 +291,9 @@ Bei normalen Fragen oder Gesprächen antworte mit:
         : `Ziel: <strong style="color:#eafaff">${text.slice(0, 60)}</strong>`;
       setGoal(displayHtml, text, result.schritte, result.realisierbarkeit);
       if (result.analyse) addBubble('Analyse: ' + result.analyse, 'jarvis');
+      if (result.leads && result.leads.length) {
+        renderLeads(result.leads, result.lead_ort, result.lead_branche);
+      }
       jarvisSay(result.antwort);
     } else {
       jarvisSay(result.antwort);
