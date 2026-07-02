@@ -1,5 +1,5 @@
 /* JARVIS — Sprachlogik: Web Speech API (Erkennung + Ausgabe),
-   Mikrofon-Pegel für den Orb, einfache Ziel-Erkennung & Dialog. */
+   Mikrofon-Pegel für den Orb, Ziel-Erkennung & Dialog via n8n/Claude. */
 (function () {
   const micBtn = document.getElementById('micBtn');
   const textInput = document.getElementById('textInput');
@@ -63,10 +63,11 @@
   }
 
   // ---------- Ziel- & Dialoglogik ----------
-  const state = { goal: null };
+  const N8N_WEBHOOK = 'https://falca.app.n8n.cloud/webhook/orb-goal';
+
+  const state = { goal: null, plan: null };
 
   function parseAmount(text) {
-    // findet z.B. "500€", "500 euro", "1.500", "1500 eur"
     const m = text.replace(/\./g, '').match(/(\d[\d\s]*)\s*(€|euro|eur)?/i);
     if (m && /€|euro|eur/i.test(text)) {
       const n = parseInt(m[1].replace(/\s/g, ''), 10);
@@ -75,81 +76,82 @@
     return null;
   }
 
-  function setGoal(amount, raw) {
-    state.goal = { amount, raw };
-    goalText.innerHTML = amount
-      ? `JARVIS soll <span class="goal-amount">${amount.toLocaleString('de-DE')} €</span> verdienen`
-      : raw;
+  function setGoal(goalText_display, raw, schritte, realisierbarkeit) {
+    state.goal = { display: goalText_display, raw, schritte: schritte || [], realisierbarkeit };
+    goalText.innerHTML = goalText_display;
+    if (realisierbarkeit != null) {
+      goalText.innerHTML += ` <span style="font-size:12px;color:#6f8aa0;letter-spacing:2px"> · ${realisierbarkeit}% realisierbar</span>`;
+    }
     goalPanel.classList.add('show');
   }
 
-  function planFor(amount) {
-    // Einfacher, generischer "Strategie"-Plan als Demo
-    const ideen = [
-      `Freelance-Aufträge (Texte, Design, Code) über Plattformen — ca. ${Math.ceil(amount / 50)} kleine Jobs à 50 €.`,
-      `Digitales Produkt einmal erstellen und mehrfach verkaufen — Vorlage, E-Book oder Kurs.`,
-      `Bestehende Gegenstände verkaufen und den Erlös reinvestieren.`,
-      `Ein Micro-Angebot definieren und gezielt 5 potenzielle Kunden ansprechen.`,
-    ];
-    return ideen;
+  async function callN8N(goalText) {
+    const resp = await fetch(N8N_WEBHOOK, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ goal: goalText }),
+    });
+    if (!resp.ok) throw new Error('n8n ' + resp.status);
+    return resp.json();
   }
 
-  function respond(text) {
+  async function respond(text) {
     setState('thinking');
     const lower = text.toLowerCase();
-    const amount = parseAmount(text);
 
-    setTimeout(() => {
-      // Begrüßung
-      if (/^(hallo|hey|hi|jarvis|guten (tag|morgen|abend))\b/.test(lower) && !amount) {
-        jarvisSay('Guten Tag. Ich bin JARVIS. Nenne mir dein Ziel — zum Beispiel, wie viel Geld ich für dich verdienen soll.');
-        return;
-      }
-      // Ziel mit Betrag
-      if (amount || /verdien|geld|ziel|einnahm|umsatz/.test(lower)) {
-        if (amount) {
-          setGoal(amount, text);
-          const ideen = planFor(amount);
-          jarvisSay(
-            `Verstanden. Ziel gesetzt: ${amount.toLocaleString('de-DE')} Euro. ` +
-            `Mein Vorschlag, um das zu erreichen: Erstens, ${ideen[0]} Zweitens, ${ideen[1]} ` +
-            `Sag "Plan zeigen", wenn du alle Schritte sehen möchtest.`
-          );
-        } else {
-          jarvisSay('Wie hoch soll das Ziel sein? Nenne mir einen Betrag, zum Beispiel 500 Euro.');
-        }
-        return;
-      }
-      // Plan zeigen
-      if (/plan|schritte|zeig/.test(lower) && state.goal && state.goal.amount) {
-        const ideen = planFor(state.goal.amount);
-        addBubble('Plan für ' + state.goal.amount.toLocaleString('de-DE') + ' €:\n• ' + ideen.join('\n• '), 'jarvis');
-        speak('Hier ist der vollständige Plan. Insgesamt ' + ideen.length + ' Schritte, um dein Ziel zu erreichen.');
-        return;
-      }
-      // Status
-      if (/status|wie weit|fortschritt/.test(lower)) {
-        jarvisSay(state.goal
-          ? `Aktuelles Ziel: ${state.goal.amount ? state.goal.amount.toLocaleString('de-DE') + ' Euro' : state.goal.raw}. Bereit, den Plan umzusetzen.`
-          : 'Es ist noch kein Ziel gesetzt. Nenne mir eines.');
-        return;
-      }
-      // Danke / Ende
-      if (/danke|stop|ende|tschüss/.test(lower)) {
-        jarvisSay('Immer zu Diensten. Ich bin bereit, wenn du mich brauchst.');
-        return;
-      }
-      // Fallback: als Ziel übernehmen
-      setGoal(null, text);
-      jarvisSay(`Ich habe dein Ziel notiert: "${text}". Soll ich dafür einen Plan erstellen?`);
-    }, 550);
+    // Begrüßung — lokal, kein API-Call nötig
+    if (/^(hallo|hey|hi|jarvis|guten (tag|morgen|abend))\b/.test(lower) && !/\d/.test(text)) {
+      jarvisSay('Guten Tag. Ich bin JARVIS. Nenne mir dein Ziel — zum Beispiel: Ich möchte 500 Euro verdienen.');
+      return;
+    }
+
+    // Plan zeigen (bereits gesetzt)
+    if (/plan|schritte|zeig/.test(lower) && state.goal && state.goal.schritte.length) {
+      const list = state.goal.schritte.map((s, i) => `${i + 1}. ${s}`).join('\n');
+      addBubble('Plan:\n' + list, 'jarvis');
+      speak('Hier sind die Schritte: ' + state.goal.schritte.join('. '));
+      return;
+    }
+
+    // Status lokal
+    if (/^(status|wie weit|fortschritt)\b/.test(lower)) {
+      jarvisSay(state.goal
+        ? `Aktuelles Ziel: ${state.goal.raw}. ${state.goal.realisierbarkeit != null ? state.goal.realisierbarkeit + ' Prozent Realisierbarkeit.' : ''}`
+        : 'Es ist noch kein Ziel gesetzt. Nenne mir eines.');
+      return;
+    }
+
+    // Danke / Ende — lokal
+    if (/^(danke|stop|ende|tschüss)/.test(lower)) {
+      jarvisSay('Immer zu Diensten. Ich bin bereit, wenn du mich brauchst.');
+      return;
+    }
+
+    // Alles andere → n8n / Claude analysieren lassen
+    try {
+      const data = await callN8N(text);
+      // data: { goal, analyse, schritte, realisierbarkeit, antwort }
+      const amount = parseAmount(text);
+      const displayHtml = amount
+        ? `JARVIS-Ziel: <span class="goal-amount">${amount.toLocaleString('de-DE')} €</span>`
+        : `Ziel: <strong style="color:#eafaff">${text}</strong>`;
+
+      setGoal(displayHtml, text, data.schritte, data.realisierbarkeit);
+
+      // Dialog: Analyse als Bubble, dann Antwort sprechen
+      if (data.analyse) addBubble('Analyse: ' + data.analyse, 'jarvis');
+      jarvisSay(data.antwort || 'Ziel aufgenommen. Sage "Plan zeigen" für die Schritte.');
+    } catch (err) {
+      console.warn('n8n Fehler', err);
+      jarvisSay('Ich konnte das Ziel gerade nicht analysieren. Bitte versuche es erneut.');
+    }
   }
 
   function handleInput(text) {
     text = text.trim();
     if (!text) return;
     addBubble(text, 'user');
-    respond(text);
+    respond(text); // async, Fehler intern behandelt
   }
 
   // ---------- Mikrofon-Pegel → Orb ----------
