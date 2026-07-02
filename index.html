@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>JARVIS</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <style>
+    :root {
+      --accent: #38d9ff;
+      --accent-dim: #1a6b8f;
+      --bg: #04070d;
+      --danger: #ff5c7a;
+      --ok: #55ffa8;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body {
+      height: 100%;
+      background: var(--bg);
+      color: #cfe9ff;
+      font-family: "Segoe UI", "Helvetica Neue", system-ui, sans-serif;
+      overflow: hidden;
+    }
+    body {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background:
+        radial-gradient(circle at 50% 40%, rgba(56,217,255,0.08), transparent 60%),
+        radial-gradient(circle at 50% 120%, rgba(56,217,255,0.10), transparent 55%),
+        var(--bg);
+    }
+    /* subtle grid */
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(56,217,255,0.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(56,217,255,0.04) 1px, transparent 1px);
+      background-size: 46px 46px;
+      mask-image: radial-gradient(circle at 50% 45%, black, transparent 75%);
+      pointer-events: none;
+    }
+
+    .stage {
+      position: relative;
+      width: min(70vw, 70vh, 560px);
+      aspect-ratio: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 2;
+    }
+    canvas#orb {
+      width: 100%;
+      height: 100%;
+      cursor: pointer;
+      filter: drop-shadow(0 0 40px rgba(56,217,255,0.35));
+    }
+
+    .hud-top {
+      position: fixed;
+      top: 28px;
+      left: 0; right: 0;
+      text-align: center;
+      z-index: 3;
+      pointer-events: none;
+    }
+    .hud-top .brand {
+      font-size: 13px;
+      letter-spacing: 8px;
+      color: var(--accent);
+      opacity: 0.8;
+    }
+    .state-label {
+      margin-top: 6px;
+      font-size: 12px;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      color: #6f8aa0;
+      min-height: 16px;
+    }
+
+    /* Goal panel */
+    .goal-panel {
+      position: fixed;
+      top: 90px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 3;
+      background: rgba(8,18,28,0.55);
+      border: 1px solid rgba(56,217,255,0.25);
+      border-radius: 14px;
+      padding: 12px 22px;
+      backdrop-filter: blur(8px);
+      text-align: center;
+      max-width: 90vw;
+      opacity: 0;
+      transition: opacity .4s;
+    }
+    .goal-panel.show { opacity: 1; }
+    .goal-panel .lbl {
+      font-size: 10px; letter-spacing: 3px; color: #5f7a90; text-transform: uppercase;
+    }
+    .goal-panel .goal-text {
+      margin-top: 4px; font-size: 18px; color: #eafaff;
+    }
+    .goal-panel .goal-amount { color: var(--accent); font-weight: 600; }
+
+    /* Transcript / dialog */
+    .dialog {
+      position: fixed;
+      bottom: 130px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: min(760px, 90vw);
+      z-index: 3;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      max-height: 34vh;
+      overflow: hidden;
+      -webkit-mask-image: linear-gradient(transparent, black 22%);
+      mask-image: linear-gradient(transparent, black 22%);
+    }
+    .bubble {
+      align-self: flex-start;
+      max-width: 85%;
+      padding: 10px 16px;
+      border-radius: 14px;
+      font-size: 15px;
+      line-height: 1.45;
+      animation: rise .35s ease both;
+    }
+    .bubble.user {
+      align-self: flex-end;
+      background: rgba(56,217,255,0.14);
+      border: 1px solid rgba(56,217,255,0.3);
+      color: #eafaff;
+    }
+    .bubble.jarvis {
+      background: rgba(10,22,34,0.7);
+      border: 1px solid rgba(56,217,255,0.16);
+      color: #bfe3f5;
+    }
+    .bubble.interim { opacity: .55; font-style: italic; }
+    @keyframes rise { from { opacity: 0; transform: translateY(12px);} to {opacity:1; transform:none;} }
+
+    /* Controls */
+    .controls {
+      position: fixed;
+      bottom: 42px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 4;
+      display: flex;
+      align-items: center;
+      gap: 18px;
+    }
+    .mic-btn {
+      width: 68px; height: 68px;
+      border-radius: 50%;
+      border: 1px solid rgba(56,217,255,0.4);
+      background: rgba(10,26,38,0.8);
+      color: var(--accent);
+      cursor: pointer;
+      display: grid; place-items: center;
+      transition: all .2s;
+      position: relative;
+    }
+    .mic-btn:hover { background: rgba(20,44,60,0.9); }
+    .mic-btn.active {
+      background: var(--accent);
+      color: #04121a;
+      box-shadow: 0 0 0 0 rgba(56,217,255,0.6);
+      animation: micpulse 1.6s infinite;
+    }
+    @keyframes micpulse {
+      0% { box-shadow: 0 0 0 0 rgba(56,217,255,0.55); }
+      100% { box-shadow: 0 0 0 22px rgba(56,217,255,0); }
+    }
+    .mic-btn svg { width: 28px; height: 28px; }
+    .text-input {
+      background: rgba(8,18,28,0.7);
+      border: 1px solid rgba(56,217,255,0.25);
+      border-radius: 24px;
+      padding: 14px 20px;
+      color: #eafaff;
+      font-size: 15px;
+      width: min(420px, 60vw);
+      outline: none;
+    }
+    .text-input::placeholder { color: #4f6b80; }
+    .text-input:focus { border-color: var(--accent); }
+
+    .hint {
+      position: fixed;
+      bottom: 14px;
+      left: 0; right: 0;
+      text-align: center;
+      font-size: 11px;
+      color: #40566a;
+      z-index: 3;
+    }
+    .unsupported {
+      position: fixed; inset: 0; display: none;
+      align-items: center; justify-content: center;
+      background: rgba(4,7,13,0.9); z-index: 20; text-align: center; padding: 30px;
+    }
+  </style>
+</head>
+<body>
+  <div class="hud-top">
+    <div class="brand">J · A · R · V · I · S</div>
+    <div class="state-label" id="stateLabel">Bereit</div>
+  </div>
+
+  <div class="goal-panel" id="goalPanel">
+    <div class="lbl">Aktuelles Ziel</div>
+    <div class="goal-text" id="goalText"></div>
+  </div>
+
+  <div class="stage">
+    <canvas id="orb"></canvas>
+  </div>
+
+  <div class="dialog" id="dialog"></div>
+
+  <div class="controls">
+    <input class="text-input" id="textInput" placeholder="Sag mir dein Ziel… (oder tippe hier)" />
+    <button class="mic-btn" id="micBtn" title="Sprechen">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+        <path d="M12 2a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/>
+        <path d="M5 11a7 7 0 0 0 14 0"/>
+        <line x1="12" y1="18" x2="12" y2="22"/>
+      </svg>
+    </button>
+  </div>
+
+  <div class="hint">Klicke auf den Orb oder das Mikrofon und sprich · Chrome/Edge empfohlen</div>
+
+  <div class="unsupported" id="unsupported">
+    <div>
+      <h2 style="color:var(--accent)">Spracherkennung nicht verfügbar</h2>
+      <p style="margin-top:10px;max-width:420px;color:#9fc">Dein Browser unterstützt die Web Speech API nicht.
+      Nutze Chrome oder Edge — du kannst aber trotzdem über das Textfeld mit JARVIS sprechen.</p>
+    </div>
+  </div>
+
+  <script src="orb.js"></script>
+  <script src="jarvis.js"></script>
+</body>
+</html>
