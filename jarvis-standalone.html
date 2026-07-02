@@ -281,13 +281,17 @@
 
   <div class="api-overlay" id="apiOverlay">
     <h2>JARVIS · AKTIVIERUNG</h2>
-    <p>Gib deinen <strong style="color:#eafaff">Anthropic API Key</strong> ein, damit JARVIS mit echter KI antworten kann.<br/>
-    Der Key wird nur lokal in deinem Browser gespeichert und nirgendwo hochgeladen.</p>
-    <input type="password" id="apiKeyInput" placeholder="sk-ant-..." autocomplete="off" />
+    <p>Gib deine API Keys ein. Beide werden nur lokal gespeichert.</p>
+    <div style="width:min(380px,90vw);text-align:left">
+      <div style="font-size:11px;color:#5f8aa0;letter-spacing:2px;margin-bottom:6px">ANTHROPIC API KEY *</div>
+      <input type="password" id="apiKeyInput" placeholder="sk-ant-..." autocomplete="off" />
+      <div style="font-size:11px;color:#5f8aa0;letter-spacing:2px;margin:14px 0 6px">ELEVENLABS API KEY (optional — für KI-Stimme)</div>
+      <input type="password" id="elevenKeyInput" placeholder="sk_..." autocomplete="off" style="background:rgba(8,18,28,0.8);border:1px solid rgba(56,217,255,0.35);border-radius:10px;padding:14px 20px;color:#eafaff;font-size:15px;width:100%;outline:none;letter-spacing:1px;" />
+    </div>
     <button id="apiSaveBtn">JARVIS STARTEN</button>
     <button class="skip-btn" id="apiSkipBtn">Ohne KI starten (Demo-Modus)</button>
     <div class="api-hint">
-      Key holen: <span style="color:#38d9ff">console.anthropic.com</span> → API Keys → Create Key
+      Anthropic: <span style="color:#38d9ff">console.anthropic.com</span> · ElevenLabs: <span style="color:#38d9ff">elevenlabs.io</span> → Profile → API Key
     </div>
   </div>
 
@@ -420,6 +424,7 @@
     const orbCanvas = document.getElementById('orb');
     const apiOverlay = document.getElementById('apiOverlay');
     const apiKeyInput = document.getElementById('apiKeyInput');
+    const elevenKeyInput = document.getElementById('elevenKeyInput');
     const apiSaveBtn = document.getElementById('apiSaveBtn');
     const apiSkipBtn = document.getElementById('apiSkipBtn');
 
@@ -430,6 +435,9 @@
     let interimBubble = null;
     let deVoice = null;
     let ANTHROPIC_KEY = localStorage.getItem('jarvis_api_key') || '';
+    let ELEVEN_KEY = localStorage.getItem('jarvis_eleven_key') || '';
+    // ElevenLabs voice: "Adam" — tiefe männliche englische Stimme, ideal für JARVIS
+    const ELEVEN_VOICE_ID = 'pNInz6obpgDQGcFmaJgB';
 
     function initApiOverlay() {
       if (ANTHROPIC_KEY) { apiOverlay.style.display = 'none'; return; }
@@ -439,6 +447,8 @@
         if (!k.startsWith('sk-')) { apiKeyInput.style.borderColor = '#ff5c7a'; return; }
         ANTHROPIC_KEY = k;
         localStorage.setItem('jarvis_api_key', k);
+        const ek = elevenKeyInput.value.trim();
+        if (ek) { ELEVEN_KEY = ek; localStorage.setItem('jarvis_eleven_key', ek); }
         apiOverlay.style.display = 'none';
         greetOnce();
       });
@@ -457,7 +467,34 @@
     }
     if (synth) { pickVoice(); synth.onvoiceschanged = pickVoice; }
 
-    function speak(text) {
+    async function speak(text) {
+      if (ELEVEN_KEY) {
+        setState('speaking');
+        try {
+          const res = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${ELEVEN_VOICE_ID}`, {
+            method: 'POST',
+            headers: {
+              'xi-api-key': ELEVEN_KEY,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              text,
+              model_id: 'eleven_multilingual_v2',
+              voice_settings: { stability: 0.45, similarity_boost: 0.82, style: 0.3, use_speaker_boost: true },
+            }),
+          });
+          if (res.ok) {
+            const blob = await res.blob();
+            const url = URL.createObjectURL(blob);
+            const audio = new Audio(url);
+            audio.onended = () => { URL.revokeObjectURL(url); setState(listening ? 'listening' : 'idle'); };
+            audio.onerror = () => setState(listening ? 'listening' : 'idle');
+            audio.play();
+            return;
+          }
+        } catch (e) {}
+        // ElevenLabs failed, fall through to browser synth
+      }
       if (!synth) return;
       synth.cancel();
       const u = new SpeechSynthesisUtterance(text);
