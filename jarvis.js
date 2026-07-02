@@ -220,8 +220,29 @@ Bei normalen Fragen oder Gesprächen antworte mit:
       setGoal(displayHtml, text, result.schritte, result.realisierbarkeit);
       if (result.analyse) addBubble('Analyse: ' + result.analyse, 'jarvis');
       jarvisSay(result.antwort);
+
+      // Echte Aktion in n8n auslösen
+      triggerN8NAction({ goal: text, amount: amount || 0, schritte: result.schritte, realisierbarkeit: result.realisierbarkeit });
     } else {
       jarvisSay(result.antwort);
+    }
+  }
+
+  async function triggerN8NAction(payload) {
+    try {
+      const res = await fetch('https://falca.app.n8n.cloud/webhook/jarvis-action', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      if (res.ok) {
+        const data = await res.json().catch(() => ({}));
+        if (data.message) {
+          setTimeout(() => addBubble('✓ ' + data.message, 'jarvis'), 800);
+        }
+      }
+    } catch (e) {
+      // n8n nicht erreichbar — kein Fehler zeigen, JARVIS läuft weiter
     }
   }
 
