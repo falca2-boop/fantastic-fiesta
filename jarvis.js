@@ -20,7 +20,9 @@
   let listening = false;
   let interimBubble = null;
   let deVoice = null;
-  let ANTHROPIC_KEY = localStorage.getItem('jarvis_api_key') || '';
+  // Key aus config.js (lokal, nicht auf GitHub) oder localStorage
+  let ANTHROPIC_KEY = (window.JARVIS_CONFIG && window.JARVIS_CONFIG.anthropicKey)
+    || localStorage.getItem('jarvis_api_key') || '';
 
   // ---------- API Key Setup ----------
   function initApiOverlay() {
