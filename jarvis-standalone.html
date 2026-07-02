@@ -1,0 +1,742 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>JARVIS</title>
+  <style>
+    :root {
+      --accent: #38d9ff;
+      --accent-dim: #1a6b8f;
+      --bg: #04070d;
+      --danger: #ff5c7a;
+      --ok: #55ffa8;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body {
+      height: 100%;
+      background: var(--bg);
+      color: #cfe9ff;
+      font-family: "Segoe UI", "Helvetica Neue", system-ui, sans-serif;
+      overflow: hidden;
+    }
+    body {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background:
+        radial-gradient(circle at 50% 40%, rgba(56,217,255,0.08), transparent 60%),
+        radial-gradient(circle at 50% 120%, rgba(56,217,255,0.10), transparent 55%),
+        var(--bg);
+    }
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(56,217,255,0.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(56,217,255,0.04) 1px, transparent 1px);
+      background-size: 46px 46px;
+      mask-image: radial-gradient(circle at 50% 45%, black, transparent 75%);
+      pointer-events: none;
+    }
+
+    .stage {
+      position: relative;
+      width: min(70vw, 70vh, 560px);
+      aspect-ratio: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 2;
+    }
+    canvas#orb {
+      width: 100%;
+      height: 100%;
+      cursor: pointer;
+      filter: drop-shadow(0 0 40px rgba(56,217,255,0.35));
+    }
+
+    .hud-top {
+      position: fixed;
+      top: 28px;
+      left: 0; right: 0;
+      text-align: center;
+      z-index: 3;
+      pointer-events: none;
+    }
+    .hud-top .brand {
+      font-size: 13px;
+      letter-spacing: 8px;
+      color: var(--accent);
+      opacity: 0.8;
+    }
+    .state-label {
+      margin-top: 6px;
+      font-size: 12px;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      color: #6f8aa0;
+      min-height: 16px;
+    }
+
+    .goal-panel {
+      position: fixed;
+      top: 90px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 3;
+      background: rgba(8,18,28,0.55);
+      border: 1px solid rgba(56,217,255,0.25);
+      border-radius: 14px;
+      padding: 12px 22px;
+      backdrop-filter: blur(8px);
+      text-align: center;
+      max-width: 90vw;
+      opacity: 0;
+      transition: opacity .4s;
+    }
+    .goal-panel.show { opacity: 1; }
+    .goal-panel .lbl {
+      font-size: 10px; letter-spacing: 3px; color: #5f7a90; text-transform: uppercase;
+    }
+    .goal-panel .goal-text {
+      margin-top: 4px; font-size: 18px; color: #eafaff;
+    }
+    .goal-panel .goal-amount { color: var(--accent); font-weight: 600; }
+
+    .dialog {
+      position: fixed;
+      bottom: 130px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: min(760px, 90vw);
+      z-index: 3;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      max-height: 34vh;
+      overflow: hidden;
+      -webkit-mask-image: linear-gradient(transparent, black 22%);
+      mask-image: linear-gradient(transparent, black 22%);
+    }
+    .bubble {
+      align-self: flex-start;
+      max-width: 85%;
+      padding: 10px 16px;
+      border-radius: 14px;
+      font-size: 15px;
+      line-height: 1.45;
+      animation: rise .35s ease both;
+    }
+    .bubble.user {
+      align-self: flex-end;
+      background: rgba(56,217,255,0.14);
+      border: 1px solid rgba(56,217,255,0.3);
+      color: #eafaff;
+    }
+    .bubble.jarvis {
+      background: rgba(10,22,34,0.7);
+      border: 1px solid rgba(56,217,255,0.16);
+      color: #bfe3f5;
+    }
+    .bubble.interim { opacity: .55; font-style: italic; }
+    @keyframes rise { from { opacity: 0; transform: translateY(12px);} to {opacity:1; transform:none;} }
+
+    .controls {
+      position: fixed;
+      bottom: 42px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 4;
+      display: flex;
+      align-items: center;
+      gap: 18px;
+    }
+    .mic-btn {
+      width: 68px; height: 68px;
+      border-radius: 50%;
+      border: 1px solid rgba(56,217,255,0.4);
+      background: rgba(10,26,38,0.8);
+      color: var(--accent);
+      cursor: pointer;
+      display: grid; place-items: center;
+      transition: all .2s;
+    }
+    .mic-btn:hover { background: rgba(20,44,60,0.9); }
+    .mic-btn.active {
+      background: var(--accent);
+      color: #04121a;
+      animation: micpulse 1.6s infinite;
+    }
+    @keyframes micpulse {
+      0% { box-shadow: 0 0 0 0 rgba(56,217,255,0.55); }
+      100% { box-shadow: 0 0 0 22px rgba(56,217,255,0); }
+    }
+    .mic-btn svg { width: 28px; height: 28px; }
+    .text-input {
+      background: rgba(8,18,28,0.7);
+      border: 1px solid rgba(56,217,255,0.25);
+      border-radius: 24px;
+      padding: 14px 20px;
+      color: #eafaff;
+      font-size: 15px;
+      width: min(420px, 60vw);
+      outline: none;
+    }
+    .text-input::placeholder { color: #4f6b80; }
+    .text-input:focus { border-color: var(--accent); }
+
+    .hint {
+      position: fixed;
+      bottom: 14px;
+      left: 0; right: 0;
+      text-align: center;
+      font-size: 11px;
+      color: #40566a;
+      z-index: 3;
+    }
+    .unsupported {
+      position: fixed; inset: 0; display: none;
+      align-items: center; justify-content: center;
+      background: rgba(4,7,13,0.9); z-index: 20; text-align: center; padding: 30px;
+    }
+
+    .api-overlay {
+      position: fixed; inset: 0;
+      background: rgba(4,7,13,0.97);
+      z-index: 30;
+      display: flex; align-items: center; justify-content: center;
+      flex-direction: column; gap: 18px; padding: 30px;
+      text-align: center;
+    }
+    .api-overlay h2 { color: var(--accent); letter-spacing: 4px; font-size: 18px; }
+    .api-overlay p { color: #7fa0b5; font-size: 14px; max-width: 420px; line-height: 1.6; }
+    .api-overlay input {
+      background: rgba(8,18,28,0.8);
+      border: 1px solid rgba(56,217,255,0.35);
+      border-radius: 10px;
+      padding: 14px 20px;
+      color: #eafaff;
+      font-size: 15px;
+      width: min(380px, 90vw);
+      outline: none;
+      letter-spacing: 1px;
+    }
+    .api-overlay input:focus { border-color: var(--accent); }
+    .api-overlay button {
+      background: var(--accent);
+      color: #04121a;
+      border: none;
+      border-radius: 10px;
+      padding: 13px 36px;
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+      letter-spacing: 2px;
+    }
+    .api-overlay .skip-btn {
+      background: transparent;
+      color: #4f6b80;
+      font-size: 12px;
+      padding: 6px 12px;
+      font-weight: 400;
+      letter-spacing: 1px;
+    }
+    .api-overlay .api-hint {
+      font-size: 11px; color: #3a5060;
+    }
+  </style>
+</head>
+<body>
+  <div class="hud-top">
+    <div class="brand">J · A · R · V · I · S</div>
+    <div class="state-label" id="stateLabel">Bereit</div>
+  </div>
+
+  <div class="goal-panel" id="goalPanel">
+    <div class="lbl">Aktuelles Ziel</div>
+    <div class="goal-text" id="goalText"></div>
+  </div>
+
+  <div class="stage">
+    <canvas id="orb"></canvas>
+  </div>
+
+  <div class="dialog" id="dialog"></div>
+
+  <div class="controls">
+    <input class="text-input" id="textInput" placeholder="Sag mir dein Ziel… (oder tippe hier)" />
+    <button class="mic-btn" id="micBtn" title="Sprechen">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+        <path d="M12 2a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/>
+        <path d="M5 11a7 7 0 0 0 14 0"/>
+        <line x1="12" y1="18" x2="12" y2="22"/>
+      </svg>
+    </button>
+  </div>
+
+  <div class="hint">Klicke auf den Orb oder das Mikrofon und sprich · Chrome/Edge empfohlen</div>
+
+  <div class="api-overlay" id="apiOverlay">
+    <h2>JARVIS · AKTIVIERUNG</h2>
+    <p>Gib deinen <strong style="color:#eafaff">Anthropic API Key</strong> ein, damit JARVIS mit echter KI antworten kann.<br/>
+    Der Key wird nur lokal in deinem Browser gespeichert und nirgendwo hochgeladen.</p>
+    <input type="password" id="apiKeyInput" placeholder="sk-ant-..." autocomplete="off" />
+    <button id="apiSaveBtn">JARVIS STARTEN</button>
+    <button class="skip-btn" id="apiSkipBtn">Ohne KI starten (Demo-Modus)</button>
+    <div class="api-hint">
+      Key holen: <span style="color:#38d9ff">console.anthropic.com</span> → API Keys → Create Key
+    </div>
+  </div>
+
+  <div class="unsupported" id="unsupported">
+    <div>
+      <h2 style="color:var(--accent)">Spracherkennung nicht verfügbar</h2>
+      <p style="margin-top:10px;max-width:420px;color:#9fc">Dein Browser unterstützt die Web Speech API nicht.
+      Nutze Chrome oder Edge — du kannst aber trotzdem über das Textfeld mit JARVIS sprechen.</p>
+    </div>
+  </div>
+
+  <script>
+  /* ===== ORB ===== */
+  (function () {
+    const canvas = document.getElementById('orb');
+    const ctx = canvas.getContext('2d');
+    let W = 0, H = 0, DPR = Math.min(window.devicePixelRatio || 1, 2);
+
+    const state = { mode: 'idle', audioLevel: 0, energy: 0.15, t: 0 };
+    const modeEnergy = { idle: 0.15, listening: 0.55, thinking: 0.4, speaking: 0.75 };
+    const ACCENT = { r: 56, g: 217, b: 255 };
+
+    function resize() {
+      const rect = canvas.getBoundingClientRect();
+      W = rect.width; H = rect.height;
+      canvas.width = W * DPR; canvas.height = H * DPR;
+      ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    }
+    window.addEventListener('resize', resize);
+
+    const rings = [];
+    for (let i = 0; i < 3; i++) {
+      rings.push({ radius: 0.62 + i * 0.12, speed: (i % 2 ? -1 : 1) * (0.18 + i * 0.08), dots: 40 + i * 14, tilt: 0.32 + i * 0.06 });
+    }
+
+    function draw() {
+      state.t += 0.016;
+      const target = modeEnergy[state.mode] + state.audioLevel * 0.5;
+      state.energy += (target - state.energy) * 0.08;
+      const e = state.energy;
+
+      ctx.clearRect(0, 0, W, H);
+      const cx = W / 2, cy = H / 2;
+      const base = Math.min(W, H) * 0.30;
+      const col = (a) => `rgba(${ACCENT.r},${ACCENT.g},${ACCENT.b},${a})`;
+
+      const pulse = Math.sin(state.t * 2) * 0.5 + 0.5;
+      const auraR = base * (1.7 + e * 0.6 + pulse * 0.08 * e);
+      const aura = ctx.createRadialGradient(cx, cy, base * 0.4, cx, cy, auraR);
+      aura.addColorStop(0, col(0.22 + e * 0.25));
+      aura.addColorStop(0.4, col(0.08));
+      aura.addColorStop(1, col(0));
+      ctx.fillStyle = aura;
+      ctx.fillRect(0, 0, W, H);
+
+      rings.forEach((ring) => {
+        const rr = base * ring.radius * (1 + e * 0.12);
+        for (let i = 0; i < ring.dots; i++) {
+          const a = (i / ring.dots) * Math.PI * 2 + state.t * ring.speed;
+          const x = cx + Math.cos(a) * rr;
+          const y = cy + Math.sin(a) * rr * ring.tilt + Math.sin(a * 2 + state.t) * 2;
+          const depth = (Math.sin(a) + 1) / 2;
+          const size = (0.6 + depth * 1.8) * (1 + e * 0.5);
+          ctx.beginPath();
+          ctx.arc(x, y, size, 0, Math.PI * 2);
+          ctx.fillStyle = col(0.15 + depth * 0.55);
+          ctx.fill();
+        }
+      });
+
+      const layers = 5;
+      for (let L = layers; L >= 1; L--) {
+        const lr = base * (0.55 + L * 0.06);
+        ctx.beginPath();
+        const segs = 90;
+        for (let s = 0; s <= segs; s++) {
+          const a = (s / segs) * Math.PI * 2;
+          const noise =
+            Math.sin(a * 3 + state.t * 1.5 + L) * 0.05 +
+            Math.sin(a * 5 - state.t * 2 + L * 2) * 0.04 * (1 + e);
+          const r = lr * (1 + noise * (0.4 + e));
+          const x = cx + Math.cos(a) * r;
+          const y = cy + Math.sin(a) * r;
+          s === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+        }
+        ctx.closePath();
+        ctx.strokeStyle = col(0.06 + (L / layers) * 0.14 * (1 + e));
+        ctx.lineWidth = 1.2;
+        ctx.stroke();
+      }
+
+      const coreR = base * (0.5 + e * 0.14 + pulse * 0.03);
+      const core = ctx.createRadialGradient(cx, cy - coreR * 0.2, 0, cx, cy, coreR);
+      core.addColorStop(0, `rgba(230,250,255,0.9)`);
+      core.addColorStop(0.25, col(0.85));
+      core.addColorStop(0.7, col(0.28));
+      core.addColorStop(1, col(0));
+      ctx.beginPath();
+      ctx.arc(cx, cy, coreR, 0, Math.PI * 2);
+      ctx.fillStyle = core;
+      ctx.fill();
+
+      ctx.beginPath();
+      ctx.arc(cx - coreR * 0.22, cy - coreR * 0.28, coreR * 0.5, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(255,255,255,0.10)';
+      ctx.fill();
+
+      requestAnimationFrame(draw);
+    }
+
+    resize();
+    requestAnimationFrame(draw);
+
+    window.Orb = {
+      setMode(m) { if (modeEnergy[m] != null) state.mode = m; },
+      setAudioLevel(v) { state.audioLevel = Math.max(0, Math.min(1, v)); },
+      getMode() { return state.mode; },
+    };
+  })();
+
+  /* ===== JARVIS ===== */
+  (function () {
+    const micBtn = document.getElementById('micBtn');
+    const textInput = document.getElementById('textInput');
+    const dialog = document.getElementById('dialog');
+    const stateLabel = document.getElementById('stateLabel');
+    const goalPanel = document.getElementById('goalPanel');
+    const goalText = document.getElementById('goalText');
+    const unsupported = document.getElementById('unsupported');
+    const orbCanvas = document.getElementById('orb');
+    const apiOverlay = document.getElementById('apiOverlay');
+    const apiKeyInput = document.getElementById('apiKeyInput');
+    const apiSaveBtn = document.getElementById('apiSaveBtn');
+    const apiSkipBtn = document.getElementById('apiSkipBtn');
+
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    const synth = window.speechSynthesis;
+    let recognition = null;
+    let listening = false;
+    let interimBubble = null;
+    let deVoice = null;
+    let ANTHROPIC_KEY = localStorage.getItem('jarvis_api_key') || '';
+
+    function initApiOverlay() {
+      if (ANTHROPIC_KEY) { apiOverlay.style.display = 'none'; return; }
+      apiOverlay.style.display = 'flex';
+      apiSaveBtn.addEventListener('click', () => {
+        const k = apiKeyInput.value.trim();
+        if (!k.startsWith('sk-')) { apiKeyInput.style.borderColor = '#ff5c7a'; return; }
+        ANTHROPIC_KEY = k;
+        localStorage.setItem('jarvis_api_key', k);
+        apiOverlay.style.display = 'none';
+        greetOnce();
+      });
+      apiSkipBtn.addEventListener('click', () => {
+        apiOverlay.style.display = 'none';
+        greetOnce();
+      });
+      apiKeyInput.addEventListener('keydown', e => { if (e.key === 'Enter') apiSaveBtn.click(); });
+    }
+
+    function pickVoice() {
+      const voices = synth.getVoices();
+      deVoice = voices.find(v => /de(-|_)?/i.test(v.lang) && /google|microsoft/i.test(v.name))
+             || voices.find(v => /de(-|_)?/i.test(v.lang))
+             || voices[0] || null;
+    }
+    if (synth) { pickVoice(); synth.onvoiceschanged = pickVoice; }
+
+    function speak(text) {
+      if (!synth) return;
+      synth.cancel();
+      const u = new SpeechSynthesisUtterance(text);
+      if (deVoice) u.voice = deVoice;
+      u.lang = 'de-DE'; u.rate = 1.02; u.pitch = 0.9;
+      u.onstart = () => setState('speaking');
+      u.onend = () => setState(listening ? 'listening' : 'idle');
+      synth.speak(u);
+    }
+
+    function setState(mode) {
+      window.Orb && window.Orb.setMode(mode);
+      const labels = { idle: 'Bereit', listening: 'Höre zu…', thinking: 'Verarbeite…', speaking: 'Spreche…' };
+      stateLabel.textContent = labels[mode] || '';
+    }
+
+    function addBubble(text, who, interim) {
+      const b = document.createElement('div');
+      b.className = 'bubble ' + who + (interim ? ' interim' : '');
+      b.textContent = text;
+      dialog.appendChild(b);
+      while (dialog.children.length > 10) dialog.removeChild(dialog.firstChild);
+      return b;
+    }
+
+    function jarvisSay(text) { addBubble(text, 'jarvis'); speak(text); }
+
+    const state = { goal: null };
+
+    function setGoal(displayHtml, raw, schritte, realisierbarkeit) {
+      state.goal = { displayHtml, raw, schritte: schritte || [], realisierbarkeit };
+      let html = displayHtml;
+      if (realisierbarkeit != null) {
+        html += ` <span style="font-size:11px;color:#6f8aa0;letter-spacing:2px"> · ${realisierbarkeit}% realisierbar</span>`;
+      }
+      goalText.innerHTML = html;
+      goalPanel.classList.add('show');
+    }
+
+    async function askClaude(userMessage) {
+      if (!ANTHROPIC_KEY) return null;
+      const res = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': ANTHROPIC_KEY,
+          'anthropic-version': '2023-06-01',
+          'anthropic-dangerous-direct-browser-access': 'true',
+        },
+        body: JSON.stringify({
+          model: 'claude-sonnet-4-6',
+          max_tokens: 1024,
+          system: `Du bist JARVIS, ein intelligenter KI-Assistent im Stil von Iron Man. Du antwortest kurz, präzise und auf Deutsch.
+Wenn der Nutzer ein Ziel nennt (z.B. Geld verdienen, etwas erreichen), antworte NUR mit diesem JSON (kein weiterer Text):
+{
+  "typ": "ziel",
+  "analyse": "Kurze Analyse des Ziels (1-2 Sätze)",
+  "schritte": ["Schritt 1", "Schritt 2", "Schritt 3"],
+  "realisierbarkeit": 85,
+  "antwort": "Kurze gesprochene Antwort (1-2 Sätze, direkt und motivierend)"
+}
+Bei normalen Fragen oder Gesprächen antworte mit:
+{
+  "typ": "chat",
+  "antwort": "Deine Antwort hier"
+}`,
+          messages: [{ role: 'user', content: userMessage }],
+        }),
+      });
+      if (!res.ok) {
+        if (res.status === 401) {
+          localStorage.removeItem('jarvis_api_key');
+          ANTHROPIC_KEY = '';
+          throw new Error('invalid_key');
+        }
+        throw new Error('api_error_' + res.status);
+      }
+      const data = await res.json();
+      const text = data.content?.[0]?.text || '';
+      try { return JSON.parse(text); }
+      catch { return { typ: 'chat', antwort: text }; }
+    }
+
+    function localRespond(text) {
+      const lower = text.toLowerCase();
+      const amountMatch = text.replace(/\./g, '').match(/(\d[\d\s]*)\s*(€|euro|eur)/i);
+      const amount = amountMatch ? parseInt(amountMatch[1].replace(/\s/g, ''), 10) : null;
+
+      if (/^(hallo|hey|hi|jarvis|guten)/.test(lower)) {
+        return { typ: 'chat', antwort: 'Guten Tag. Ich bin JARVIS im Demo-Modus. Füge einen API Key hinzu für echte KI-Antworten.' };
+      }
+      if (amount) {
+        return {
+          typ: 'ziel',
+          analyse: `${amount.toLocaleString('de-DE')} € ist ein erreichbares Ziel mit der richtigen Strategie.`,
+          schritte: [
+            `Freelance-Aufträge über Plattformen — ca. ${Math.ceil(amount / 50)} Aufträge à 50 €`,
+            'Digitales Produkt erstellen und mehrfach verkaufen (E-Book, Vorlage, Kurs)',
+            'Micro-Angebot definieren und 5 potenzielle Kunden direkt ansprechen',
+          ],
+          realisierbarkeit: 78,
+          antwort: `Ziel gesetzt: ${amount.toLocaleString('de-DE')} Euro. Ich habe 3 Schritte vorbereitet.`,
+        };
+      }
+      return {
+        typ: 'ziel',
+        analyse: 'Ziel aufgenommen.',
+        schritte: ['Ziel konkretisieren', 'Ersten Schritt heute umsetzen', 'Fortschritt täglich messen'],
+        realisierbarkeit: 80,
+        antwort: `Ich habe dein Ziel notiert. Sage "Plan zeigen" für die nächsten Schritte.`,
+      };
+    }
+
+    async function respond(text) {
+      setState('thinking');
+      const lower = text.toLowerCase();
+
+      if (/^(hallo|hey|hi|jarvis|guten)\b/.test(lower) && !/\d/.test(text) && !ANTHROPIC_KEY) {
+        jarvisSay('Guten Tag. Ich bin JARVIS. Nenne mir dein Ziel.');
+        return;
+      }
+      if (/^(plan|schritte|zeig)/.test(lower) && state.goal?.schritte?.length) {
+        const list = state.goal.schritte.map((s, i) => `${i + 1}. ${s}`).join('\n');
+        addBubble('Plan:\n' + list, 'jarvis');
+        speak('Hier sind deine Schritte: ' + state.goal.schritte.join('. '));
+        return;
+      }
+      if (/^(status|wie weit|fortschritt)/.test(lower)) {
+        jarvisSay(state.goal ? `Aktuelles Ziel: ${state.goal.raw}.` : 'Kein Ziel gesetzt. Nenne mir eines.');
+        return;
+      }
+      if (/^(danke|stop|ende|tschüss)/.test(lower)) {
+        jarvisSay('Immer zu Diensten. Ich stehe bereit.');
+        return;
+      }
+
+      let result;
+      try {
+        result = ANTHROPIC_KEY ? await askClaude(text) : localRespond(text);
+      } catch (err) {
+        if (err.message === 'invalid_key') {
+          jarvisSay('Der API Key ist ungültig. Bitte lade die Seite neu und gib einen gültigen Key ein.');
+        } else {
+          jarvisSay('Verbindungsfehler. Bitte versuche es erneut.');
+        }
+        setState('idle');
+        return;
+      }
+
+      if (!result) { jarvisSay('Kein API Key vorhanden. Lade die Seite neu, um einen einzugeben.'); return; }
+
+      if (result.typ === 'ziel') {
+        const amountMatch = text.replace(/\./g, '').match(/(\d[\d\s]*)\s*(€|euro|eur)/i);
+        const amount = amountMatch ? parseInt(amountMatch[1].replace(/\s/g, ''), 10) : null;
+        const displayHtml = amount
+          ? `Ziel: <span class="goal-amount">${amount.toLocaleString('de-DE')} €</span>`
+          : `Ziel: <strong style="color:#eafaff">${text.slice(0, 60)}</strong>`;
+        setGoal(displayHtml, text, result.schritte, result.realisierbarkeit);
+        if (result.analyse) addBubble('Analyse: ' + result.analyse, 'jarvis');
+        jarvisSay(result.antwort);
+        triggerN8NAction({ goal: text, amount: amount || 0, schritte: result.schritte, realisierbarkeit: result.realisierbarkeit });
+      } else {
+        jarvisSay(result.antwort);
+      }
+    }
+
+    async function triggerN8NAction(payload) {
+      try {
+        const res = await fetch('https://falca.app.n8n.cloud/webhook/jarvis-action', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        if (res.ok) {
+          const data = await res.json().catch(() => ({}));
+          if (data.message) {
+            setTimeout(() => addBubble('✓ ' + data.message, 'jarvis'), 800);
+          }
+        }
+      } catch (e) {}
+    }
+
+    function handleInput(text) {
+      text = text.trim();
+      if (!text) return;
+      addBubble(text, 'user');
+      respond(text);
+    }
+
+    let audioCtx = null, analyser = null, micData = null, rafId = null;
+    async function startMicMeter() {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const src = audioCtx.createMediaStreamSource(stream);
+        analyser = audioCtx.createAnalyser();
+        analyser.fftSize = 512;
+        src.connect(analyser);
+        micData = new Uint8Array(analyser.frequencyBinCount);
+        const tick = () => {
+          analyser.getByteFrequencyData(micData);
+          let sum = 0;
+          for (let i = 0; i < micData.length; i++) sum += micData[i];
+          window.Orb && window.Orb.setAudioLevel((sum / micData.length) / 128);
+          rafId = requestAnimationFrame(tick);
+        };
+        tick();
+      } catch (e) {}
+    }
+    function stopMicMeter() {
+      if (rafId) cancelAnimationFrame(rafId);
+      window.Orb && window.Orb.setAudioLevel(0);
+    }
+
+    function initRecognition() {
+      if (!SR) { unsupported.style.display = 'flex'; return; }
+      recognition = new SR();
+      recognition.lang = 'de-DE';
+      recognition.interimResults = true;
+      recognition.continuous = false;
+      recognition.onresult = (ev) => {
+        let interim = '', final = '';
+        for (let i = ev.resultIndex; i < ev.results.length; i++) {
+          const r = ev.results[i];
+          if (r.isFinal) final += r[0].transcript;
+          else interim += r[0].transcript;
+        }
+        if (interim) {
+          if (!interimBubble) interimBubble = addBubble(interim, 'user', true);
+          else interimBubble.textContent = interim;
+        }
+        if (final) {
+          if (interimBubble) { interimBubble.remove(); interimBubble = null; }
+          handleInput(final);
+        }
+      };
+      recognition.onend = () => {
+        if (interimBubble) { interimBubble.remove(); interimBubble = null; }
+        listening = false;
+        micBtn.classList.remove('active');
+        stopMicMeter();
+        if (window.Orb.getMode() !== 'speaking') setState('idle');
+      };
+      recognition.onerror = () => { listening = false; micBtn.classList.remove('active'); stopMicMeter(); setState('idle'); };
+    }
+
+    function toggleListen() {
+      if (apiOverlay.style.display !== 'none') return;
+      if (!recognition) { textInput.focus(); return; }
+      if (listening) { recognition.stop(); return; }
+      synth && synth.cancel();
+      listening = true;
+      micBtn.classList.add('active');
+      setState('listening');
+      startMicMeter();
+      try { recognition.start(); } catch (e) {}
+    }
+
+    micBtn.addEventListener('click', toggleListen);
+    orbCanvas.addEventListener('click', toggleListen);
+    textInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') { handleInput(textInput.value); textInput.value = ''; }
+    });
+
+    initRecognition();
+    setState('idle');
+
+    let greeted = false;
+    function greetOnce() {
+      if (greeted) return; greeted = true;
+      const mode = ANTHROPIC_KEY ? 'KI-Modus aktiv' : 'Demo-Modus';
+      jarvisSay(`Systeme online. ${mode}. Ich bin JARVIS. Wie kann ich dir heute helfen?`);
+    }
+
+    initApiOverlay();
+    if (ANTHROPIC_KEY) {
+      window.addEventListener('pointerdown', greetOnce, { once: true });
+    }
+  })();
+  </script>
+</body>
+</html>
