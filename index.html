@@ -441,8 +441,8 @@
     const WAKE_WORD_RE = /\bjarvis\b/i;
     let ANTHROPIC_KEY = localStorage.getItem('jarvis_api_key') || '';
     let ELEVEN_KEY = localStorage.getItem('jarvis_eleven_key') || '';
-    // ElevenLabs voice: "Callum" — tiefe, britisch-angehauchte Stimme im Iron-Man-JARVIS-Stil
-    const ELEVEN_VOICE_ID = 'N2lVS1w4EtoT3dr4eOWO';
+    // ElevenLabs voice: "Daniel" — klare, deutlich artikulierte britische Stimme
+    const ELEVEN_VOICE_ID = 'onwK4e9ZLuTAKqWW03F9';
 
     function initApiOverlay() {
       if (ANTHROPIC_KEY) { apiOverlay.style.display = 'none'; return; }
@@ -499,7 +499,7 @@
             body: JSON.stringify({
               text,
               model_id: 'eleven_multilingual_v2',
-              voice_settings: { stability: 0.45, similarity_boost: 0.82, style: 0.3, use_speaker_boost: true },
+              voice_settings: { stability: 0.7, similarity_boost: 0.85, style: 0.15, use_speaker_boost: true },
             }),
           });
           if (res.ok) {
