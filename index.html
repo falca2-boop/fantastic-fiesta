@@ -277,7 +277,7 @@
     </button>
   </div>
 
-  <div class="hint">Klicke auf den Orb oder das Mikrofon und sprich · Chrome/Edge empfohlen</div>
+  <div class="hint">Einmal auf den Orb klicken, dann jederzeit "Jarvis" sagen gefolgt von deinem Befehl · Chrome/Edge empfohlen</div>
 
   <div class="api-overlay" id="apiOverlay">
     <h2>JARVIS · AKTIVIERUNG</h2>
@@ -434,6 +434,11 @@
     let listening = false;
     let interimBubble = null;
     let deVoice = null;
+    let alwaysListening = false;
+    let awaitingCommand = false;
+    let awaitingTimer = null;
+    let pausedForSpeech = false;
+    const WAKE_WORD_RE = /\bjarvis\b/i;
     let ANTHROPIC_KEY = localStorage.getItem('jarvis_api_key') || '';
     let ELEVEN_KEY = localStorage.getItem('jarvis_eleven_key') || '';
     // ElevenLabs voice: "Callum" — tiefe, britisch-angehauchte Stimme im Iron-Man-JARVIS-Stil
@@ -467,7 +472,21 @@
     }
     if (synth) { pickVoice(); synth.onvoiceschanged = pickVoice; }
 
+    function pauseListeningForSpeech() {
+      if (alwaysListening && recognition) {
+        pausedForSpeech = true;
+        try { recognition.stop(); } catch (e) {}
+      }
+    }
+    function resumeListeningAfterSpeech() {
+      if (alwaysListening && pausedForSpeech) {
+        pausedForSpeech = false;
+        setTimeout(() => { try { recognition.start(); } catch (e) {} }, 300);
+      }
+    }
+
     async function speak(text) {
+      pauseListeningForSpeech();
       if (ELEVEN_KEY) {
         setState('speaking');
         try {
@@ -487,8 +506,8 @@
             const blob = await res.blob();
             const url = URL.createObjectURL(blob);
             const audio = new Audio(url);
-            audio.onended = () => { URL.revokeObjectURL(url); setState(listening ? 'listening' : 'idle'); };
-            audio.onerror = () => setState(listening ? 'listening' : 'idle');
+            audio.onended = () => { URL.revokeObjectURL(url); setState(listening ? 'listening' : 'idle'); resumeListeningAfterSpeech(); };
+            audio.onerror = () => { setState(listening ? 'listening' : 'idle'); resumeListeningAfterSpeech(); };
             audio.play();
             return;
           }
@@ -501,7 +520,7 @@
       if (deVoice) u.voice = deVoice;
       u.lang = 'de-DE'; u.rate = 1.02; u.pitch = 0.9;
       u.onstart = () => setState('speaking');
-      u.onend = () => setState(listening ? 'listening' : 'idle');
+      u.onend = () => { setState(listening ? 'listening' : 'idle'); resumeListeningAfterSpeech(); };
       synth.speak(u);
     }
 
@@ -714,7 +733,7 @@ Bei normalen Fragen oder Gesprächen antworte mit:
       recognition = new SR();
       recognition.lang = 'de-DE';
       recognition.interimResults = true;
-      recognition.continuous = false;
+      recognition.continuous = true;
       recognition.onresult = (ev) => {
         let interim = '', final = '';
         for (let i = ev.resultIndex; i < ev.results.length; i++) {
@@ -728,29 +747,73 @@ Bei normalen Fragen oder Gesprächen antworte mit:
         }
         if (final) {
           if (interimBubble) { interimBubble.remove(); interimBubble = null; }
-          handleInput(final);
+          const lower = final.toLowerCase();
+          if (awaitingCommand) {
+            clearTimeout(awaitingTimer);
+            awaitingCommand = false;
+            handleInput(final);
+          } else if (WAKE_WORD_RE.test(lower)) {
+            const remainder = final.replace(WAKE_WORD_RE, '').trim();
+            if (remainder.length > 2) {
+              handleInput(remainder);
+            } else {
+              jarvisSay('Ja?');
+              awaitingCommand = true;
+              awaitingTimer = setTimeout(() => { awaitingCommand = false; }, 7000);
+            }
+          }
+          // Kein Weckwort erkannt: Eingabe wird ignoriert (passives Zuhören)
         }
       };
       recognition.onend = () => {
         if (interimBubble) { interimBubble.remove(); interimBubble = null; }
-        listening = false;
-        micBtn.classList.remove('active');
-        stopMicMeter();
-        if (window.Orb.getMode() !== 'speaking') setState('idle');
+        if (alwaysListening && !pausedForSpeech) {
+          setTimeout(() => { try { recognition.start(); } catch (e) {} }, 300);
+          return;
+        }
+        if (!alwaysListening) {
+          listening = false;
+          micBtn.classList.remove('active');
+          stopMicMeter();
+          if (window.Orb.getMode() !== 'speaking') setState('idle');
+        }
       };
-      recognition.onerror = () => { listening = false; micBtn.classList.remove('active'); stopMicMeter(); setState('idle'); };
+      recognition.onerror = (ev) => {
+        if (ev.error === 'no-speech' || ev.error === 'aborted') return;
+        if (!alwaysListening) {
+          listening = false;
+          micBtn.classList.remove('active');
+          stopMicMeter();
+          setState('idle');
+        }
+      };
     }
 
-    function toggleListen() {
-      if (apiOverlay.style.display !== 'none') return;
-      if (!recognition) { textInput.focus(); return; }
-      if (listening) { recognition.stop(); return; }
-      synth && synth.cancel();
+    function startAlwaysListening() {
+      alwaysListening = true;
       listening = true;
       micBtn.classList.add('active');
       setState('listening');
       startMicMeter();
       try { recognition.start(); } catch (e) {}
+    }
+
+    function stopAlwaysListening() {
+      alwaysListening = false;
+      listening = false;
+      awaitingCommand = false;
+      micBtn.classList.remove('active');
+      stopMicMeter();
+      setState('idle');
+      try { recognition.stop(); } catch (e) {}
+    }
+
+    function toggleListen() {
+      if (apiOverlay.style.display !== 'none') return;
+      if (!recognition) { textInput.focus(); return; }
+      if (alwaysListening) { stopAlwaysListening(); return; }
+      synth && synth.cancel();
+      startAlwaysListening();
     }
 
     micBtn.addEventListener('click', toggleListen);
