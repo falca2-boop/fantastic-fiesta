@@ -592,7 +592,8 @@ Bei normalen Fragen oder Gesprächen antworte mit:
         throw new Error('api_error_' + res.status);
       }
       const data = await res.json();
-      const text = data.content?.[0]?.text || '';
+      let text = data.content?.[0]?.text || '';
+      text = text.trim().replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/i, '').trim();
       try { return JSON.parse(text); }
       catch { return { typ: 'chat', antwort: text }; }
     }
