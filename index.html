@@ -6,8 +6,8 @@
   <title>JARVIS</title>
   <style>
     :root {
-      --accent: #38d9ff;
-      --accent-dim: #1a6b8f;
+      --accent: #ff8c1a;
+      --accent-dim: #8f4a1a;
       --bg: #04070d;
       --danger: #ff5c7a;
       --ok: #55ffa8;
@@ -26,8 +26,8 @@
       align-items: center;
       justify-content: center;
       background:
-        radial-gradient(circle at 50% 40%, rgba(56,217,255,0.08), transparent 60%),
-        radial-gradient(circle at 50% 120%, rgba(56,217,255,0.10), transparent 55%),
+        radial-gradient(circle at 50% 40%, rgba(255,140,26,0.08), transparent 60%),
+        radial-gradient(circle at 50% 120%, rgba(255,140,26,0.10), transparent 55%),
         var(--bg);
     }
     body::before {
@@ -35,8 +35,8 @@
       position: fixed;
       inset: 0;
       background-image:
-        linear-gradient(rgba(56,217,255,0.04) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(56,217,255,0.04) 1px, transparent 1px);
+        linear-gradient(rgba(255,140,26,0.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,140,26,0.04) 1px, transparent 1px);
       background-size: 46px 46px;
       mask-image: radial-gradient(circle at 50% 45%, black, transparent 75%);
       pointer-events: none;
@@ -55,7 +55,7 @@
       width: 100%;
       height: 100%;
       cursor: pointer;
-      filter: drop-shadow(0 0 40px rgba(56,217,255,0.35));
+      filter: drop-shadow(0 0 40px rgba(255,140,26,0.35));
     }
 
     .hud-top {
@@ -88,7 +88,7 @@
       transform: translateX(-50%);
       z-index: 3;
       background: rgba(8,18,28,0.55);
-      border: 1px solid rgba(56,217,255,0.25);
+      border: 1px solid rgba(255,140,26,0.25);
       border-radius: 14px;
       padding: 12px 22px;
       backdrop-filter: blur(8px);
@@ -132,13 +132,13 @@
     }
     .bubble.user {
       align-self: flex-end;
-      background: rgba(56,217,255,0.14);
-      border: 1px solid rgba(56,217,255,0.3);
+      background: rgba(255,140,26,0.14);
+      border: 1px solid rgba(255,140,26,0.3);
       color: #eafaff;
     }
     .bubble.jarvis {
       background: rgba(10,22,34,0.7);
-      border: 1px solid rgba(56,217,255,0.16);
+      border: 1px solid rgba(255,140,26,0.16);
       color: #bfe3f5;
     }
     .bubble.interim { opacity: .55; font-style: italic; }
@@ -157,7 +157,7 @@
     .mic-btn {
       width: 68px; height: 68px;
       border-radius: 50%;
-      border: 1px solid rgba(56,217,255,0.4);
+      border: 1px solid rgba(255,140,26,0.4);
       background: rgba(10,26,38,0.8);
       color: var(--accent);
       cursor: pointer;
@@ -171,13 +171,13 @@
       animation: micpulse 1.6s infinite;
     }
     @keyframes micpulse {
-      0% { box-shadow: 0 0 0 0 rgba(56,217,255,0.55); }
-      100% { box-shadow: 0 0 0 22px rgba(56,217,255,0); }
+      0% { box-shadow: 0 0 0 0 rgba(255,140,26,0.55); }
+      100% { box-shadow: 0 0 0 22px rgba(255,140,26,0); }
     }
     .mic-btn svg { width: 28px; height: 28px; }
     .text-input {
       background: rgba(8,18,28,0.7);
-      border: 1px solid rgba(56,217,255,0.25);
+      border: 1px solid rgba(255,140,26,0.25);
       border-radius: 24px;
       padding: 14px 20px;
       color: #eafaff;
@@ -215,7 +215,7 @@
     .api-overlay p { color: #7fa0b5; font-size: 14px; max-width: 420px; line-height: 1.6; }
     .api-overlay input {
       background: rgba(8,18,28,0.8);
-      border: 1px solid rgba(56,217,255,0.35);
+      border: 1px solid rgba(255,140,26,0.35);
       border-radius: 10px;
       padding: 14px 20px;
       color: #eafaff;
@@ -286,12 +286,12 @@
       <div style="font-size:11px;color:#5f8aa0;letter-spacing:2px;margin-bottom:6px">ANTHROPIC API KEY *</div>
       <input type="password" id="apiKeyInput" placeholder="sk-ant-..." autocomplete="off" />
       <div style="font-size:11px;color:#5f8aa0;letter-spacing:2px;margin:14px 0 6px">ELEVENLABS API KEY (optional — für KI-Stimme)</div>
-      <input type="password" id="elevenKeyInput" placeholder="sk_..." autocomplete="off" style="background:rgba(8,18,28,0.8);border:1px solid rgba(56,217,255,0.35);border-radius:10px;padding:14px 20px;color:#eafaff;font-size:15px;width:100%;outline:none;letter-spacing:1px;" />
+      <input type="password" id="elevenKeyInput" placeholder="sk_..." autocomplete="off" style="background:rgba(8,18,28,0.8);border:1px solid rgba(255,140,26,0.35);border-radius:10px;padding:14px 20px;color:#eafaff;font-size:15px;width:100%;outline:none;letter-spacing:1px;" />
     </div>
     <button id="apiSaveBtn">JARVIS STARTEN</button>
     <button class="skip-btn" id="apiSkipBtn">Ohne KI starten (Demo-Modus)</button>
     <div class="api-hint">
-      Anthropic: <span style="color:#38d9ff">console.anthropic.com</span> · ElevenLabs: <span style="color:#38d9ff">elevenlabs.io</span> → Profile → API Key
+      Anthropic: <span style="color:#ff8c1a">console.anthropic.com</span> · ElevenLabs: <span style="color:#ff8c1a">elevenlabs.io</span> → Profile → API Key
     </div>
   </div>
 
@@ -312,7 +312,7 @@
 
     const state = { mode: 'idle', audioLevel: 0, energy: 0.15, t: 0 };
     const modeEnergy = { idle: 0.15, listening: 0.55, thinking: 0.4, speaking: 0.75 };
-    const ACCENT = { r: 56, g: 217, b: 255 };
+    const ACCENT = { r: 255, g: 140, b: 26 };
 
     function resize() {
       const rect = canvas.getBoundingClientRect();
