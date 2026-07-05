@@ -499,7 +499,7 @@
             body: JSON.stringify({
               text,
               model_id: 'eleven_multilingual_v2',
-              voice_settings: { stability: 0.7, similarity_boost: 0.85, style: 0.15, use_speaker_boost: true },
+              voice_settings: { stability: 0.4, similarity_boost: 0.8, style: 0.45, use_speaker_boost: true },
             }),
           });
           if (res.ok) {
@@ -566,7 +566,7 @@
         body: JSON.stringify({
           model: 'claude-sonnet-4-6',
           max_tokens: 1024,
-          system: `Du bist JARVIS, ein intelligenter KI-Assistent im Stil von Iron Man. Du antwortest kurz, präzise und auf Deutsch.
+          system: `Du bist JARVIS, ein intelligenter KI-Assistent im Stil von Iron Man. Du antwortest kurz, natürlich und auf Deutsch — locker und menschlich formuliert, wie ein vertrauter Assistent im Gespräch, nicht steif oder förmlich. Nutze Umgangssprache, kleine Füllwörter und einen warmen, direkten Ton, aber bleib klar und knapp.
 Wenn der Nutzer ein Ziel nennt (z.B. Geld verdienen, etwas erreichen), antworte NUR mit diesem JSON (kein weiterer Text):
 {
   "typ": "ziel",
