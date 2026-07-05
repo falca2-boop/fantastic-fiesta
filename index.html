@@ -599,7 +599,13 @@ WICHTIG: Deine finale Textantwort muss IMMER genau dieses JSON sein, auch nachde
       let text = textBlocks.length ? textBlocks[textBlocks.length - 1].text : '';
       text = text.trim().replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/i, '').trim();
       try { return JSON.parse(text); }
-      catch { return { typ: 'chat', antwort: text }; }
+      catch {
+        // Fallback: JSON konnte nicht geparst werden. Nie rohen JSON/Fence-Text anzeigen —
+        // versuche das "antwort"-Feld direkt herauszuziehen, sonst zeige einen generischen Satz.
+        const match = text.match(/"antwort"\s*:\s*"((?:[^"\\]|\\.)*)"/);
+        const antwort = match ? match[1].replace(/\\"/g, '"').replace(/\\n/g, ' ') : 'Entschuldige, das habe ich nicht ganz verstanden.';
+        return { typ: 'chat', antwort };
+      }
     }
 
     function localRespond(text) {
