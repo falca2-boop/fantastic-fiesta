@@ -441,8 +441,8 @@
     const WAKE_WORD_RE = /\bjarvis\b/i;
     let ANTHROPIC_KEY = localStorage.getItem('jarvis_api_key') || '';
     let ELEVEN_KEY = localStorage.getItem('jarvis_eleven_key') || '';
-    // ElevenLabs voice: "Daniel" — klare, deutlich artikulierte britische Stimme
-    const ELEVEN_VOICE_ID = 'onwK4e9ZLuTAKqWW03F9';
+    // ElevenLabs voice: "Augustin Stimme" — eigene geklonte deutsche Stimme
+    const ELEVEN_VOICE_ID = 'cLfxqXoupMWNSCPvYv4l';
 
     function initApiOverlay() {
       if (ANTHROPIC_KEY) { apiOverlay.style.display = 'none'; return; }
