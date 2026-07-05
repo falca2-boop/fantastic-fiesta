@@ -566,7 +566,9 @@
         body: JSON.stringify({
           model: 'claude-sonnet-4-6',
           max_tokens: 1024,
+          tools: [{ type: 'web_search_20250305', name: 'web_search', max_uses: 3 }],
           system: `Du bist JARVIS, ein intelligenter KI-Assistent im Stil von Iron Man. Du antwortest kurz, natürlich und auf Deutsch — locker und menschlich formuliert, wie ein vertrauter Assistent im Gespräch, nicht steif oder förmlich. Nutze Umgangssprache, kleine Füllwörter und einen warmen, direkten Ton, aber bleib klar und knapp.
+Du hast Zugriff auf eine Websuche. Nutze sie, wenn der Nutzer nach aktuellen Informationen fragt (Nachrichten, Wetter, Preise, Ereignisse, alles was sich ändern kann oder nach deinem Wissensstand liegt).
 Wenn der Nutzer ein Ziel nennt (z.B. Geld verdienen, etwas erreichen), antworte NUR mit diesem JSON (kein weiterer Text):
 {
   "typ": "ziel",
@@ -575,11 +577,12 @@ Wenn der Nutzer ein Ziel nennt (z.B. Geld verdienen, etwas erreichen), antworte 
   "realisierbarkeit": 85,
   "antwort": "Kurze gesprochene Antwort (1-2 Sätze, direkt und motivierend)"
 }
-Bei normalen Fragen oder Gesprächen antworte mit:
+Bei normalen Fragen oder Gesprächen (auch nach einer Websuche) antworte mit:
 {
   "typ": "chat",
   "antwort": "Deine Antwort hier"
-}`,
+}
+WICHTIG: Deine finale Textantwort muss IMMER genau dieses JSON sein, auch nachdem du die Websuche benutzt hast — kein Text davor oder danach.`,
           messages: [{ role: 'user', content: userMessage }],
         }),
       });
@@ -592,7 +595,8 @@ Bei normalen Fragen oder Gesprächen antworte mit:
         throw new Error('api_error_' + res.status);
       }
       const data = await res.json();
-      let text = data.content?.[0]?.text || '';
+      const textBlocks = (data.content || []).filter(b => b.type === 'text');
+      let text = textBlocks.length ? textBlocks[textBlocks.length - 1].text : '';
       text = text.trim().replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/i, '').trim();
       try { return JSON.parse(text); }
       catch { return { typ: 'chat', antwort: text }; }
