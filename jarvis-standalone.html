@@ -4,30 +4,42 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>JARVIS</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
   <style>
     :root {
-      --accent: #ff8c1a;
-      --accent-dim: #8f4a1a;
-      --bg: #04070d;
-      --danger: #ff5c7a;
-      --ok: #55ffa8;
+      --accent: #ff9d2e;         /* Arc-Reactor-Gold */
+      --accent-soft: #ffc47a;
+      --accent-deep: #7d3f0e;
+      --ember: #ff5a3c;          /* zweiter Mesh-Ton für Tiefe */
+      --bg: #060402;             /* warmes OLED-Schwarz */
+      --ink: #f3e6d6;
+      --ink-dim: #9a8574;
+      --hair: rgba(255,196,122,0.16);   /* Haarlinie statt harter Border */
+      --glass: rgba(28,18,10,0.44);
+      --ease: cubic-bezier(0.32, 0.72, 0, 1);
+      --ease-soft: cubic-bezier(0.16, 1, 0.3, 1);
     }
     * { box-sizing: border-box; margin: 0; padding: 0; }
     html, body {
       height: 100%;
       background: var(--bg);
-      color: #cfe9ff;
-      font-family: "Segoe UI", "Helvetica Neue", system-ui, sans-serif;
+      color: var(--ink);
+      font-family: "Space Grotesk", system-ui, sans-serif;
       overflow: hidden;
+      -webkit-font-smoothing: antialiased;
     }
     body {
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
+      /* Radial-Mesh: warme Glow-Orbs (Gold + Ember) auf OLED-Schwarz */
       background:
-        radial-gradient(circle at 50% 40%, rgba(255,140,26,0.08), transparent 60%),
-        radial-gradient(circle at 50% 120%, rgba(255,140,26,0.10), transparent 55%),
+        radial-gradient(60% 55% at 50% 42%, rgba(255,157,46,0.11), transparent 70%),
+        radial-gradient(45% 45% at 22% 20%, rgba(255,90,60,0.09), transparent 70%),
+        radial-gradient(55% 60% at 50% 118%, rgba(255,157,46,0.12), transparent 60%),
         var(--bg);
     }
     body::before {
@@ -35,12 +47,34 @@
       position: fixed;
       inset: 0;
       background-image:
-        linear-gradient(rgba(255,140,26,0.04) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(255,140,26,0.04) 1px, transparent 1px);
-      background-size: 46px 46px;
-      mask-image: radial-gradient(circle at 50% 45%, black, transparent 75%);
+        linear-gradient(rgba(255,157,46,0.035) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,157,46,0.035) 1px, transparent 1px);
+      background-size: 52px 52px;
+      mask-image: radial-gradient(circle at 50% 45%, black, transparent 72%);
       pointer-events: none;
+      z-index: 1;
     }
+    /* Film-Grain als fixe, nicht-interaktive Ebene */
+    body::after {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 60;
+      opacity: 0.04;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    }
+
+    .reveal {
+      opacity: 0;
+      transform: translateY(18px);
+      filter: blur(6px);
+      animation: rise-in 0.9s var(--ease-soft) forwards;
+    }
+    .reveal.d1 { animation-delay: 0.05s; }
+    .reveal.d2 { animation-delay: 0.18s; }
+    .reveal.d3 { animation-delay: 0.30s; }
+    @keyframes rise-in { to { opacity: 1; transform: none; filter: blur(0); } }
 
     .stage {
       position: relative;
@@ -55,12 +89,14 @@
       width: 100%;
       height: 100%;
       cursor: pointer;
-      filter: drop-shadow(0 0 40px rgba(255,140,26,0.35));
+      filter: drop-shadow(0 0 60px rgba(255,157,46,0.32));
+      transition: filter 0.6s var(--ease);
     }
+    .stage:hover canvas#orb { filter: drop-shadow(0 0 80px rgba(255,157,46,0.45)); }
 
     .hud-top {
       position: fixed;
-      top: 28px;
+      top: 34px;
       left: 0; right: 0;
       text-align: center;
       z-index: 3;
@@ -68,54 +104,71 @@
     }
     .hud-top .brand {
       font-size: 13px;
-      letter-spacing: 8px;
-      color: var(--accent);
-      opacity: 0.8;
+      font-weight: 500;
+      letter-spacing: 0.62em;
+      text-indent: 0.62em;
+      color: var(--accent-soft);
     }
     .state-label {
-      margin-top: 6px;
-      font-size: 12px;
-      letter-spacing: 3px;
+      display: inline-block;
+      margin-top: 12px;
+      padding: 5px 14px;
+      border-radius: 999px;
+      background: rgba(255,157,46,0.06);
+      border: 1px solid var(--hair);
+      box-shadow: inset 0 1px 1px rgba(255,255,255,0.05);
+      font-size: 10px;
+      font-weight: 500;
+      letter-spacing: 0.24em;
       text-transform: uppercase;
-      color: #6f8aa0;
-      min-height: 16px;
+      color: var(--ink-dim);
+      min-height: 22px;
     }
 
+    /* Ziel-Panel · Double-Bezel */
     .goal-panel {
       position: fixed;
-      top: 90px;
+      top: 104px;
       left: 50%;
-      transform: translateX(-50%);
+      transform: translateX(-50%) translateY(-8px);
       z-index: 3;
-      background: rgba(8,18,28,0.55);
-      border: 1px solid rgba(255,140,26,0.25);
-      border-radius: 14px;
-      padding: 12px 22px;
-      backdrop-filter: blur(8px);
-      text-align: center;
+      background: rgba(255,196,122,0.05);
+      border: 1px solid var(--hair);
+      border-radius: 24px;
+      padding: 6px;
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
       max-width: 90vw;
       opacity: 0;
-      transition: opacity .4s;
+      pointer-events: none;
+      transition: opacity 0.6s var(--ease), transform 0.6s var(--ease);
     }
-    .goal-panel.show { opacity: 1; }
+    .goal-panel.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+    .goal-panel > .core {
+      background: var(--glass);
+      border-radius: 18px;
+      padding: 14px 26px;
+      box-shadow: inset 0 1px 1px rgba(255,255,255,0.08);
+      text-align: center;
+    }
     .goal-panel .lbl {
-      font-size: 10px; letter-spacing: 3px; color: #5f7a90; text-transform: uppercase;
+      font-size: 9px; letter-spacing: 0.28em; color: var(--ink-dim); text-transform: uppercase;
     }
     .goal-panel .goal-text {
-      margin-top: 4px; font-size: 18px; color: #eafaff;
+      margin-top: 6px; font-size: 19px; color: #fff4e6;
     }
     .goal-panel .goal-amount { color: var(--accent); font-weight: 600; }
 
     .dialog {
       position: fixed;
-      bottom: 130px;
+      bottom: 138px;
       left: 50%;
       transform: translateX(-50%);
       width: min(760px, 90vw);
       z-index: 3;
       display: flex;
       flex-direction: column;
-      gap: 10px;
+      gap: 12px;
       max-height: 34vh;
       overflow: hidden;
       -webkit-mask-image: linear-gradient(transparent, black 22%);
@@ -124,152 +177,241 @@
     .bubble {
       align-self: flex-start;
       max-width: 85%;
-      padding: 10px 16px;
-      border-radius: 14px;
+      padding: 12px 18px;
+      border-radius: 20px;
       font-size: 15px;
-      line-height: 1.45;
-      animation: rise .35s ease both;
+      line-height: 1.5;
+      box-shadow: inset 0 1px 1px rgba(255,255,255,0.05);
+      animation: rise 0.5s var(--ease-soft) both;
     }
     .bubble.user {
       align-self: flex-end;
-      background: rgba(255,140,26,0.14);
-      border: 1px solid rgba(255,140,26,0.3);
-      color: #eafaff;
+      background: linear-gradient(180deg, rgba(255,157,46,0.18), rgba(255,157,46,0.09));
+      border: 1px solid rgba(255,157,46,0.3);
+      border-bottom-right-radius: 6px;
+      color: #fff4e6;
     }
     .bubble.jarvis {
-      background: rgba(10,22,34,0.7);
-      border: 1px solid rgba(255,140,26,0.16);
-      color: #bfe3f5;
+      background: var(--glass);
+      border: 1px solid var(--hair);
+      border-bottom-left-radius: 6px;
+      color: #e8d5c2;
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
     }
-    .bubble.interim { opacity: .55; font-style: italic; }
-    @keyframes rise { from { opacity: 0; transform: translateY(12px);} to {opacity:1; transform:none;} }
+    .bubble.interim { opacity: .5; font-style: italic; }
+    @keyframes rise { from { opacity: 0; transform: translateY(14px);} to {opacity:1; transform:none;} }
 
     .controls {
       position: fixed;
-      bottom: 42px;
+      bottom: 46px;
       left: 50%;
       transform: translateX(-50%);
       z-index: 4;
       display: flex;
       align-items: center;
-      gap: 18px;
+      gap: 16px;
+    }
+    .input-shell {
+      padding: 5px;
+      border-radius: 999px;
+      background: rgba(255,196,122,0.05);
+      border: 1px solid var(--hair);
+      transition: border-color 0.5s var(--ease), background 0.5s var(--ease);
+    }
+    .input-shell:focus-within {
+      border-color: rgba(255,157,46,0.42);
+      background: rgba(255,157,46,0.08);
     }
     .mic-btn {
-      width: 68px; height: 68px;
+      width: 66px; height: 66px;
       border-radius: 50%;
-      border: 1px solid rgba(255,140,26,0.4);
-      background: rgba(10,26,38,0.8);
-      color: var(--accent);
+      border: 1px solid rgba(255,157,46,0.4);
+      background: radial-gradient(120% 120% at 30% 25%, rgba(255,157,46,0.22), rgba(28,18,10,0.85));
+      color: var(--accent-soft);
       cursor: pointer;
       display: grid; place-items: center;
-      transition: all .2s;
+      box-shadow: inset 0 1px 1px rgba(255,255,255,0.12), 0 8px 30px rgba(0,0,0,0.42);
+      transition: transform 0.5s var(--ease), box-shadow 0.5s var(--ease), background 0.5s var(--ease);
     }
-    .mic-btn:hover { background: rgba(20,44,60,0.9); }
+    .mic-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: inset 0 1px 1px rgba(255,255,255,0.18), 0 14px 44px rgba(255,157,46,0.28);
+    }
+    .mic-btn:active { transform: scale(0.96); }
     .mic-btn.active {
-      background: var(--accent);
-      color: #04121a;
-      animation: micpulse 1.6s infinite;
+      background: radial-gradient(120% 120% at 30% 25%, var(--accent-soft), var(--accent-deep));
+      color: #1a0e04;
+      animation: micpulse 1.8s var(--ease) infinite;
     }
     @keyframes micpulse {
-      0% { box-shadow: 0 0 0 0 rgba(255,140,26,0.55); }
-      100% { box-shadow: 0 0 0 22px rgba(255,140,26,0); }
+      0% { box-shadow: 0 0 0 0 rgba(255,157,46,0.5); }
+      100% { box-shadow: 0 0 0 26px rgba(255,157,46,0); }
     }
-    .mic-btn svg { width: 28px; height: 28px; }
+    .mic-btn svg { width: 26px; height: 26px; transition: transform 0.5s var(--ease); }
+    .mic-btn:hover svg { transform: scale(1.08); }
     .text-input {
-      background: rgba(8,18,28,0.7);
-      border: 1px solid rgba(255,140,26,0.25);
-      border-radius: 24px;
-      padding: 14px 20px;
-      color: #eafaff;
+      background: var(--glass);
+      border: none;
+      border-radius: 999px;
+      padding: 13px 22px;
+      color: #fff4e6;
+      font-family: inherit;
       font-size: 15px;
       width: min(420px, 60vw);
       outline: none;
+      box-shadow: inset 0 1px 1px rgba(255,255,255,0.05);
     }
-    .text-input::placeholder { color: #4f6b80; }
-    .text-input:focus { border-color: var(--accent); }
+    .text-input::placeholder { color: #7a6552; }
 
     .hint {
       position: fixed;
-      bottom: 14px;
+      bottom: 16px;
       left: 0; right: 0;
       text-align: center;
-      font-size: 11px;
-      color: #40566a;
+      font-size: 10px;
+      letter-spacing: 0.1em;
+      color: #5a4838;
       z-index: 3;
     }
     .unsupported {
       position: fixed; inset: 0; display: none;
       align-items: center; justify-content: center;
-      background: rgba(4,7,13,0.9); z-index: 20; text-align: center; padding: 30px;
+      background: rgba(6,4,2,0.92); z-index: 20; text-align: center; padding: 30px;
+      backdrop-filter: blur(8px);
     }
 
+    /* API-Key-Overlay · Double-Bezel Karte */
     .api-overlay {
       position: fixed; inset: 0;
-      background: rgba(4,7,13,0.97);
+      background: rgba(6,4,2,0.86);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
       z-index: 30;
       display: flex; align-items: center; justify-content: center;
-      flex-direction: column; gap: 18px; padding: 30px;
+      padding: 24px;
+    }
+    .api-card {
+      width: min(470px, 92vw);
+      padding: 8px;
+      border-radius: 30px;
+      background: rgba(255,196,122,0.05);
+      border: 1px solid var(--hair);
+      box-shadow: 0 40px 120px rgba(0,0,0,0.6), inset 0 1px 1px rgba(255,255,255,0.06);
+    }
+    .api-card > .core {
+      background: linear-gradient(180deg, rgba(30,20,12,0.72), rgba(14,9,5,0.72));
+      border-radius: 23px;
+      box-shadow: inset 0 1px 1px rgba(255,255,255,0.07);
+      padding: 38px 32px;
+      display: flex; flex-direction: column; align-items: center; gap: 14px;
       text-align: center;
     }
-    .api-overlay h2 { color: var(--accent); letter-spacing: 4px; font-size: 18px; }
-    .api-overlay p { color: #7fa0b5; font-size: 14px; max-width: 420px; line-height: 1.6; }
-    .api-overlay input {
-      background: rgba(8,18,28,0.8);
-      border: 1px solid rgba(255,140,26,0.35);
-      border-radius: 10px;
-      padding: 14px 20px;
-      color: #eafaff;
+    .api-eyebrow {
+      padding: 5px 14px;
+      border-radius: 999px;
+      background: rgba(255,157,46,0.08);
+      border: 1px solid var(--hair);
+      font-size: 10px; font-weight: 500; letter-spacing: 0.28em;
+      text-transform: uppercase; color: var(--accent-soft);
+    }
+    .api-card h2 { color: #fff4e6; letter-spacing: 0.04em; font-size: 24px; font-weight: 600; }
+    .api-card p { color: #b39a84; font-size: 14px; max-width: 380px; line-height: 1.6; }
+    .field-group { width: 100%; text-align: left; display: flex; flex-direction: column; gap: 6px; }
+    .field-group .field-lbl {
+      font-size: 10px; color: var(--ink-dim); letter-spacing: 0.2em; text-transform: uppercase;
+    }
+    .field-group + .field-group { margin-top: 4px; }
+    .api-input {
+      background: rgba(14,9,5,0.8);
+      border: 1px solid var(--hair);
+      border-radius: 14px;
+      padding: 14px 18px;
+      color: #fff4e6;
+      font-family: inherit;
       font-size: 15px;
-      width: min(380px, 90vw);
+      width: 100%;
       outline: none;
-      letter-spacing: 1px;
+      letter-spacing: 0.04em;
+      box-shadow: inset 0 1px 1px rgba(255,255,255,0.04);
+      transition: border-color 0.5s var(--ease);
     }
-    .api-overlay input:focus { border-color: var(--accent); }
-    .api-overlay button {
-      background: var(--accent);
-      color: #04121a;
+    .api-input:focus { border-color: rgba(255,157,46,0.45); }
+    /* Primär-CTA · Button-in-Button */
+    .api-cta {
+      display: inline-flex; align-items: center; gap: 12px;
+      background: linear-gradient(180deg, var(--accent-soft), var(--accent));
+      color: #1a0e04;
       border: none;
-      border-radius: 10px;
-      padding: 13px 36px;
+      border-radius: 999px;
+      padding: 6px 8px 6px 26px;
+      font-family: inherit;
       font-size: 15px;
-      font-weight: 700;
+      font-weight: 600;
+      letter-spacing: 0.06em;
       cursor: pointer;
-      letter-spacing: 2px;
+      box-shadow: 0 10px 30px rgba(255,157,46,0.3);
+      transition: transform 0.5s var(--ease), box-shadow 0.5s var(--ease);
+      margin-top: 4px;
     }
-    .api-overlay .skip-btn {
+    .api-cta:hover { transform: translateY(-2px); box-shadow: 0 16px 44px rgba(255,157,46,0.4); }
+    .api-cta:active { transform: scale(0.98); }
+    .api-cta .chip {
+      width: 34px; height: 34px;
+      border-radius: 50%;
+      background: rgba(26,14,4,0.16);
+      display: grid; place-items: center;
+      font-size: 16px;
+      transition: transform 0.5s var(--ease);
+    }
+    .api-cta:hover .chip { transform: translate(3px, -1px) scale(1.05); }
+    .skip-btn {
       background: transparent;
-      color: #4f6b80;
+      border: none;
+      color: #6f5a48;
+      font-family: inherit;
       font-size: 12px;
-      padding: 6px 12px;
-      font-weight: 400;
-      letter-spacing: 1px;
+      padding: 4px 12px;
+      letter-spacing: 0.08em;
+      cursor: pointer;
+      transition: color 0.4s var(--ease);
     }
-    .api-overlay .api-hint {
-      font-size: 11px; color: #3a5060;
+    .skip-btn:hover { color: #c4a98e; }
+    .api-hint { font-size: 11px; color: #5a4838; letter-spacing: 0.02em; }
+    .api-hint b { color: var(--accent-soft); font-weight: 500; }
+
+    @media (max-width: 768px) {
+      .controls { flex-direction: column-reverse; gap: 14px; width: 90vw; }
+      .text-input, .input-shell { width: 100%; }
+      .goal-panel .goal-text { font-size: 17px; }
     }
   </style>
 </head>
 <body>
   <div class="hud-top">
-    <div class="brand">J · A · R · V · I · S</div>
-    <div class="state-label" id="stateLabel">Bereit</div>
+    <div class="brand reveal d1">J · A · R · V · I · S</div>
+    <div class="reveal d2"><span class="state-label" id="stateLabel">Bereit</span></div>
   </div>
 
   <div class="goal-panel" id="goalPanel">
-    <div class="lbl">Aktuelles Ziel</div>
-    <div class="goal-text" id="goalText"></div>
+    <div class="core">
+      <div class="lbl">Aktuelles Ziel</div>
+      <div class="goal-text" id="goalText"></div>
+    </div>
   </div>
 
-  <div class="stage">
+  <div class="stage reveal d2">
     <canvas id="orb"></canvas>
   </div>
 
   <div class="dialog" id="dialog"></div>
 
-  <div class="controls">
-    <input class="text-input" id="textInput" placeholder="Sag mir dein Ziel… (oder tippe hier)" />
+  <div class="controls reveal d3">
+    <div class="input-shell">
+      <input class="text-input" id="textInput" placeholder="Sag mir dein Ziel… (oder tippe hier)" />
+    </div>
     <button class="mic-btn" id="micBtn" title="Sprechen">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
         <path d="M12 2a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/>
         <path d="M5 11a7 7 0 0 0 14 0"/>
         <line x1="12" y1="18" x2="12" y2="22"/>
@@ -277,28 +419,35 @@
     </button>
   </div>
 
-  <div class="hint">Einmal auf den Orb klicken, dann jederzeit "Jarvis" sagen gefolgt von deinem Befehl · Chrome/Edge empfohlen</div>
+  <div class="hint">Einmal auf den Orb klicken, dann jederzeit „Jarvis" sagen gefolgt von deinem Befehl · Chrome/Edge empfohlen</div>
 
   <div class="api-overlay" id="apiOverlay">
-    <h2>JARVIS · AKTIVIERUNG</h2>
-    <p>Gib deine API Keys ein. Beide werden nur lokal gespeichert.</p>
-    <div style="width:min(380px,90vw);text-align:left">
-      <div style="font-size:11px;color:#5f8aa0;letter-spacing:2px;margin-bottom:6px">ANTHROPIC API KEY *</div>
-      <input type="password" id="apiKeyInput" placeholder="sk-ant-..." autocomplete="off" />
-      <div style="font-size:11px;color:#5f8aa0;letter-spacing:2px;margin:14px 0 6px">ELEVENLABS API KEY (optional — für KI-Stimme)</div>
-      <input type="password" id="elevenKeyInput" placeholder="sk_..." autocomplete="off" style="background:rgba(8,18,28,0.8);border:1px solid rgba(255,140,26,0.35);border-radius:10px;padding:14px 20px;color:#eafaff;font-size:15px;width:100%;outline:none;letter-spacing:1px;" />
-    </div>
-    <button id="apiSaveBtn">JARVIS STARTEN</button>
-    <button class="skip-btn" id="apiSkipBtn">Ohne KI starten (Demo-Modus)</button>
-    <div class="api-hint">
-      Anthropic: <span style="color:#ff8c1a">console.anthropic.com</span> · ElevenLabs: <span style="color:#ff8c1a">elevenlabs.io</span> → Profile → API Key
+    <div class="api-card">
+      <div class="core">
+        <span class="api-eyebrow">System-Aktivierung</span>
+        <h2>JARVIS online bringen</h2>
+        <p>Gib deine API Keys ein. Beide werden nur lokal in deinem Browser gespeichert.</p>
+        <div class="field-group">
+          <span class="field-lbl">Anthropic API Key *</span>
+          <input class="api-input" type="password" id="apiKeyInput" placeholder="sk-ant-..." autocomplete="off" />
+        </div>
+        <div class="field-group">
+          <span class="field-lbl">ElevenLabs API Key · optional (KI-Stimme)</span>
+          <input class="api-input" type="password" id="elevenKeyInput" placeholder="sk_..." autocomplete="off" />
+        </div>
+        <button class="api-cta" id="apiSaveBtn">JARVIS STARTEN <span class="chip">↗</span></button>
+        <button class="skip-btn" id="apiSkipBtn">Ohne KI starten · Demo-Modus</button>
+        <div class="api-hint">
+          Anthropic: <b>console.anthropic.com</b> · ElevenLabs: <b>elevenlabs.io</b> → Profile → API Key
+        </div>
+      </div>
     </div>
   </div>
 
   <div class="unsupported" id="unsupported">
     <div>
-      <h2 style="color:var(--accent)">Spracherkennung nicht verfügbar</h2>
-      <p style="margin-top:10px;max-width:420px;color:#9fc">Dein Browser unterstützt die Web Speech API nicht.
+      <h2 style="color:var(--accent-soft);font-weight:600">Spracherkennung nicht verfügbar</h2>
+      <p style="margin-top:12px;max-width:420px;color:#b39a84;line-height:1.6">Dein Browser unterstützt die Web Speech API nicht.
       Nutze Chrome oder Edge — du kannst aber trotzdem über das Textfeld mit JARVIS sprechen.</p>
     </div>
   </div>
@@ -312,7 +461,7 @@
 
     const state = { mode: 'idle', audioLevel: 0, energy: 0.15, t: 0 };
     const modeEnergy = { idle: 0.15, listening: 0.55, thinking: 0.4, speaking: 0.75 };
-    const ACCENT = { r: 255, g: 140, b: 26 };
+    const ACCENT = { r: 255, g: 157, b: 46 };
 
     function resize() {
       const rect = canvas.getBoundingClientRect();
