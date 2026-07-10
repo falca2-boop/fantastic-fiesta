@@ -5,43 +5,79 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>JARVIS</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
   <style>
     :root {
       --accent: #38d9ff;
-      --accent-dim: #1a6b8f;
-      --bg: #04070d;
-      --danger: #ff5c7a;
-      --ok: #55ffa8;
+      --accent-soft: #7ee9ff;
+      --accent-deep: #0e5f7d;
+      --violet: #6b5cff;      /* zweiter Mesh-Ton für Tiefe */
+      --bg: #030507;          /* OLED-Schwarz */
+      --ink: #dcefff;
+      --ink-dim: #6f8aa0;
+      --hair: rgba(126, 233, 255, 0.14);   /* Haarlinie statt harter Border */
+      --glass: rgba(10, 20, 30, 0.42);
+      --ease: cubic-bezier(0.32, 0.72, 0, 1);   /* Feder-Physik */
+      --ease-soft: cubic-bezier(0.16, 1, 0.3, 1);
     }
     * { box-sizing: border-box; margin: 0; padding: 0; }
     html, body {
       height: 100%;
       background: var(--bg);
-      color: #cfe9ff;
-      font-family: "Segoe UI", "Helvetica Neue", system-ui, sans-serif;
+      color: var(--ink);
+      font-family: "Space Grotesk", system-ui, sans-serif;
       overflow: hidden;
+      -webkit-font-smoothing: antialiased;
     }
     body {
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
+      /* Radial-Mesh: zwei Glow-Orbs (Cyan + Violett) auf OLED-Schwarz */
       background:
-        radial-gradient(circle at 50% 40%, rgba(56,217,255,0.08), transparent 60%),
-        radial-gradient(circle at 50% 120%, rgba(56,217,255,0.10), transparent 55%),
+        radial-gradient(60% 55% at 50% 42%, rgba(56,217,255,0.10), transparent 70%),
+        radial-gradient(45% 45% at 78% 18%, rgba(107,92,255,0.10), transparent 70%),
+        radial-gradient(55% 60% at 50% 118%, rgba(56,217,255,0.12), transparent 60%),
         var(--bg);
     }
-    /* subtle grid */
+    /* feines technisches Raster, weich ausmaskiert */
     body::before {
       content: "";
       position: fixed;
       inset: 0;
       background-image:
-        linear-gradient(rgba(56,217,255,0.04) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(56,217,255,0.04) 1px, transparent 1px);
-      background-size: 46px 46px;
-      mask-image: radial-gradient(circle at 50% 45%, black, transparent 75%);
+        linear-gradient(rgba(56,217,255,0.035) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(56,217,255,0.035) 1px, transparent 1px);
+      background-size: 52px 52px;
+      mask-image: radial-gradient(circle at 50% 45%, black, transparent 72%);
       pointer-events: none;
+      z-index: 1;
+    }
+    /* Film-Grain als fixe, nicht-interaktive Ebene (Performance-Guardrail) */
+    body::after {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 60;
+      opacity: 0.035;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    }
+
+    /* Sanfte Erst-Einblendung, gestaffelt */
+    .reveal {
+      opacity: 0;
+      transform: translateY(18px);
+      filter: blur(6px);
+      animation: rise-in 0.9s var(--ease-soft) forwards;
+    }
+    .reveal.d1 { animation-delay: 0.05s; }
+    .reveal.d2 { animation-delay: 0.18s; }
+    .reveal.d3 { animation-delay: 0.30s; }
+    @keyframes rise-in {
+      to { opacity: 1; transform: none; filter: blur(0); }
     }
 
     .stage {
@@ -57,12 +93,15 @@
       width: 100%;
       height: 100%;
       cursor: pointer;
-      filter: drop-shadow(0 0 40px rgba(56,217,255,0.35));
+      filter: drop-shadow(0 0 60px rgba(56,217,255,0.30));
+      transition: filter 0.6s var(--ease);
     }
+    .stage:hover canvas#orb { filter: drop-shadow(0 0 80px rgba(56,217,255,0.42)); }
 
+    /* ---- HUD oben ---- */
     .hud-top {
       position: fixed;
-      top: 28px;
+      top: 34px;
       left: 0; right: 0;
       text-align: center;
       z-index: 3;
@@ -70,56 +109,78 @@
     }
     .hud-top .brand {
       font-size: 13px;
-      letter-spacing: 8px;
-      color: var(--accent);
-      opacity: 0.8;
+      font-weight: 500;
+      letter-spacing: 0.62em;
+      color: var(--accent-soft);
+      text-indent: 0.62em;   /* letzten Tracking-Space ausgleichen */
     }
+    /* Eyebrow-Statuspille */
     .state-label {
-      margin-top: 6px;
-      font-size: 12px;
-      letter-spacing: 3px;
+      display: inline-block;
+      margin-top: 12px;
+      padding: 5px 14px;
+      border-radius: 999px;
+      background: rgba(56,217,255,0.06);
+      border: 1px solid var(--hair);
+      box-shadow: inset 0 1px 1px rgba(255,255,255,0.06);
+      font-size: 10px;
+      font-weight: 500;
+      letter-spacing: 0.24em;
       text-transform: uppercase;
-      color: #6f8aa0;
-      min-height: 16px;
+      color: var(--ink-dim);
+      min-height: 22px;
     }
 
-    /* Goal panel */
+    /* ---- Ziel-Panel · Double-Bezel ---- */
     .goal-panel {
       position: fixed;
-      top: 90px;
+      top: 104px;
       left: 50%;
-      transform: translateX(-50%);
+      transform: translateX(-50%) translateY(-8px);
       z-index: 3;
-      background: rgba(8,18,28,0.55);
-      border: 1px solid rgba(56,217,255,0.25);
-      border-radius: 14px;
-      padding: 12px 22px;
-      backdrop-filter: blur(8px);
-      text-align: center;
+      /* Äußere Schale */
+      background: rgba(126,233,255,0.05);
+      border: 1px solid var(--hair);
+      border-radius: 24px;
+      padding: 6px;
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
       max-width: 90vw;
       opacity: 0;
-      transition: opacity .4s;
+      pointer-events: none;
+      transition: opacity 0.6s var(--ease), transform 0.6s var(--ease);
     }
-    .goal-panel.show { opacity: 1; }
+    .goal-panel.show {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+    .goal-panel > .core {
+      /* Innerer Kern — eigenes BG, Innen-Highlight, konzentrischer Radius */
+      background: var(--glass);
+      border-radius: 18px;
+      padding: 14px 26px;
+      box-shadow: inset 0 1px 1px rgba(255,255,255,0.10);
+      text-align: center;
+    }
     .goal-panel .lbl {
-      font-size: 10px; letter-spacing: 3px; color: #5f7a90; text-transform: uppercase;
+      font-size: 9px; letter-spacing: 0.28em; color: var(--ink-dim); text-transform: uppercase;
     }
     .goal-panel .goal-text {
-      margin-top: 4px; font-size: 18px; color: #eafaff;
+      margin-top: 6px; font-size: 19px; font-weight: 400; color: #eafaff;
     }
     .goal-panel .goal-amount { color: var(--accent); font-weight: 600; }
 
-    /* Transcript / dialog */
+    /* ---- Dialog / Transkript ---- */
     .dialog {
       position: fixed;
-      bottom: 130px;
+      bottom: 138px;
       left: 50%;
       transform: translateX(-50%);
       width: min(760px, 90vw);
       z-index: 3;
       display: flex;
       flex-direction: column;
-      gap: 10px;
+      gap: 12px;
       max-height: 34vh;
       overflow: hidden;
       -webkit-mask-image: linear-gradient(transparent, black 22%);
@@ -128,156 +189,250 @@
     .bubble {
       align-self: flex-start;
       max-width: 85%;
-      padding: 10px 16px;
-      border-radius: 14px;
+      padding: 12px 18px;
+      border-radius: 20px;
       font-size: 15px;
-      line-height: 1.45;
-      animation: rise .35s ease both;
+      line-height: 1.5;
+      box-shadow: inset 0 1px 1px rgba(255,255,255,0.05);
+      animation: rise 0.5s var(--ease-soft) both;
     }
     .bubble.user {
       align-self: flex-end;
-      background: rgba(56,217,255,0.14);
-      border: 1px solid rgba(56,217,255,0.3);
+      background: linear-gradient(180deg, rgba(56,217,255,0.16), rgba(56,217,255,0.08));
+      border: 1px solid rgba(56,217,255,0.28);
+      border-bottom-right-radius: 6px;
       color: #eafaff;
     }
     .bubble.jarvis {
-      background: rgba(10,22,34,0.7);
-      border: 1px solid rgba(56,217,255,0.16);
-      color: #bfe3f5;
+      background: var(--glass);
+      border: 1px solid var(--hair);
+      border-bottom-left-radius: 6px;
+      color: #c6e6f7;
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
     }
-    .bubble.interim { opacity: .55; font-style: italic; }
-    @keyframes rise { from { opacity: 0; transform: translateY(12px);} to {opacity:1; transform:none;} }
+    .bubble.interim { opacity: 0.5; font-style: italic; }
+    @keyframes rise { from { opacity: 0; transform: translateY(14px);} to {opacity:1; transform:none;} }
 
-    /* Controls */
+    /* ---- Steuerung ---- */
     .controls {
       position: fixed;
-      bottom: 42px;
+      bottom: 46px;
       left: 50%;
       transform: translateX(-50%);
       z-index: 4;
       display: flex;
       align-items: center;
-      gap: 18px;
+      gap: 16px;
     }
-    .mic-btn {
-      width: 68px; height: 68px;
-      border-radius: 50%;
-      border: 1px solid rgba(56,217,255,0.4);
-      background: rgba(10,26,38,0.8);
-      color: var(--accent);
-      cursor: pointer;
-      display: grid; place-items: center;
-      transition: all .2s;
-      position: relative;
+    /* Text-Input · Double-Bezel Pill */
+    .input-shell {
+      padding: 5px;
+      border-radius: 999px;
+      background: rgba(126,233,255,0.05);
+      border: 1px solid var(--hair);
+      transition: border-color 0.5s var(--ease), background 0.5s var(--ease);
     }
-    .mic-btn:hover { background: rgba(20,44,60,0.9); }
-    .mic-btn.active {
-      background: var(--accent);
-      color: #04121a;
-      box-shadow: 0 0 0 0 rgba(56,217,255,0.6);
-      animation: micpulse 1.6s infinite;
+    .input-shell:focus-within {
+      border-color: rgba(56,217,255,0.4);
+      background: rgba(56,217,255,0.08);
     }
-    @keyframes micpulse {
-      0% { box-shadow: 0 0 0 0 rgba(56,217,255,0.55); }
-      100% { box-shadow: 0 0 0 22px rgba(56,217,255,0); }
-    }
-    .mic-btn svg { width: 28px; height: 28px; }
     .text-input {
-      background: rgba(8,18,28,0.7);
-      border: 1px solid rgba(56,217,255,0.25);
-      border-radius: 24px;
-      padding: 14px 20px;
+      background: var(--glass);
+      border: none;
+      border-radius: 999px;
+      padding: 13px 22px;
       color: #eafaff;
+      font-family: inherit;
       font-size: 15px;
       width: min(420px, 60vw);
       outline: none;
+      box-shadow: inset 0 1px 1px rgba(255,255,255,0.06);
     }
     .text-input::placeholder { color: #4f6b80; }
-    .text-input:focus { border-color: var(--accent); }
+
+    .mic-btn {
+      width: 66px; height: 66px;
+      border-radius: 50%;
+      border: 1px solid rgba(56,217,255,0.35);
+      background:
+        radial-gradient(120% 120% at 30% 25%, rgba(56,217,255,0.20), rgba(10,26,38,0.85));
+      color: var(--accent-soft);
+      cursor: pointer;
+      display: grid; place-items: center;
+      box-shadow: inset 0 1px 1px rgba(255,255,255,0.12), 0 8px 30px rgba(0,0,0,0.4);
+      transition: transform 0.5s var(--ease), background 0.5s var(--ease), box-shadow 0.5s var(--ease);
+      position: relative;
+    }
+    .mic-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: inset 0 1px 1px rgba(255,255,255,0.18), 0 14px 44px rgba(56,217,255,0.28);
+    }
+    .mic-btn:active { transform: scale(0.96); }
+    .mic-btn.active {
+      background: radial-gradient(120% 120% at 30% 25%, var(--accent-soft), var(--accent-deep));
+      color: #04121a;
+      animation: micpulse 1.8s var(--ease) infinite;
+    }
+    @keyframes micpulse {
+      0% { box-shadow: 0 0 0 0 rgba(56,217,255,0.5); }
+      100% { box-shadow: 0 0 0 26px rgba(56,217,255,0); }
+    }
+    .mic-btn svg {
+      width: 26px; height: 26px;
+      transition: transform 0.5s var(--ease);
+    }
+    .mic-btn:hover svg { transform: scale(1.08); }
 
     .hint {
       position: fixed;
-      bottom: 14px;
+      bottom: 16px;
       left: 0; right: 0;
       text-align: center;
-      font-size: 11px;
-      color: #40566a;
+      font-size: 10px;
+      letter-spacing: 0.12em;
+      color: #3a5064;
       z-index: 3;
     }
     .unsupported {
       position: fixed; inset: 0; display: none;
       align-items: center; justify-content: center;
-      background: rgba(4,7,13,0.9); z-index: 20; text-align: center; padding: 30px;
+      background: rgba(3,5,7,0.92); z-index: 20; text-align: center; padding: 30px;
+      backdrop-filter: blur(8px);
     }
 
-    /* API Key Setup */
+    /* ---- API-Key-Overlay · Double-Bezel Karte ---- */
     .api-overlay {
       position: fixed; inset: 0;
-      background: rgba(4,7,13,0.97);
+      background: rgba(3,5,7,0.86);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
       z-index: 30;
       display: flex; align-items: center; justify-content: center;
-      flex-direction: column; gap: 18px; padding: 30px;
+      padding: 24px;
+    }
+    .api-card {
+      /* Äußere Schale */
+      width: min(460px, 92vw);
+      padding: 8px;
+      border-radius: 30px;
+      background: rgba(126,233,255,0.05);
+      border: 1px solid var(--hair);
+      box-shadow: 0 40px 120px rgba(0,0,0,0.6), inset 0 1px 1px rgba(255,255,255,0.06);
+    }
+    .api-card > .core {
+      /* Innerer Kern */
+      background: linear-gradient(180deg, rgba(12,22,32,0.7), rgba(6,12,18,0.7));
+      border-radius: 23px;
+      box-shadow: inset 0 1px 1px rgba(255,255,255,0.08);
+      padding: 40px 34px;
+      display: flex; flex-direction: column; align-items: center; gap: 16px;
       text-align: center;
     }
-    .api-overlay h2 { color: var(--accent); letter-spacing: 4px; font-size: 18px; }
-    .api-overlay p { color: #7fa0b5; font-size: 14px; max-width: 420px; line-height: 1.6; }
-    .api-overlay input {
-      background: rgba(8,18,28,0.8);
-      border: 1px solid rgba(56,217,255,0.35);
-      border-radius: 10px;
-      padding: 14px 20px;
-      color: #eafaff;
-      font-size: 15px;
-      width: min(380px, 90vw);
-      outline: none;
-      letter-spacing: 1px;
+    .api-eyebrow {
+      padding: 5px 14px;
+      border-radius: 999px;
+      background: rgba(56,217,255,0.08);
+      border: 1px solid var(--hair);
+      font-size: 10px; font-weight: 500; letter-spacing: 0.28em;
+      text-transform: uppercase; color: var(--accent-soft);
     }
-    .api-overlay input:focus { border-color: var(--accent); }
-    .api-overlay button {
-      background: var(--accent);
+    .api-card h2 {
+      color: #eafaff; letter-spacing: 0.04em; font-size: 24px; font-weight: 600;
+    }
+    .api-card p { color: #8fb0c5; font-size: 14px; max-width: 380px; line-height: 1.65; }
+    .api-card input {
+      background: rgba(6,14,22,0.8);
+      border: 1px solid var(--hair);
+      border-radius: 14px;
+      padding: 15px 20px;
+      color: #eafaff;
+      font-family: inherit;
+      font-size: 15px;
+      width: 100%;
+      outline: none;
+      letter-spacing: 0.04em;
+      box-shadow: inset 0 1px 1px rgba(255,255,255,0.05);
+      transition: border-color 0.5s var(--ease);
+    }
+    .api-card input:focus { border-color: rgba(56,217,255,0.45); }
+    /* Primär-CTA · Button-in-Button */
+    .api-cta {
+      display: inline-flex; align-items: center; gap: 12px;
+      background: linear-gradient(180deg, var(--accent-soft), var(--accent));
       color: #04121a;
       border: none;
-      border-radius: 10px;
-      padding: 13px 36px;
+      border-radius: 999px;
+      padding: 6px 8px 6px 26px;
+      font-family: inherit;
       font-size: 15px;
-      font-weight: 700;
+      font-weight: 600;
+      letter-spacing: 0.06em;
       cursor: pointer;
-      letter-spacing: 2px;
+      box-shadow: 0 10px 30px rgba(56,217,255,0.3);
+      transition: transform 0.5s var(--ease), box-shadow 0.5s var(--ease);
     }
-    .api-overlay .skip-btn {
+    .api-cta:hover { transform: translateY(-2px); box-shadow: 0 16px 44px rgba(56,217,255,0.4); }
+    .api-cta:active { transform: scale(0.98); }
+    .api-cta .chip {
+      width: 34px; height: 34px;
+      border-radius: 50%;
+      background: rgba(4,18,26,0.16);
+      display: grid; place-items: center;
+      font-size: 16px;
+      transition: transform 0.5s var(--ease);
+    }
+    .api-cta:hover .chip { transform: translate(3px, -1px) scale(1.05); }
+    .skip-btn {
       background: transparent;
-      color: #4f6b80;
+      border: none;
+      color: #567488;
+      font-family: inherit;
       font-size: 12px;
       padding: 6px 12px;
-      font-weight: 400;
-      letter-spacing: 1px;
+      letter-spacing: 0.08em;
+      cursor: pointer;
+      transition: color 0.4s var(--ease);
     }
-    .api-overlay .api-hint {
-      font-size: 11px; color: #3a5060;
+    .skip-btn:hover { color: #9fc4d8; }
+    .api-hint {
+      font-size: 11px; color: #3a5060; letter-spacing: 0.02em;
+    }
+    .api-hint b { color: var(--accent-soft); font-weight: 500; }
+
+    @media (max-width: 768px) {
+      .controls { flex-direction: column-reverse; gap: 14px; width: 90vw; }
+      .text-input { width: 100%; }
+      .input-shell { width: 100%; }
+      .goal-panel .goal-text { font-size: 17px; }
     }
   </style>
 </head>
 <body>
   <div class="hud-top">
-    <div class="brand">J · A · R · V · I · S</div>
-    <div class="state-label" id="stateLabel">Bereit</div>
+    <div class="brand reveal d1">J · A · R · V · I · S</div>
+    <div class="reveal d2"><span class="state-label" id="stateLabel">Bereit</span></div>
   </div>
 
   <div class="goal-panel" id="goalPanel">
-    <div class="lbl">Aktuelles Ziel</div>
-    <div class="goal-text" id="goalText"></div>
+    <div class="core">
+      <div class="lbl">Aktuelles Ziel</div>
+      <div class="goal-text" id="goalText"></div>
+    </div>
   </div>
 
-  <div class="stage">
+  <div class="stage reveal d2">
     <canvas id="orb"></canvas>
   </div>
 
   <div class="dialog" id="dialog"></div>
 
-  <div class="controls">
-    <input class="text-input" id="textInput" placeholder="Sag mir dein Ziel… (oder tippe hier)" />
+  <div class="controls reveal d3">
+    <div class="input-shell">
+      <input class="text-input" id="textInput" placeholder="Sag mir dein Ziel… (oder tippe hier)" />
+    </div>
     <button class="mic-btn" id="micBtn" title="Sprechen">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
         <path d="M12 2a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/>
         <path d="M5 11a7 7 0 0 0 14 0"/>
         <line x1="12" y1="18" x2="12" y2="22"/>
@@ -289,21 +444,26 @@
 
   <!-- API Key Setup Overlay -->
   <div class="api-overlay" id="apiOverlay">
-    <h2>JARVIS · AKTIVIERUNG</h2>
-    <p>Gib deinen <strong style="color:#eafaff">Anthropic API Key</strong> ein, damit JARVIS mit echter KI antworten kann.<br/>
-    Der Key wird nur lokal in deinem Browser gespeichert und nirgendwo hochgeladen.</p>
-    <input type="password" id="apiKeyInput" placeholder="sk-ant-..." autocomplete="off" />
-    <button id="apiSaveBtn">JARVIS STARTEN</button>
-    <button class="skip-btn" id="apiSkipBtn">Ohne KI starten (Demo-Modus)</button>
-    <div class="api-hint">
-      Key holen: <span style="color:#38d9ff">console.anthropic.com</span> → API Keys → Create Key
+    <div class="api-card">
+      <div class="core">
+        <span class="api-eyebrow">System-Aktivierung</span>
+        <h2>JARVIS online bringen</h2>
+        <p>Gib deinen <strong style="color:#eafaff">Anthropic API Key</strong> ein, damit JARVIS mit echter KI antwortet.
+        Der Key wird nur lokal in deinem Browser gespeichert und nirgendwo hochgeladen.</p>
+        <input type="password" id="apiKeyInput" placeholder="sk-ant-..." autocomplete="off" />
+        <button class="api-cta" id="apiSaveBtn">JARVIS STARTEN <span class="chip">↗</span></button>
+        <button class="skip-btn" id="apiSkipBtn">Ohne KI starten · Demo-Modus</button>
+        <div class="api-hint">
+          Key holen: <b>console.anthropic.com</b> → API Keys → Create Key
+        </div>
+      </div>
     </div>
   </div>
 
   <div class="unsupported" id="unsupported">
     <div>
-      <h2 style="color:var(--accent)">Spracherkennung nicht verfügbar</h2>
-      <p style="margin-top:10px;max-width:420px;color:#9fc">Dein Browser unterstützt die Web Speech API nicht.
+      <h2 style="color:var(--accent-soft);font-weight:600">Spracherkennung nicht verfügbar</h2>
+      <p style="margin-top:12px;max-width:420px;color:#8fb0c5;line-height:1.6">Dein Browser unterstützt die Web Speech API nicht.
       Nutze Chrome oder Edge — du kannst aber trotzdem über das Textfeld mit JARVIS sprechen.</p>
     </div>
   </div>
