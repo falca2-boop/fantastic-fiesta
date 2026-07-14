@@ -149,8 +149,13 @@
     };
   }
 
-  // ---------- Ziel-Panel ----------
-  const state = { goal: null };
+  // ---------- Ziel-Panel & Gedächtnis ----------
+  const state = { goal: null, history: [] };
+
+  function pushHistory(role, content) {
+    state.history.push({ role, content });
+    if (state.history.length > 20) state.history.splice(0, state.history.length - 20);
+  }
 
   function setGoal(displayHtml, raw, schritte, realisierbarkeit) {
     state.goal = { displayHtml, raw, schritte: schritte || [], realisierbarkeit };
@@ -162,9 +167,37 @@
     goalPanel.classList.add('show');
   }
 
-  // ---------- Claude direkt ----------
+  // ---------- Thinking-Bubble ----------
+  function addThinkingBubble() {
+    const b = document.createElement('div');
+    b.className = 'bubble thinking-bubble';
+    b.innerHTML = `<div class="think-header">
+      <span class="think-dot"></span><span class="think-dot"></span><span class="think-dot"></span>
+      <span>Gehirn denkt…</span>
+    </div><div class="think-text"></div>`;
+    b.addEventListener('click', () => b.classList.toggle('expanded'));
+    dialog.appendChild(b);
+    while (dialog.children.length > 12) dialog.removeChild(dialog.firstChild);
+    return b;
+  }
+
+  function finalizeThinkingBubble(bubble, thoughts) {
+    if (!thoughts) { bubble.remove(); return; }
+    const textEl = bubble.querySelector('.think-text');
+    const header = bubble.querySelector('.think-header span:last-child');
+    header.textContent = 'Gedanken (klicken zum Aufklappen)';
+    textEl.textContent = thoughts.slice(0, 600) + (thoughts.length > 600 ? '…' : '');
+    bubble.querySelector('.think-dot').style.animation = 'none';
+    bubble.querySelectorAll('.think-dot').forEach(d => d.style.animation = 'none');
+  }
+
+  // ---------- Claude direkt (mit Extended Thinking + History) ----------
   async function askClaude(userMessage) {
     if (!ANTHROPIC_KEY) return null;
+
+    // History aufbauen: alle bisherigen Turns + aktuelle Nachricht
+    const messages = [...state.history, { role: 'user', content: userMessage }];
+
     const res = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
@@ -175,12 +208,16 @@
       },
       body: JSON.stringify({
         model: 'claude-sonnet-4-6',
-        max_tokens: 1024,
-        system: `Du bist JARVIS, ein intelligenter KI-Assistent im Stil von Iron Man. Du antwortest kurz, präzise und auf Deutsch.
+        max_tokens: 6000,
+        thinking: { type: 'enabled', budget_tokens: 5000 },
+        system: `Du bist JARVIS, ein hochintelligenter KI-Assistent im Stil von Iron Man. Du denkst wie ein Gehirn: du erinnerst dich an frühere Aussagen im Gespräch, ziehst Schlüsse aus dem Kontext, und gibst präzise, kontextbewusste Antworten auf Deutsch.
+
+Wenn du auf frühere Informationen aus dem Gespräch zurückgreifst, weise aktiv darauf hin (z.B. "Du hast vorhin erwähnt…").
+
 Wenn der Nutzer ein Ziel nennt (z.B. Geld verdienen, etwas erreichen), antworte NUR mit diesem JSON (kein weiterer Text):
 {
   "typ": "ziel",
-  "analyse": "Kurze Analyse des Ziels (1-2 Sätze)",
+  "analyse": "Kurze Analyse des Ziels (1-2 Sätze, berücksichtige den bisherigen Gesprächskontext)",
   "schritte": ["Schritt 1", "Schritt 2", "Schritt 3"],
   "realisierbarkeit": 85,
   "antwort": "Kurze gesprochene Antwort (1-2 Sätze, direkt und motivierend)"
@@ -188,9 +225,9 @@ Wenn der Nutzer ein Ziel nennt (z.B. Geld verdienen, etwas erreichen), antworte 
 Bei normalen Fragen oder Gesprächen antworte mit:
 {
   "typ": "chat",
-  "antwort": "Deine Antwort hier"
+  "antwort": "Deine Antwort hier (berücksichtige den bisherigen Gesprächskontext)"
 }`,
-        messages: [{ role: 'user', content: userMessage }],
+        messages,
       }),
     });
     if (!res.ok) {
@@ -202,9 +239,20 @@ Bei normalen Fragen oder Gesprächen antworte mit:
       throw new Error('api_error_' + res.status);
     }
     const data = await res.json();
-    const text = data.content?.[0]?.text || '';
-    try { return JSON.parse(text); }
-    catch { return { typ: 'chat', antwort: text }; }
+
+    // Thinking-Block und Text-Block aus der Response extrahieren
+    let thinkingText = null;
+    let answerText = '';
+    for (const block of data.content || []) {
+      if (block.type === 'thinking') thinkingText = block.thinking;
+      if (block.type === 'text') answerText += block.text;
+    }
+
+    let parsed;
+    try { parsed = JSON.parse(answerText); }
+    catch { parsed = { typ: 'chat', antwort: answerText }; }
+    parsed._thinking = thinkingText;
+    return parsed;
   }
 
   // ---------- Lokaler Demo-Modus Fallback ----------
@@ -263,15 +311,22 @@ Bei normalen Fragen oder Gesprächen antworte mit:
       return;
     }
 
-    // n8n (echte Aktionen) → Claude → Demo, in dieser Reihenfolge
+    // n8n (echte Aktionen) → Claude (mit Thinking + History) → Demo
     let result;
+    let thinkBubble = null;
     try {
       try {
         result = await askN8n(text);
       } catch (n8nErr) {
-        result = ANTHROPIC_KEY ? await askClaude(text) : localRespond(text);
+        if (ANTHROPIC_KEY) {
+          thinkBubble = addThinkingBubble();
+          result = await askClaude(text);
+        } else {
+          result = localRespond(text);
+        }
       }
     } catch (err) {
+      if (thinkBubble) thinkBubble.remove();
       if (err.message === 'invalid_key') {
         jarvisSay('Der API Key ist ungültig. Bitte lade die Seite neu und gib einen gültigen Key ein.');
       } else {
@@ -282,6 +337,9 @@ Bei normalen Fragen oder Gesprächen antworte mit:
     }
 
     if (!result) { jarvisSay('Kein API Key vorhanden. Lade die Seite neu, um einen einzugeben.'); return; }
+
+    // Thinking-Bubble finalisieren
+    if (thinkBubble) finalizeThinkingBubble(thinkBubble, result._thinking || null);
 
     if (result.typ === 'ziel') {
       const amountMatch = text.replace(/\./g, '').match(/(\d[\d\s]*)\s*(€|euro|eur)/i);
@@ -298,12 +356,16 @@ Bei normalen Fragen oder Gesprächen antworte mit:
     } else {
       jarvisSay(result.antwort);
     }
+
+    // Antwort ins Gedächtnis speichern
+    pushHistory('assistant', result.antwort);
   }
 
   function handleInput(text) {
     text = text.trim();
     if (!text) return;
     addBubble(text, 'user');
+    pushHistory('user', text);
     respond(text);
   }
 
