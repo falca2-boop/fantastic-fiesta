@@ -10,29 +10,13 @@ import {
   cancelRender,
   delayRender,
 } from "remotion";
+import { Video } from "@remotion/media";
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { createTikTokStyleCaptions } from "@remotion/captions";
 import type { Caption } from "@remotion/captions";
 import { CaptionPage } from "./CaptionPage";
 
-const SWITCH_CAPTIONS_EVERY_MS = 1500;
-
-const Background: React.FC = () => {
-  const frame = useCurrentFrame();
-
-  const gradientShift = interpolate(frame, [0, 300], [0, 20], {
-    extrapolateRight: "clamp",
-    easing: Easing.bezier(0.4, 0, 0.6, 1),
-  });
-
-  return (
-    <AbsoluteFill
-      style={{
-        background: `linear-gradient(${135 + gradientShift}deg, #1a1a2e 0%, #16213e 40%, #0f3460 100%)`,
-      }}
-    />
-  );
-};
+const SWITCH_MS = 1500;
 
 const DIYLabel: React.FC = () => {
   const frame = useCurrentFrame();
@@ -53,6 +37,7 @@ const DIYLabel: React.FC = () => {
         justifyContent: "flex-start",
         alignItems: "center",
         paddingTop: 100,
+        pointerEvents: "none",
       }}
     >
       <div
@@ -75,6 +60,16 @@ const DIYLabel: React.FC = () => {
     </AbsoluteFill>
   );
 };
+
+// Dark overlay so captions stay readable over any video
+const VideoOverlay: React.FC = () => (
+  <AbsoluteFill
+    style={{
+      background:
+        "linear-gradient(to bottom, rgba(0,0,0,0.35) 0%, rgba(0,0,0,0.1) 40%, rgba(0,0,0,0.55) 100%)",
+    }}
+  />
+);
 
 export const DIYVideo: React.FC = () => {
   const [captions, setCaptions] = useState<Caption[] | null>(null);
@@ -100,15 +95,27 @@ export const DIYVideo: React.FC = () => {
     if (!captions) return { pages: [] };
     return createTikTokStyleCaptions({
       captions,
-      combineTokensWithinMilliseconds: SWITCH_CAPTIONS_EVERY_MS,
+      combineTokensWithinMilliseconds: SWITCH_MS,
     });
   }, [captions]);
 
   return (
-    <AbsoluteFill style={{ backgroundColor: "#1a1a2e" }}>
-      <Background />
+    <AbsoluteFill style={{ backgroundColor: "#0f1923" }}>
+      {/* Background video — loop so it fills the full 60s */}
+      <Video
+        src={staticFile("video.mp4")}
+        style={{ width: "100%", height: "100%", objectFit: "cover" }}
+        loop
+        muted
+      />
+
+      {/* Gradient overlay for readability */}
+      <VideoOverlay />
+
+      {/* DIY badge */}
       <DIYLabel />
 
+      {/* Captions */}
       {captions && (
         <AbsoluteFill>
           {pages.map((page, index) => {
@@ -116,7 +123,7 @@ export const DIYVideo: React.FC = () => {
             const startFrame = (page.startMs / 1000) * fps;
             const endFrame = Math.min(
               nextPage ? (nextPage.startMs / 1000) * fps : Infinity,
-              startFrame + (SWITCH_CAPTIONS_EVERY_MS / 1000) * fps
+              startFrame + (SWITCH_MS / 1000) * fps
             );
             const durationInFrames = Math.round(endFrame - startFrame);
 
@@ -136,19 +143,21 @@ export const DIYVideo: React.FC = () => {
         </AbsoluteFill>
       )}
 
+      {/* Bottom home indicator */}
       <AbsoluteFill
         style={{
           justifyContent: "flex-end",
           alignItems: "center",
-          paddingBottom: 60,
+          paddingBottom: 24,
+          pointerEvents: "none",
         }}
       >
         <div
           style={{
-            width: 80,
-            height: 6,
+            width: 120,
+            height: 5,
             borderRadius: 3,
-            background: "rgba(255,255,255,0.3)",
+            background: "rgba(255,255,255,0.4)",
           }}
         />
       </AbsoluteFill>
