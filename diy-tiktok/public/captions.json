@@ -1,0 +1,19 @@
+[
+  { "text": "Heute", "startMs": 0, "endMs": 400, "timestampMs": 200, "confidence": 0.99 },
+  { "text": " bauen", "startMs": 400, "endMs": 750, "timestampMs": 575, "confidence": 0.99 },
+  { "text": " wir", "startMs": 750, "endMs": 1000, "timestampMs": 875, "confidence": 0.99 },
+  { "text": " ein", "startMs": 1000, "endMs": 1200, "timestampMs": 1100, "confidence": 0.99 },
+  { "text": " Regal", "startMs": 1200, "endMs": 1800, "timestampMs": 1500, "confidence": 0.99 },
+  { "text": " aus", "startMs": 1800, "endMs": 2100, "timestampMs": 1950, "confidence": 0.99 },
+  { "text": " Holz!", "startMs": 2100, "endMs": 2800, "timestampMs": 2450, "confidence": 0.99 },
+  { "text": " Du", "startMs": 3000, "endMs": 3250, "timestampMs": 3125, "confidence": 0.98 },
+  { "text": " brauchst", "startMs": 3250, "endMs": 3700, "timestampMs": 3475, "confidence": 0.98 },
+  { "text": " nur", "startMs": 3700, "endMs": 3950, "timestampMs": 3825, "confidence": 0.98 },
+  { "text": " Holzbretter,", "startMs": 3950, "endMs": 4700, "timestampMs": 4325, "confidence": 0.97 },
+  { "text": " Schrauben", "startMs": 4700, "endMs": 5300, "timestampMs": 5000, "confidence": 0.97 },
+  { "text": " und", "startMs": 5300, "endMs": 5500, "timestampMs": 5400, "confidence": 0.99 },
+  { "text": " einen", "startMs": 5500, "endMs": 5750, "timestampMs": 5625, "confidence": 0.99 },
+  { "text": " Akkuschrauber.", "startMs": 5750, "endMs": 6700, "timestampMs": 6225, "confidence": 0.97 },
+  { "text": " Los", "startMs": 7000, "endMs": 7300, "timestampMs": 7150, "confidence": 0.99 },
+  { "text": " geht's!", "startMs": 7300, "endMs": 8000, "timestampMs": 7650, "confidence": 0.99 }
+]
