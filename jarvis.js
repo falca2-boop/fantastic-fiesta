@@ -11,6 +11,7 @@
   const orbCanvas = document.getElementById('orb');
   const apiOverlay = document.getElementById('apiOverlay');
   const apiKeyInput = document.getElementById('apiKeyInput');
+  const elevenKeyInput = document.getElementById('elevenKeyInput');
   const apiSaveBtn = document.getElementById('apiSaveBtn');
   const apiSkipBtn = document.getElementById('apiSkipBtn');
 
@@ -23,6 +24,10 @@
   // Key aus config.js (lokal, nicht auf GitHub) oder localStorage
   let ANTHROPIC_KEY = (window.JARVIS_CONFIG && window.JARVIS_CONFIG.anthropicKey)
     || localStorage.getItem('jarvis_api_key') || '';
+  let ELEVEN_KEY = (window.JARVIS_CONFIG && window.JARVIS_CONFIG.elevenKey)
+    || localStorage.getItem('jarvis_eleven_key') || '';
+  // ElevenLabs Voice ID: "Adam" — tief, männlich, Englisch/Deutsch
+  const ELEVEN_VOICE = 'pNInz6obpgDQGcFmaJgB';
 
   // n8n-Webhook: JARVIS führt echte Aktionen aus (KI-Analyse + Lead-Generierung
   // über OpenStreetMap). Standardpfad; überschreibbar via config.js.
@@ -38,6 +43,8 @@
       if (!k.startsWith('sk-')) { apiKeyInput.style.borderColor = '#ff5c7a'; return; }
       ANTHROPIC_KEY = k;
       localStorage.setItem('jarvis_api_key', k);
+      const ek = elevenKeyInput ? elevenKeyInput.value.trim() : '';
+      if (ek) { ELEVEN_KEY = ek; localStorage.setItem('jarvis_eleven_key', ek); }
       apiOverlay.style.display = 'none';
       greetOnce();
     });
@@ -57,7 +64,36 @@
   }
   if (synth) { pickVoice(); synth.onvoiceschanged = pickVoice; }
 
-  function speak(text) {
+  async function speakElevenLabs(text) {
+    setState('speaking');
+    try {
+      const res = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${ELEVEN_VOICE}`, {
+        method: 'POST',
+        headers: {
+          'xi-api-key': ELEVEN_KEY,
+          'Content-Type': 'application/json',
+          'Accept': 'audio/mpeg',
+        },
+        body: JSON.stringify({
+          text,
+          model_id: 'eleven_multilingual_v2',
+          voice_settings: { stability: 0.45, similarity_boost: 0.82, style: 0.3, use_speaker_boost: true },
+        }),
+      });
+      if (!res.ok) throw new Error('eleven_' + res.status);
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const audio = new Audio(url);
+      audio.onended = () => { URL.revokeObjectURL(url); setState(listening ? 'listening' : 'idle'); };
+      audio.onerror = () => { setState(listening ? 'listening' : 'idle'); };
+      await audio.play();
+    } catch (e) {
+      console.warn('ElevenLabs Fehler, Fallback auf Browser-Stimme:', e);
+      speakBrowser(text);
+    }
+  }
+
+  function speakBrowser(text) {
     if (!synth) return;
     synth.cancel();
     const u = new SpeechSynthesisUtterance(text);
@@ -66,6 +102,10 @@
     u.onstart = () => setState('speaking');
     u.onend = () => setState(listening ? 'listening' : 'idle');
     synth.speak(u);
+  }
+
+  function speak(text) {
+    if (ELEVEN_KEY) { speakElevenLabs(text); } else { speakBrowser(text); }
   }
 
   // ---------- UI ----------

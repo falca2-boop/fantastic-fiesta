@@ -338,11 +338,15 @@
     <h2>JARVIS · AKTIVIERUNG</h2>
     <p>Gib deinen <strong style="color:#eafaff">Anthropic API Key</strong> ein, damit JARVIS mit echter KI antworten kann.<br/>
     Der Key wird nur lokal in deinem Browser gespeichert und nirgendwo hochgeladen.</p>
+    <label style="font-size:11px;letter-spacing:2px;color:#6f8aa0">ANTHROPIC API KEY *</label>
     <input type="password" id="apiKeyInput" placeholder="sk-ant-..." autocomplete="off" />
+    <label style="font-size:11px;letter-spacing:2px;color:#6f8aa0;margin-top:12px">ELEVENLABS API KEY <span style="color:#38495a">(optional — für menschliche Stimme)</span></label>
+    <input type="password" id="elevenKeyInput" placeholder="sk_..." autocomplete="off" />
     <button id="apiSaveBtn">JARVIS STARTEN</button>
     <button class="skip-btn" id="apiSkipBtn">Ohne KI starten (Demo-Modus)</button>
     <div class="api-hint">
-      Key holen: <span style="color:#38d9ff">console.anthropic.com</span> → API Keys → Create Key
+      Anthropic: <span style="color:#38d9ff">console.anthropic.com</span> → API Keys &nbsp;·&nbsp;
+      ElevenLabs: <span style="color:#38d9ff">elevenlabs.io</span> → Profile → API Key
     </div>
   </div>
 
