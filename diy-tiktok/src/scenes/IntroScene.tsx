@@ -1,102 +1,122 @@
 import { AbsoluteFill, interpolate, useCurrentFrame, Easing } from "remotion";
+import { Person } from "../Person";
 
 export const IntroScene: React.FC = () => {
   const frame = useCurrentFrame();
 
-  const titleOpacity = interpolate(frame, [10, 35], [0, 1], {
+  const p1X = interpolate(frame, [0, 40], [-300, 0], {
     extrapolateLeft: "clamp", extrapolateRight: "clamp",
     easing: Easing.bezier(0.16, 1, 0.3, 1),
   });
-  const titleY = interpolate(frame, [10, 35], [40, 0], {
+  const p2X = interpolate(frame, [10, 50], [300, 0], {
     extrapolateLeft: "clamp", extrapolateRight: "clamp",
     easing: Easing.bezier(0.16, 1, 0.3, 1),
   });
-  const subOpacity = interpolate(frame, [30, 55], [0, 1], {
-    extrapolateLeft: "clamp", extrapolateRight: "clamp",
-  });
-  const planksY = interpolate(frame, [0, 50], [120, 0], {
+
+  const titleOpacity = interpolate(frame, [35, 60], [0, 1], {
     extrapolateLeft: "clamp", extrapolateRight: "clamp",
     easing: Easing.bezier(0.16, 1, 0.3, 1),
   });
-  const exitOpacity = interpolate(frame, [75, 90], [1, 0], {
+  const titleY = interpolate(frame, [35, 60], [30, 0], {
+    extrapolateLeft: "clamp", extrapolateRight: "clamp",
+    easing: Easing.bezier(0.16, 1, 0.3, 1),
+  });
+
+  // Arm wave
+  const wave = interpolate(frame, [50, 70, 90], [0, -30, 0], {
+    extrapolateLeft: "clamp", extrapolateRight: "clamp",
+  });
+
+  const exitOpacity = interpolate(frame, [78, 90], [1, 0], {
     extrapolateLeft: "clamp", extrapolateRight: "clamp",
   });
 
   return (
-    <AbsoluteFill style={{ opacity: exitOpacity, background: "#1a0f00", overflow: "hidden" }}>
+    <AbsoluteFill style={{ opacity: exitOpacity, background: "linear-gradient(180deg, #1a0f00 0%, #0d0800 100%)", overflow: "hidden" }}>
       {/* Warm spotlight */}
       <AbsoluteFill style={{
-        background: "radial-gradient(ellipse 70% 50% at 50% 60%, rgba(200,120,30,0.25) 0%, transparent 70%)",
+        background: "radial-gradient(ellipse 70% 55% at 50% 70%, rgba(220,140,40,0.22) 0%, transparent 65%)",
       }} />
 
-      {/* Wood planks decorative */}
+      {/* Workshop floor */}
       <div style={{
-        position: "absolute", bottom: 0, left: 0, right: 0,
-        translate: `0px ${planksY}px`,
-        display: "flex", flexDirection: "column", gap: 6,
+        position: "absolute", bottom: 0, left: 0, right: 0, height: 220,
+        background: "linear-gradient(180deg, #2a1d0a 0%, #1a1008 100%)",
+        borderTop: "2px solid rgba(255,255,255,0.06)",
+      }} />
+
+      {/* Person 1 — left, facing right */}
+      <div style={{
+        position: "absolute", bottom: 200, left: 100,
+        translate: `${p1X}px 0`,
       }}>
-        {[0.9, 0.75, 0.85, 0.7, 0.95].map((opacity, i) => (
+        <Person
+          skin="#F4A261" shirt="#3B82F6" pants="#1E293B" hairColor="#3D2B1F"
+          leftArmAngle={wave} rightArmAngle={25}
+          leftForearmAngle={20} rightForearmAngle={20}
+          leftLegAngle={8} rightLegAngle={-8}
+          scale={1.7}
+        />
+      </div>
+
+      {/* Person 2 — right, facing left */}
+      <div style={{
+        position: "absolute", bottom: 200, right: 80,
+        translate: `${p2X}px 0`,
+      }}>
+        <Person
+          skin="#A0522D" shirt="#EF4444" pants="#374151" hairColor="#111"
+          leftArmAngle={-wave} rightArmAngle={20}
+          leftForearmAngle={20} rightForearmAngle={20}
+          leftLegAngle={-8} rightLegAngle={8}
+          flip scale={1.7}
+        />
+      </div>
+
+      {/* Shelf between them */}
+      <div style={{
+        position: "absolute", bottom: 210, left: "50%", translate: "-50% 0",
+        width: 260, opacity: titleOpacity,
+      }}>
+        {[0, 1, 2].map(i => (
           <div key={i} style={{
-            height: 52, width: "100%",
-            background: `rgba(${[139+i*8, 90-i*4, 43-i*3].join(",")}, ${opacity})`,
-            borderTop: "1px solid rgba(255,255,255,0.07)",
-            boxShadow: "inset 0 -2px 8px rgba(0,0,0,0.4)",
+            height: 24, marginBottom: 8,
+            background: "linear-gradient(180deg, #DEB887, #A0784A)",
+            borderRadius: 4,
+            boxShadow: "0 4px 12px rgba(0,0,0,0.4)",
           }} />
         ))}
       </div>
 
-      {/* Center content */}
-      <AbsoluteFill style={{ justifyContent: "center", alignItems: "center", flexDirection: "column", gap: 20 }}>
-        {/* Emoji tool */}
+      {/* Title */}
+      <div style={{
+        position: "absolute", top: 120, left: 60, right: 60,
+        opacity: titleOpacity,
+        translate: `0 ${titleY}px`,
+        textAlign: "center",
+      }}>
         <div style={{
-          fontSize: 100,
-          opacity: titleOpacity,
-          translate: `0px ${titleY}px`,
-          filter: "drop-shadow(0 8px 24px rgba(255,120,0,0.4))",
-        }}>
-          🔨
-        </div>
-
+          fontFamily: "Arial Black, Arial, sans-serif",
+          fontSize: 96, fontWeight: 900, color: "#fff",
+          letterSpacing: -3, lineHeight: 1,
+          textShadow: "0 4px 32px rgba(0,0,0,0.9)",
+        }}>DIY</div>
         <div style={{
-          opacity: titleOpacity,
-          translate: `0px ${titleY * 0.6}px`,
-          textAlign: "center",
-        }}>
-          <div style={{
-            fontFamily: "Arial Black, Arial, sans-serif",
-            fontSize: 88,
-            fontWeight: 900,
-            color: "#fff",
-            letterSpacing: -2,
-            lineHeight: 1,
-            textShadow: "0 4px 32px rgba(0,0,0,0.8)",
-          }}>
-            DIY
-          </div>
-          <div style={{
-            fontFamily: "Arial Black, Arial, sans-serif",
-            fontSize: 52,
-            fontWeight: 900,
-            color: "#F4A460",
-            letterSpacing: 1,
-            textShadow: "0 4px 20px rgba(0,0,0,0.8)",
-          }}>
-            Regal aus Holz
-          </div>
-        </div>
-
+          fontFamily: "Arial Black, Arial, sans-serif",
+          fontSize: 48, fontWeight: 900, color: "#F4A460",
+          textShadow: "0 4px 20px rgba(0,0,0,0.8)",
+        }}>Regal aus Holz</div>
         <div style={{
-          opacity: subOpacity,
-          background: "rgba(255,255,255,0.1)",
-          borderRadius: 50,
-          padding: "10px 28px",
-          border: "1px solid rgba(255,255,255,0.2)",
+          marginTop: 16,
+          background: "rgba(255,255,255,0.08)",
+          borderRadius: 50, padding: "8px 28px",
+          border: "1px solid rgba(255,255,255,0.15)",
+          display: "inline-block",
+          color: "#F4A460", fontSize: 28, fontWeight: 700,
         }}>
-          <span style={{ color: "#F4A460", fontWeight: 700, fontSize: 28 }}>
-            In 60 Sekunden! ⚡
-          </span>
+          Gemeinsam bauen! 👷‍♂️👷‍♀️
         </div>
-      </AbsoluteFill>
+      </div>
     </AbsoluteFill>
   );
 };
