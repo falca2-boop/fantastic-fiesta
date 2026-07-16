@@ -31,14 +31,17 @@ const SWITCH_MS = 1500;
 // 1230–1560 Paint      (41–52s)
 // 1560–1800 Outro      (52–60s)
 const SCENES = [
-  { from: 0,    duration: 90,  component: IntroScene },
-  { from: 90,   duration: 150, component: MaterialsScene },
-  { from: 240,  duration: 330, component: MeasureScene },
-  { from: 570,  duration: 270, component: DrillScene },
-  { from: 840,  duration: 390, component: AssembleScene },
-  { from: 1230, duration: 330, component: PaintScene },
-  { from: 1560, duration: 240, component: OutroScene },
+  { from: 0,    duration: 90,  component: IntroScene,      voiceover: "intro" },
+  { from: 90,   duration: 150, component: MaterialsScene,  voiceover: "materials" },
+  { from: 240,  duration: 330, component: MeasureScene,    voiceover: "measure" },
+  { from: 570,  duration: 270, component: DrillScene,      voiceover: "drill" },
+  { from: 840,  duration: 390, component: AssembleScene,   voiceover: "assemble" },
+  { from: 1230, duration: 330, component: PaintScene,      voiceover: "paint" },
+  { from: 1560, duration: 240, component: OutroScene,      voiceover: "outro" },
 ];
+
+// Set to true once you've run generate-voiceover.ts and public/voiceover/*.mp3 exist
+const USE_VOICEOVER = false;
 
 // DIY badge shown throughout
 const DIYBadge: React.FC = () => (
@@ -81,13 +84,16 @@ export const DIYVideo: React.FC = () => {
 
   return (
     <AbsoluteFill style={{ backgroundColor: "#0a0a0a", overflow: "hidden" }}>
-      {/* Background music */}
-      <Audio src={staticFile("bgmusic.wav")} volume={0.55} />
+      {/* Background music — quieter when voiceover is active */}
+      <Audio src={staticFile("bgmusic.wav")} volume={USE_VOICEOVER ? 0.2 : 0.55} />
 
-      {/* Scenes */}
-      {SCENES.map(({ from, duration, component: Scene }, i) => (
+      {/* Scenes + per-scene voiceover */}
+      {SCENES.map(({ from, duration, component: Scene, voiceover }, i) => (
         <Sequence key={i} from={from} durationInFrames={duration} name={Scene.name}>
           <Scene />
+          {USE_VOICEOVER && (
+            <Audio src={staticFile(`voiceover/${voiceover}.mp3`)} volume={1} />
+          )}
         </Sequence>
       ))}
 
