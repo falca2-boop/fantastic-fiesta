@@ -1,74 +1,58 @@
 import {
   AbsoluteFill,
   Sequence,
-  interpolate,
-  useCurrentFrame,
   useVideoConfig,
   staticFile,
-  Easing,
   continueRender,
   cancelRender,
   delayRender,
 } from "remotion";
-import { Video } from "@remotion/media";
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { createTikTokStyleCaptions } from "@remotion/captions";
 import type { Caption } from "@remotion/captions";
 import { CaptionPage } from "./CaptionPage";
+import { IntroScene } from "./scenes/IntroScene";
+import { MaterialsScene } from "./scenes/MaterialsScene";
+import { MeasureScene } from "./scenes/MeasureScene";
+import { DrillScene } from "./scenes/DrillScene";
+import { AssembleScene } from "./scenes/AssembleScene";
+import { PaintScene } from "./scenes/PaintScene";
+import { OutroScene } from "./scenes/OutroScene";
 
 const SWITCH_MS = 1500;
 
-const DIYLabel: React.FC = () => {
-  const frame = useCurrentFrame();
+// Scene timing at 30fps:
+// 0–90     Intro       (0–3s)
+// 90–240   Materials   (3–8s)
+// 240–570  Measure     (8–19s)
+// 570–840  Drill       (19–28s)
+// 840–1230 Assemble    (28–41s)
+// 1230–1560 Paint      (41–52s)
+// 1560–1800 Outro      (52–60s)
+const SCENES = [
+  { from: 0,    duration: 90,  component: IntroScene },
+  { from: 90,   duration: 150, component: MaterialsScene },
+  { from: 240,  duration: 330, component: MeasureScene },
+  { from: 570,  duration: 270, component: DrillScene },
+  { from: 840,  duration: 390, component: AssembleScene },
+  { from: 1230, duration: 330, component: PaintScene },
+  { from: 1560, duration: 240, component: OutroScene },
+];
 
-  const opacity = interpolate(frame, [0, 20], [0, 1], {
-    extrapolateRight: "clamp",
-    easing: Easing.bezier(0.16, 1, 0.3, 1),
-  });
-
-  const translateY = interpolate(frame, [0, 20], [-20, 0], {
-    extrapolateRight: "clamp",
-    easing: Easing.bezier(0.16, 1, 0.3, 1),
-  });
-
-  return (
-    <AbsoluteFill
-      style={{
-        justifyContent: "flex-start",
-        alignItems: "center",
-        paddingTop: 100,
-        pointerEvents: "none",
-      }}
-    >
-      <div
-        style={{
-          opacity,
-          translate: `0px ${translateY}px`,
-          background: "linear-gradient(135deg, #FF6B35, #FF3F00)",
-          borderRadius: 16,
-          padding: "12px 32px",
-          fontSize: 42,
-          fontWeight: 900,
-          color: "#fff",
-          fontFamily: "Arial Black, Arial, sans-serif",
-          letterSpacing: 2,
-          boxShadow: "0 8px 32px rgba(255,63,0,0.4)",
-        }}
-      >
-        🔨 DIY
-      </div>
-    </AbsoluteFill>
-  );
-};
-
-// Dark overlay so captions stay readable over any video
-const VideoOverlay: React.FC = () => (
-  <AbsoluteFill
-    style={{
-      background:
-        "linear-gradient(to bottom, rgba(0,0,0,0.35) 0%, rgba(0,0,0,0.1) 40%, rgba(0,0,0,0.55) 100%)",
-    }}
-  />
+// DIY badge shown throughout
+const DIYBadge: React.FC = () => (
+  <AbsoluteFill style={{ justifyContent: "flex-start", alignItems: "center", paddingTop: 100, pointerEvents: "none" }}>
+    <div style={{
+      background: "linear-gradient(135deg, #FF6B35, #FF3F00)",
+      borderRadius: 16, padding: "12px 32px",
+      fontSize: 42, fontWeight: 900, color: "#fff",
+      fontFamily: "Arial Black, Arial, sans-serif",
+      letterSpacing: 2,
+      boxShadow: "0 8px 32px rgba(255,63,0,0.4)",
+    }}>
+      🔨 DIY
+    </div>
+  </AbsoluteFill>
 );
 
 export const DIYVideo: React.FC = () => {
@@ -87,79 +71,51 @@ export const DIYVideo: React.FC = () => {
     }
   }, [handle]);
 
-  useEffect(() => {
-    fetchCaptions();
-  }, [fetchCaptions]);
+  useEffect(() => { fetchCaptions(); }, [fetchCaptions]);
 
   const { pages } = useMemo(() => {
     if (!captions) return { pages: [] };
-    return createTikTokStyleCaptions({
-      captions,
-      combineTokensWithinMilliseconds: SWITCH_MS,
-    });
+    return createTikTokStyleCaptions({ captions, combineTokensWithinMilliseconds: SWITCH_MS });
   }, [captions]);
 
   return (
-    <AbsoluteFill style={{ backgroundColor: "#0f1923" }}>
-      {/* Background video — loop so it fills the full 60s */}
-      <Video
-        src={staticFile("video.mp4")}
-        style={{ width: "100%", height: "100%", objectFit: "cover" }}
-        loop
-        muted
-      />
+    <AbsoluteFill style={{ backgroundColor: "#0a0a0a", overflow: "hidden" }}>
+      {/* Scenes */}
+      {SCENES.map(({ from, duration, component: Scene }, i) => (
+        <Sequence key={i} from={from} durationInFrames={duration} name={Scene.name}>
+          <Scene />
+        </Sequence>
+      ))}
 
-      {/* Gradient overlay for readability */}
-      <VideoOverlay />
+      {/* DIY badge always visible */}
+      <DIYBadge />
 
-      {/* DIY badge */}
-      <DIYLabel />
+      {/* Captions overlay */}
+      {captions && pages.map((page, index) => {
+        const nextPage = pages[index + 1] ?? null;
+        const startFrame = (page.startMs / 1000) * fps;
+        const endFrame = Math.min(
+          nextPage ? (nextPage.startMs / 1000) * fps : Infinity,
+          startFrame + (SWITCH_MS / 1000) * fps
+        );
+        const durationInFrames = Math.round(endFrame - startFrame);
+        if (durationInFrames <= 0) return null;
 
-      {/* Captions */}
-      {captions && (
-        <AbsoluteFill>
-          {pages.map((page, index) => {
-            const nextPage = pages[index + 1] ?? null;
-            const startFrame = (page.startMs / 1000) * fps;
-            const endFrame = Math.min(
-              nextPage ? (nextPage.startMs / 1000) * fps : Infinity,
-              startFrame + (SWITCH_MS / 1000) * fps
-            );
-            const durationInFrames = Math.round(endFrame - startFrame);
+        return (
+          <Sequence
+            key={index}
+            name={`Caption ${index + 1}`}
+            from={Math.round(startFrame)}
+            durationInFrames={durationInFrames}
+          >
+            <CaptionPage page={page} />
+          </Sequence>
+        );
+      })}
 
-            if (durationInFrames <= 0) return null;
-
-            return (
-              <Sequence
-                key={index}
-                name={`Caption ${index + 1}`}
-                from={Math.round(startFrame)}
-                durationInFrames={durationInFrames}
-              >
-                <CaptionPage page={page} />
-              </Sequence>
-            );
-          })}
-        </AbsoluteFill>
-      )}
-
-      {/* Bottom home indicator */}
-      <AbsoluteFill
-        style={{
-          justifyContent: "flex-end",
-          alignItems: "center",
-          paddingBottom: 24,
-          pointerEvents: "none",
-        }}
-      >
-        <div
-          style={{
-            width: 120,
-            height: 5,
-            borderRadius: 3,
-            background: "rgba(255,255,255,0.4)",
-          }}
-        />
+      {/* Home indicator */}
+      <AbsoluteFill style={{ justifyContent: "flex-end", alignItems: "center", paddingBottom: 24, pointerEvents: "none" }}>
+        <div style={{ width: 120, height: 5, borderRadius: 3, background: "rgba(255,255,255,0.3)" }} />
       </AbsoluteFill>
     </AbsoluteFill>
   );
