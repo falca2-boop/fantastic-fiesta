@@ -435,13 +435,18 @@ Bei normalen Fragen oder Gesprächen antworte mit:
     window.Orb && window.Orb.setAudioLevel(0);
   }
 
-  // ---------- Spracherkennung ----------
+  // ---------- Spracherkennung (Wake-Word + kontinuierlich) ----------
+  const WAKE_WORDS = /\b(hey\s+jarvis|jarvis)\b/i;
+  let wakeMode = true;   // true = warte auf Wake-Word, false = höre Befehl ab
+  let commandTimeout = null;
+
   function initRecognition() {
     if (!SR) { unsupported.style.display = 'flex'; return; }
     recognition = new SR();
     recognition.lang = 'de-DE';
     recognition.interimResults = true;
-    recognition.continuous = false;
+    recognition.continuous = true;   // läuft dauerhaft
+
     recognition.onresult = (ev) => {
       let interim = '', final = '';
       for (let i = ev.resultIndex; i < ev.results.length; i++) {
@@ -449,39 +454,98 @@ Bei normalen Fragen oder Gesprächen antworte mit:
         if (r.isFinal) final += r[0].transcript;
         else interim += r[0].transcript;
       }
-      if (interim) {
-        if (!interimBubble) interimBubble = addBubble(interim, 'user', true);
-        else interimBubble.textContent = interim;
-      }
-      if (final) {
-        if (interimBubble) { interimBubble.remove(); interimBubble = null; }
-        handleInput(final);
+
+      if (wakeMode) {
+        // Im Schlafmodus nur auf Wake-Word prüfen
+        const combined = (interim + ' ' + final).trim();
+        if (WAKE_WORDS.test(combined)) {
+          if (interimBubble) { interimBubble.remove(); interimBubble = null; }
+          activateByWakeWord();
+        }
+      } else {
+        // Aktiv-Modus: normales Gespräch
+        if (interim) {
+          if (!interimBubble) interimBubble = addBubble(interim, 'user', true);
+          else interimBubble.textContent = interim;
+        }
+        if (final) {
+          if (interimBubble) { interimBubble.remove(); interimBubble = null; }
+          clearTimeout(commandTimeout);
+          // Wake-Word aus dem Befehl herausschneiden
+          const command = final.replace(WAKE_WORDS, '').trim();
+          if (command) handleInput(command);
+          // Nach 8 Sekunden Stille zurück in den Schlafmodus
+          commandTimeout = setTimeout(() => { wakeMode = true; setState('idle'); }, 8000);
+        }
       }
     };
+
     recognition.onend = () => {
-      if (interimBubble) { interimBubble.remove(); interimBubble = null; }
-      listening = false;
-      micBtn.classList.remove('active');
-      stopMicMeter();
-      if (window.Orb.getMode() !== 'speaking') setState('idle');
+      // Automatisch neu starten — Mikrofon bleibt immer an
+      if (listening) {
+        try { recognition.start(); } catch (e) {}
+      }
     };
-    recognition.onerror = () => { listening = false; micBtn.classList.remove('active'); stopMicMeter(); setState('idle'); };
+    recognition.onerror = (e) => {
+      if (e.error === 'no-speech') return; // ignorieren, normal
+      if (e.error === 'not-allowed') {
+        unsupported.style.display = 'flex';
+        listening = false;
+        return;
+      }
+      // kurz warten, dann neu starten
+      setTimeout(() => { if (listening) try { recognition.start(); } catch (_) {} }, 500);
+    };
+  }
+
+  function activateByWakeWord() {
+    wakeMode = false;
+    synth && synth.cancel();
+    setState('listening');
+    // Kurzes Aktivierungssignal
+    addBubble('⚡ JARVIS aktiviert — sprich jetzt', 'jarvis');
+    speak('Bereit.');
+    clearTimeout(commandTimeout);
+    // Nach 10 Sekunden ohne Befehl wieder schlafen
+    commandTimeout = setTimeout(() => {
+      wakeMode = true;
+      setState('idle');
+    }, 10000);
+  }
+
+  function startContinuousListening() {
+    if (!recognition || listening) return;
+    listening = true;
+    wakeMode = true;
+    micBtn.classList.add('active');
+    setState('idle');
+    startMicMeter();
+    try { recognition.start(); } catch (e) {}
   }
 
   function toggleListen() {
     if (apiOverlay.style.display !== 'none') return;
     if (!recognition) { textInput.focus(); return; }
-    if (listening) { recognition.stop(); return; }
-    synth && synth.cancel();
-    listening = true;
-    micBtn.classList.add('active');
-    setState('listening');
-    startMicMeter();
-    try { recognition.start(); } catch (e) {}
+    if (listening) {
+      // Manuell deaktivieren
+      listening = false;
+      wakeMode = true;
+      clearTimeout(commandTimeout);
+      micBtn.classList.remove('active');
+      stopMicMeter();
+      try { recognition.stop(); } catch (e) {}
+      setState('idle');
+    } else {
+      startContinuousListening();
+    }
   }
 
   micBtn.addEventListener('click', toggleListen);
-  orbCanvas.addEventListener('click', toggleListen);
+  orbCanvas.addEventListener('click', () => {
+    // Orb-Klick: wenn schläft → Wake-Word-Modus verlassen und direkt aktivieren
+    if (listening && wakeMode) { activateByWakeWord(); }
+    else { toggleListen(); }
+  });
   textInput.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') { handleInput(textInput.value); textInput.value = ''; }
   });
@@ -498,6 +562,10 @@ Bei normalen Fragen oder Gesprächen antworte mit:
 
   initApiOverlay();
   if (ANTHROPIC_KEY) {
-    window.addEventListener('pointerdown', greetOnce, { once: true });
+    // Beim ersten Klick: begrüßen + Mikrofon dauerhaft starten
+    window.addEventListener('pointerdown', () => {
+      greetOnce();
+      setTimeout(startContinuousListening, 800);
+    }, { once: true });
   }
 })();
