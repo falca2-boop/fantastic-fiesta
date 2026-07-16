@@ -9,7 +9,7 @@ export const PaintScene: React.FC = () => {
   // Brush sweeps left to right
   const brushX = interpolate(
     frame,
-    [30, 80, 80, 130, 130, 180, 180, 230],
+    [30, 79, 81, 129, 131, 179, 181, 230],
     [100, 780, 780, 100, 100, 780, 780, 100],
     { extrapolateLeft: "clamp", extrapolateRight: "clamp", easing: Easing.bezier(0.4, 0, 0.6, 1) }
   );
