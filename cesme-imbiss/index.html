@@ -1,0 +1,459 @@
+<title>Cesme Imbiss — Königstraße 20</title>
+<style>
+  :root {
+    --bg: #F6F1E8;
+    --bg2: #EDE6D6;
+    --surface: #FFFFFF;
+    --text: #1A1410;
+    --text2: #5C4E3A;
+    --accent: #E8A020;
+    --red: #C4303A;
+    --border: rgba(26,20,16,0.12);
+    --shadow: 0 2px 24px rgba(26,20,16,0.08);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #141210;
+      --bg2: #1E1A16;
+      --surface: #221E18;
+      --text: #F0E8D8;
+      --text2: #A09078;
+      --border: rgba(240,232,216,0.10);
+      --shadow: 0 2px 24px rgba(0,0,0,0.4);
+    }
+  }
+  :root[data-theme="light"] {
+    --bg: #F6F1E8; --bg2: #EDE6D6; --surface: #FFFFFF;
+    --text: #1A1410; --text2: #5C4E3A;
+    --border: rgba(26,20,16,0.12); --shadow: 0 2px 24px rgba(26,20,16,0.08);
+  }
+  :root[data-theme="dark"] {
+    --bg: #141210; --bg2: #1E1A16; --surface: #221E18;
+    --text: #F0E8D8; --text2: #A09078;
+    --border: rgba(240,232,216,0.10); --shadow: 0 2px 24px rgba(0,0,0,0.4);
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+    font-size: 16px;
+    line-height: 1.6;
+    min-height: 100vh;
+  }
+
+  nav {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+    padding: 0 2rem;
+    display: flex; align-items: center; justify-content: space-between;
+    height: 60px;
+    background: transparent;
+    border-bottom: none;
+  }
+  .nav-logo {
+    font-family: Georgia, 'Times New Roman', serif;
+    font-style: italic;
+    font-weight: bold;
+    font-size: 1.15rem;
+    color: #F0E8D8;
+    letter-spacing: -0.01em;
+  }
+  .nav-links { display: flex; gap: 2rem; list-style: none; }
+  .nav-links a {
+    color: rgba(240,232,216,0.7);
+    text-decoration: none;
+    font-size: 0.85rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    transition: color 0.2s;
+  }
+  .nav-links a:hover { color: var(--accent); }
+
+  .hero-photo {
+    position: relative;
+    width: 100%;
+    height: 92vh;
+    min-height: 500px;
+    overflow: hidden;
+    display: flex;
+    align-items: flex-end;
+  }
+  .hero-img {
+    position: absolute;
+    inset: 0;
+    background-image: url('https://images.unsplash.com/photo-1574071318508-1cdbab80d002?w=1800&q=85&auto=format&fit=crop');
+    background-size: cover;
+    background-position: center;
+    animation: kenburns 12s ease-in-out infinite alternate;
+    will-change: transform;
+  }
+  @keyframes kenburns {
+    from { transform: scale(1) translate(0, 0); }
+    to   { transform: scale(1.10) translate(-2%, -1.5%); }
+  }
+  .hero-overlay {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+      to top,
+      rgba(10,8,6,0.85) 0%,
+      rgba(10,8,6,0.35) 50%,
+      rgba(10,8,6,0.10) 100%
+    );
+  }
+  .hero-content {
+    position: relative;
+    z-index: 2;
+    padding: 3rem 2.5rem;
+    max-width: 900px;
+    width: 100%;
+    margin: 0 auto;
+  }
+  .hero-eyebrow {
+    font-size: 0.75rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 1.2rem;
+  }
+  .hero-name {
+    font-family: Georgia, 'Times New Roman', serif;
+    font-style: italic;
+    font-weight: bold;
+    font-size: clamp(3.5rem, 10vw, 7rem);
+    line-height: 0.95;
+    letter-spacing: -0.03em;
+    color: #F0E8D8;
+    text-wrap: balance;
+    margin-bottom: 2rem;
+  }
+  .hero-name span { color: var(--accent); }
+  .rating-row {
+    display: flex;
+    align-items: center;
+    gap: 1.2rem;
+    flex-wrap: wrap;
+    margin-bottom: 2.5rem;
+  }
+  .stars { display: flex; gap: 3px; }
+  .star { width: 18px; height: 18px; color: var(--accent); }
+  .rating-num {
+    font-family: Georgia, serif;
+    font-size: 2rem;
+    font-weight: bold;
+    color: #F0E8D8;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+  }
+  .rating-count { font-size: 0.85rem; color: rgba(240,232,216,0.6); }
+  .price-tag {
+    background: rgba(255,255,255,0.12);
+    border: 1px solid rgba(255,255,255,0.2);
+    border-radius: 4px;
+    padding: 4px 10px;
+    font-size: 0.85rem;
+    color: #F0E8D8;
+    letter-spacing: 0.05em;
+  }
+  .hero-desc {
+    font-size: 1.1rem;
+    color: rgba(240,232,216,0.75);
+    max-width: 520px;
+    line-height: 1.7;
+  }
+  .theme-btn {
+    background: rgba(255,255,255,0.12);
+    border: 1px solid rgba(255,255,255,0.2);
+    border-radius: 4px;
+    padding: 5px 10px;
+    cursor: pointer;
+    font-size: 0.8rem;
+    color: #F0E8D8;
+    transition: background 0.2s;
+  }
+
+  .divider {
+    border: none;
+    border-top: 1px solid var(--border);
+    max-width: 900px;
+    margin: 0 auto;
+  }
+  .info-strip {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 3rem 2rem;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 2rem;
+  }
+  .info-label {
+    font-size: 0.7rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--text2);
+    margin-bottom: 0.4rem;
+  }
+  .info-value { font-size: 1rem; color: var(--text); font-weight: 500; }
+  .info-value.open { color: #2E9B5A; }
+
+  .section { max-width: 900px; margin: 0 auto; padding: 3rem 2rem; }
+  .section-title {
+    font-family: Georgia, serif;
+    font-style: italic;
+    font-size: 2rem;
+    font-weight: bold;
+    color: var(--text);
+    margin-bottom: 2rem;
+    letter-spacing: -0.02em;
+  }
+  .cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 1.5rem;
+  }
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1.5rem;
+    box-shadow: var(--shadow);
+  }
+  .card-icon { font-size: 2rem; margin-bottom: 0.8rem; }
+  .card-title { font-weight: 600; font-size: 1rem; color: var(--text); margin-bottom: 0.4rem; }
+  .card-desc { font-size: 0.88rem; color: var(--text2); line-height: 1.6; }
+
+  .menu-list { display: flex; flex-direction: column; gap: 0; }
+  .menu-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    padding: 1rem 0;
+    border-bottom: 1px solid var(--border);
+    gap: 1rem;
+  }
+  .menu-item:first-child { border-top: 1px solid var(--border); }
+  .menu-name { font-size: 1rem; color: var(--text); font-weight: 500; }
+  .menu-sub { font-size: 0.82rem; color: var(--text2); margin-top: 2px; }
+  .menu-price { font-size: 0.95rem; color: var(--accent); font-weight: 600; white-space: nowrap; font-variant-numeric: tabular-nums; }
+
+  .map-section { max-width: 900px; margin: 0 auto; padding: 0 2rem 4rem; }
+  .map-box {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 2rem;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 2rem;
+    align-items: center;
+  }
+  .address-label { font-size: 0.7rem; letter-spacing: 0.18em; text-transform: uppercase; color: var(--text2); margin-bottom: 1rem; }
+  .address-line { font-size: 1.1rem; color: var(--text); font-weight: 500; line-height: 1.5; }
+  .address-line small { display: block; font-size: 0.85rem; font-weight: 400; color: var(--text2); margin-top: 0.2rem; }
+  .map-cta {
+    display: inline-block;
+    margin-top: 1.5rem;
+    background: var(--accent);
+    color: #1A1410;
+    text-decoration: none;
+    font-weight: 700;
+    font-size: 0.85rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    padding: 10px 20px;
+    border-radius: 4px;
+  }
+  .hours-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+  .hours-table td { padding: 5px 0; color: var(--text2); }
+  .hours-table td:last-child { text-align: right; color: var(--text); font-variant-numeric: tabular-nums; }
+  .hours-table tr.today td { color: var(--accent); font-weight: 600; }
+
+  footer { border-top: 1px solid var(--border); padding: 2rem; text-align: center; font-size: 0.8rem; color: var(--text2); }
+
+  @media (max-width: 600px) {
+    .map-box { grid-template-columns: 1fr; }
+    .nav-links { display: none; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .hero-img { animation: none; }
+    * { transition: none !important; }
+  }
+</style>
+
+<nav>
+  <div class="nav-logo">Cesme Imbiss</div>
+  <ul class="nav-links">
+    <li><a href="#angebot">Angebot</a></li>
+    <li><a href="#speisekarte">Speisekarte</a></li>
+    <li><a href="#kontakt">Kontakt</a></li>
+  </ul>
+  <button class="theme-btn" onclick="toggleTheme()">◐ Theme</button>
+</nav>
+
+<main>
+  <section class="hero-photo">
+    <div class="hero-img"></div>
+    <div class="hero-overlay"></div>
+    <div class="hero-content">
+      <p class="hero-eyebrow">Restaurant & Imbiss · Bamberg</p>
+      <h1 class="hero-name">Cesme<br><span>Imbiss</span></h1>
+      <div class="rating-row">
+        <span class="rating-num">4,4</span>
+        <div class="stars" aria-label="4,4 von 5 Sternen">
+          <svg class="star" viewBox="0 0 20 20" fill="currentColor"><path d="M10 15l-5.9 3.1 1.1-6.6L.4 6.9l6.6-1 3-5.9 3 5.9 6.6 1-4.8 4.6 1.1 6.6z"/></svg>
+          <svg class="star" viewBox="0 0 20 20" fill="currentColor"><path d="M10 15l-5.9 3.1 1.1-6.6L.4 6.9l6.6-1 3-5.9 3 5.9 6.6 1-4.8 4.6 1.1 6.6z"/></svg>
+          <svg class="star" viewBox="0 0 20 20" fill="currentColor"><path d="M10 15l-5.9 3.1 1.1-6.6L.4 6.9l6.6-1 3-5.9 3 5.9 6.6 1-4.8 4.6 1.1 6.6z"/></svg>
+          <svg class="star" viewBox="0 0 20 20" fill="currentColor"><path d="M10 15l-5.9 3.1 1.1-6.6L.4 6.9l6.6-1 3-5.9 3 5.9 6.6 1-4.8 4.6 1.1 6.6z"/></svg>
+          <svg class="star" viewBox="0 0 20 20" fill="currentColor" opacity="0.35"><path d="M10 15l-5.9 3.1 1.1-6.6L.4 6.9l6.6-1 3-5.9 3 5.9 6.6 1-4.8 4.6 1.1 6.6z"/></svg>
+        </div>
+        <span class="rating-count">276 Bewertungen</span>
+        <span class="price-tag">1 – 10 €</span>
+      </div>
+      <p class="hero-desc">Frisch zubereitete türkische Spezialitäten zum Mitnehmen oder vor Ort genießen. Seit Jahren eine der beliebtesten Adressen in Bamberg.</p>
+    </div>
+  </section>
+
+  <hr class="divider">
+
+  <div class="info-strip">
+    <div class="info-item">
+      <div class="info-label">Öffnungszeiten heute</div>
+      <div class="info-value open">Ab 10:00 Uhr geöffnet</div>
+    </div>
+    <div class="info-item">
+      <div class="info-label">Adresse</div>
+      <div class="info-value">Königstraße 20, Bamberg</div>
+    </div>
+    <div class="info-item">
+      <div class="info-label">Bestellmöglichkeiten</div>
+      <div class="info-value">Vor Ort · Zum Mitnehmen</div>
+    </div>
+    <div class="info-item">
+      <div class="info-label">Preisklasse</div>
+      <div class="info-value">1 – 10 € pro Person</div>
+    </div>
+  </div>
+
+  <hr class="divider">
+
+  <section class="section" id="angebot">
+    <h2 class="section-title">Was wir bieten</h2>
+    <div class="cards">
+      <div class="card">
+        <div class="card-icon">🥙</div>
+        <div class="card-title">Frisch & Täglich</div>
+        <div class="card-desc">Alle Speisen werden täglich frisch zubereitet — kein Tiefkühlkost, kein Aufwärmen.</div>
+      </div>
+      <div class="card">
+        <div class="card-icon">🛍️</div>
+        <div class="card-title">Zum Mitnehmen</div>
+        <div class="card-desc">Schnell, unkompliziert und immer mit vollem Geschmack — perfekt für die Mittagspause.</div>
+      </div>
+      <div class="card">
+        <div class="card-icon">🪑</div>
+        <div class="card-title">Vor Ort genießen</div>
+        <div class="card-desc">Sitzplätze vorhanden. Entspannt essen, direkt in der Bamberger Innenstadt.</div>
+      </div>
+    </div>
+  </section>
+
+  <hr class="divider">
+
+  <section class="section" id="speisekarte">
+    <h2 class="section-title">Speisekarte</h2>
+    <div class="menu-list">
+      <div class="menu-item">
+        <div>
+          <div class="menu-name">Döner Kebab</div>
+          <div class="menu-sub">Mit frischem Salat, Tomaten & Soße nach Wahl</div>
+        </div>
+        <div class="menu-price">ab 5,50 €</div>
+      </div>
+      <div class="menu-item">
+        <div>
+          <div class="menu-name">Lahmacun</div>
+          <div class="menu-sub">Türkische Fladenbrot-Pizza, dünn & knusprig</div>
+        </div>
+        <div class="menu-price">ab 3,50 €</div>
+      </div>
+      <div class="menu-item">
+        <div>
+          <div class="menu-name">Dürüm Wrap</div>
+          <div class="menu-sub">Im Fladenbrot gerollt, mit gegrilltem Fleisch & Beilagen</div>
+        </div>
+        <div class="menu-price">ab 6,00 €</div>
+      </div>
+      <div class="menu-item">
+        <div>
+          <div class="menu-name">Vegetarischer Döner</div>
+          <div class="menu-sub">Mit Falafel, frischem Gemüse & Joghurtsauce</div>
+        </div>
+        <div class="menu-price">ab 5,00 €</div>
+      </div>
+      <div class="menu-item">
+        <div>
+          <div class="menu-name">Ayran</div>
+          <div class="menu-sub">Frisch gerührt, kühl serviert</div>
+        </div>
+        <div class="menu-price">1,50 €</div>
+      </div>
+      <div class="menu-item">
+        <div>
+          <div class="menu-name">Kinderteller</div>
+          <div class="menu-sub">Kleinere Portion, speziell für die Kleinen</div>
+        </div>
+        <div class="menu-price">ab 3,50 €</div>
+      </div>
+    </div>
+    <p style="margin-top:1.2rem; font-size:0.8rem; color:var(--text2);">* Preise sind Richtwerte. Aktuelle Preise direkt vor Ort erfragen.</p>
+  </section>
+
+  <hr class="divider">
+
+  <section class="map-section" id="kontakt">
+    <div class="map-box">
+      <div class="address-block">
+        <div class="address-label">Anfahrt & Kontakt</div>
+        <div class="address-line">
+          Königstraße 20
+          <small>96052 Bamberg</small>
+        </div>
+        <br>
+        <div class="address-line" style="font-size:0.95rem;">Innenstadt · 1,3 km vom Bahnhof</div>
+        <a class="map-cta" href="https://maps.google.com/?q=Königstraße+20+Bamberg" target="_blank" rel="noopener">In Google Maps öffnen</a>
+      </div>
+      <div>
+        <div class="address-label">Öffnungszeiten</div>
+        <table class="hours-table">
+          <tr><td>Montag</td><td>10:00 – 21:00</td></tr>
+          <tr><td>Dienstag</td><td>10:00 – 21:00</td></tr>
+          <tr><td>Mittwoch</td><td>10:00 – 21:00</td></tr>
+          <tr><td>Donnerstag</td><td>10:00 – 21:00</td></tr>
+          <tr class="today"><td>Sonntag ★</td><td>11:00 – 20:00</td></tr>
+          <tr><td>Freitag</td><td>10:00 – 22:00</td></tr>
+          <tr><td>Samstag</td><td>10:00 – 22:00</td></tr>
+        </table>
+        <p style="font-size:0.75rem; color:var(--text2); margin-top:0.8rem;">Öffnungszeiten können abweichen. Keine Gewähr.</p>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <p>© 2026 Cesme Imbiss · Königstraße 20, 96052 Bamberg</p>
+</footer>
+
+<script>
+  function toggleTheme() {
+    const root = document.documentElement;
+    const current = root.getAttribute('data-theme');
+    if (current === 'dark') root.setAttribute('data-theme', 'light');
+    else if (current === 'light') root.setAttribute('data-theme', 'dark');
+    else {
+      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      root.setAttribute('data-theme', prefersDark ? 'light' : 'dark');
+    }
+  }
+</script>
