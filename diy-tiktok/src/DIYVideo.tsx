@@ -7,6 +7,7 @@ import {
   cancelRender,
   delayRender,
 } from "remotion";
+import { Audio } from "@remotion/media";
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { createTikTokStyleCaptions } from "@remotion/captions";
 import type { Caption } from "@remotion/captions";
@@ -80,6 +81,9 @@ export const DIYVideo: React.FC = () => {
 
   return (
     <AbsoluteFill style={{ backgroundColor: "#0a0a0a", overflow: "hidden" }}>
+      {/* Background music */}
+      <Audio src={staticFile("bgmusic.wav")} volume={0.55} />
+
       {/* Scenes */}
       {SCENES.map(({ from, duration, component: Scene }, i) => (
         <Sequence key={i} from={from} durationInFrames={duration} name={Scene.name}>
