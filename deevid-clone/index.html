@@ -1,0 +1,917 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>VidAI — KI Video & Bild Plattform</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #0a0a0f;
+      --bg2: #111118;
+      --bg3: #18181f;
+      --border: rgba(124,58,237,0.18);
+      --accent: #7c3aed;
+      --accent2: #a855f7;
+      --accent-glow: rgba(124,58,237,0.35);
+      --text: #e8e8f0;
+      --text-dim: #7a7a9a;
+      --text-muted: #3a3a55;
+      --sidebar-w: 230px;
+      --ok: #22c55e;
+    }
+    html, body { height: 100%; background: var(--bg); color: var(--text); font-family: "Segoe UI", system-ui, sans-serif; overflow: hidden; }
+
+    /* ── LAYOUT ── */
+    .app { display: flex; height: 100vh; }
+
+    /* ── SIDEBAR ── */
+    .sidebar {
+      width: var(--sidebar-w);
+      min-width: var(--sidebar-w);
+      background: var(--bg2);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      padding: 0;
+      overflow-y: auto;
+      z-index: 10;
+    }
+    .sidebar-logo {
+      padding: 22px 20px 16px;
+      font-size: 20px;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+      color: var(--text);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .sidebar-logo .logo-icon {
+      width: 32px; height: 32px; border-radius: 8px;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      display: grid; place-items: center;
+      font-size: 16px;
+    }
+    .sidebar-logo span { color: var(--accent2); }
+
+    .sidebar-section {
+      padding: 14px 14px 4px;
+      font-size: 10px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--text-muted);
+    }
+
+    .nav-item {
+      display: flex;
+      align-items: center;
+      gap: 11px;
+      padding: 9px 14px;
+      margin: 1px 8px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 13.5px;
+      color: var(--text-dim);
+      transition: all .15s;
+      user-select: none;
+    }
+    .nav-item:hover { background: rgba(124,58,237,0.1); color: var(--text); }
+    .nav-item.active { background: rgba(124,58,237,0.18); color: var(--text); }
+    .nav-item .ni-icon { font-size: 16px; width: 20px; text-align: center; flex-shrink: 0; }
+    .nav-item .badge {
+      margin-left: auto;
+      font-size: 9px;
+      letter-spacing: 1px;
+      background: var(--accent);
+      color: #fff;
+      border-radius: 4px;
+      padding: 2px 5px;
+    }
+
+    .sidebar-bottom { margin-top: auto; padding: 10px 8px 16px; border-top: 1px solid var(--border); }
+
+    /* ── MAIN ── */
+    .main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      background: var(--bg);
+    }
+
+    /* ── TOP BAR ── */
+    .topbar {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 13px 24px;
+      border-bottom: 1px solid var(--border);
+      background: var(--bg2);
+      flex-shrink: 0;
+    }
+    .topbar-title { font-size: 15px; font-weight: 600; }
+    .topbar-sub { font-size: 12px; color: var(--text-dim); }
+    .topbar-actions { margin-left: auto; display: flex; gap: 10px; }
+    .btn {
+      padding: 7px 16px;
+      border-radius: 8px;
+      font-size: 13px;
+      cursor: pointer;
+      border: none;
+      font-weight: 500;
+      transition: all .15s;
+    }
+    .btn-primary { background: var(--accent); color: #fff; }
+    .btn-primary:hover { background: var(--accent2); box-shadow: 0 0 16px var(--accent-glow); }
+    .btn-ghost { background: transparent; color: var(--text-dim); border: 1px solid var(--border); }
+    .btn-ghost:hover { border-color: var(--accent); color: var(--text); }
+
+    /* ── PANELS ── */
+    .panel { display: none; flex: 1; overflow-y: auto; padding: 28px 32px; }
+    .panel.active { display: block; }
+
+    /* ── AGENT PANEL ── */
+    .agent-hero {
+      text-align: center;
+      padding: 48px 20px 32px;
+      max-width: 680px;
+      margin: 0 auto;
+    }
+    .agent-hero h1 { font-size: 28px; font-weight: 700; line-height: 1.3; margin-bottom: 10px; }
+    .agent-hero h1 span { background: linear-gradient(90deg, var(--accent), var(--accent2)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+    .agent-hero p { color: var(--text-dim); font-size: 14px; }
+
+    .agent-input-box {
+      max-width: 720px;
+      margin: 0 auto 28px;
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 16px 18px;
+      transition: border-color .2s;
+    }
+    .agent-input-box:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(124,58,237,0.12); }
+    .agent-input-box textarea {
+      width: 100%;
+      background: transparent;
+      border: none;
+      outline: none;
+      color: var(--text);
+      font-size: 14.5px;
+      line-height: 1.5;
+      resize: none;
+      min-height: 80px;
+      font-family: inherit;
+    }
+    .agent-input-box textarea::placeholder { color: var(--text-muted); }
+    .agent-input-actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-top: 12px;
+      flex-wrap: wrap;
+    }
+    .agent-chip {
+      display: flex; align-items: center; gap: 6px;
+      padding: 6px 12px;
+      border-radius: 20px;
+      font-size: 12px;
+      cursor: pointer;
+      border: 1px solid var(--border);
+      color: var(--text-dim);
+      background: var(--bg2);
+      transition: all .15s;
+    }
+    .agent-chip:hover { border-color: var(--accent); color: var(--text); }
+    .toggle-chip { position: relative; }
+    .toggle-chip input { display: none; }
+    .toggle-chip label {
+      display: flex; align-items: center; gap: 6px;
+      padding: 6px 12px;
+      border-radius: 20px;
+      font-size: 12px;
+      cursor: pointer;
+      border: 1px solid var(--border);
+      color: var(--text-dim);
+      background: var(--bg2);
+      transition: all .15s;
+    }
+    .toggle-chip input:checked + label { border-color: var(--accent); color: var(--accent2); background: rgba(124,58,237,0.1); }
+    .agent-input-actions .btn-primary { margin-left: auto; padding: 8px 22px; }
+
+    /* ── OUTPUT AREA ── */
+    .output-area { max-width: 720px; margin: 0 auto; }
+    .output-msg {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 20px;
+      animation: fadeUp .3s ease both;
+    }
+    @keyframes fadeUp { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:none; } }
+    .output-avatar {
+      width: 34px; height: 34px; border-radius: 50%; flex-shrink: 0;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      display: grid; place-items: center; font-size: 14px;
+    }
+    .output-bubble { background: var(--bg3); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; font-size: 14px; line-height: 1.55; flex: 1; }
+    .output-bubble .loading-dots span {
+      display: inline-block; width: 7px; height: 7px; border-radius: 50%;
+      background: var(--accent2); margin: 0 2px;
+      animation: dotpulse 1.2s ease-in-out infinite;
+    }
+    .output-bubble .loading-dots span:nth-child(2) { animation-delay: .2s; }
+    .output-bubble .loading-dots span:nth-child(3) { animation-delay: .4s; }
+    @keyframes dotpulse { 0%,100%{opacity:.3;transform:scale(.8)} 50%{opacity:1;transform:scale(1.2)} }
+
+    .output-img-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-top: 12px; }
+    .output-img-grid img { width: 100%; border-radius: 10px; object-fit: cover; aspect-ratio: 16/9; display: block; }
+    .output-img-grid .img-placeholder {
+      background: var(--bg2);
+      border: 1px dashed var(--border);
+      border-radius: 10px;
+      aspect-ratio: 16/9;
+      display: grid; place-items: center;
+      color: var(--text-muted);
+      font-size: 28px;
+    }
+
+    /* ── TOOL PANELS ── */
+    .tool-header { margin-bottom: 24px; }
+    .tool-header h2 { font-size: 22px; font-weight: 700; margin-bottom: 6px; }
+    .tool-header p { color: var(--text-dim); font-size: 14px; }
+
+    .tool-card {
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 20px;
+      margin-bottom: 18px;
+    }
+    .tool-card label { display: block; font-size: 11px; letter-spacing: 1.5px; text-transform: uppercase; color: var(--text-dim); margin-bottom: 8px; }
+    .tool-card textarea, .tool-card input[type=text] {
+      width: 100%;
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px 14px;
+      color: var(--text);
+      font-size: 14px;
+      font-family: inherit;
+      outline: none;
+      resize: none;
+      transition: border-color .15s;
+    }
+    .tool-card textarea { min-height: 90px; }
+    .tool-card textarea:focus, .tool-card input:focus { border-color: var(--accent); }
+
+    .tool-actions { display: flex; gap: 10px; margin-top: 14px; align-items: center; }
+    .upload-btn {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 8px 14px; border-radius: 8px; font-size: 13px;
+      border: 1px solid var(--border); background: var(--bg2);
+      color: var(--text-dim); cursor: pointer; transition: all .15s;
+    }
+    .upload-btn:hover { border-color: var(--accent); color: var(--text); }
+
+    /* ── GALLERY / DISCOVER ── */
+    .gallery-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 14px;
+      margin-top: 20px;
+    }
+    .gallery-card {
+      border-radius: 12px;
+      overflow: hidden;
+      position: relative;
+      cursor: pointer;
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      transition: transform .2s, box-shadow .2s;
+    }
+    .gallery-card:hover { transform: translateY(-3px); box-shadow: 0 8px 30px rgba(124,58,237,0.2); }
+    .gallery-card img { width: 100%; aspect-ratio: 16/10; object-fit: cover; display: block; }
+    .gallery-card .gc-info { padding: 10px 12px; }
+    .gallery-card .gc-label { font-size: 12px; color: var(--text-dim); }
+    .gallery-card .gc-title { font-size: 13px; font-weight: 600; margin-top: 2px; }
+    .gallery-card .gc-badge {
+      position: absolute; top: 8px; left: 8px;
+      background: rgba(124,58,237,0.85); backdrop-filter: blur(4px);
+      color: #fff; font-size: 10px; padding: 3px 8px; border-radius: 4px;
+      letter-spacing: 1px; text-transform: uppercase;
+    }
+
+    /* ── RESULT CARD ── */
+    .result-card {
+      margin-top: 14px;
+      border-radius: 12px;
+      overflow: hidden;
+      position: relative;
+      animation: fadeUp .4s ease both;
+    }
+    .result-card img { width: 100%; border-radius: 12px; display: block; }
+    .result-actions { display: flex; gap: 8px; margin-top: 10px; }
+
+    /* ── SHIMMER ── */
+    .shimmer {
+      background: linear-gradient(90deg, var(--bg3) 25%, rgba(124,58,237,0.08) 50%, var(--bg3) 75%);
+      background-size: 200% 100%;
+      animation: shimmer 1.5s infinite;
+      border-radius: 12px;
+      aspect-ratio: 16/9;
+    }
+    @keyframes shimmer { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
+
+    /* ── MUSIC / TTS ── */
+    .audio-player {
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px 20px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      margin-top: 14px;
+      animation: fadeUp .4s ease both;
+    }
+    .play-btn {
+      width: 44px; height: 44px; border-radius: 50%; border: none;
+      background: var(--accent); color: #fff; font-size: 18px;
+      cursor: pointer; display: grid; place-items: center; flex-shrink: 0;
+      transition: background .15s;
+    }
+    .play-btn:hover { background: var(--accent2); }
+    .audio-wave {
+      flex: 1; height: 36px;
+      background: linear-gradient(90deg, var(--accent) 0%, var(--accent2) 50%, var(--accent) 100%);
+      background-size: 200% 100%;
+      animation: shimmer 2s infinite;
+      border-radius: 4px;
+      opacity: .35;
+    }
+    .audio-dur { font-size: 12px; color: var(--text-dim); white-space: nowrap; }
+
+    /* ── SCROLL BAR ── */
+    ::-webkit-scrollbar { width: 5px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+
+    /* ── MOBILE ── */
+    @media (max-width: 640px) {
+      .sidebar { width: 56px; min-width: 56px; }
+      .sidebar-logo .logo-text { display: none; }
+      .nav-item span:not(.ni-icon) { display: none; }
+      .nav-item .badge { display: none; }
+      .sidebar-section { display: none; }
+      .panel { padding: 18px 16px; }
+      .agent-hero h1 { font-size: 20px; }
+      .gallery-grid { grid-template-columns: repeat(2, 1fr); }
+      .output-img-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+<div class="app">
+
+  <!-- SIDEBAR -->
+  <nav class="sidebar">
+    <div class="sidebar-logo">
+      <div class="logo-icon">✦</div>
+      <span class="logo-text">Vid<span>AI</span></span>
+    </div>
+
+    <div class="sidebar-section">Erkunden</div>
+    <div class="nav-item active" onclick="showPanel('agent')">
+      <span class="ni-icon">🤖</span><span>AI Agent</span>
+    </div>
+    <div class="nav-item" onclick="showPanel('discover')">
+      <span class="ni-icon">🔍</span><span>Entdecken</span>
+    </div>
+    <div class="nav-item" onclick="showPanel('assets')">
+      <span class="ni-icon">🗂️</span><span>Meine Assets</span>
+    </div>
+
+    <div class="sidebar-section">Erstellungstools</div>
+    <div class="nav-item" onclick="showPanel('text2video')">
+      <span class="ni-icon">🎬</span><span>Text zu Video</span><span class="badge">NEU</span>
+    </div>
+    <div class="nav-item" onclick="showPanel('img2video')">
+      <span class="ni-icon">📹</span><span>Bild zu Video</span>
+    </div>
+    <div class="nav-item" onclick="showPanel('kiimage')">
+      <span class="ni-icon">🖼️</span><span>KI-Bild</span>
+    </div>
+    <div class="nav-item" onclick="showPanel('avatar')">
+      <span class="ni-icon">🧑‍💻</span><span>KI-Avatar</span>
+    </div>
+    <div class="nav-item" onclick="showPanel('music')">
+      <span class="ni-icon">🎵</span><span>KI-Musik</span>
+    </div>
+    <div class="nav-item" onclick="showPanel('tts')">
+      <span class="ni-icon">🔊</span><span>Text-zu-Sprache</span>
+    </div>
+
+    <div class="sidebar-bottom">
+      <div class="nav-item" style="color:var(--text-dim)">
+        <span class="ni-icon">⚙️</span><span>Einstellungen</span>
+      </div>
+    </div>
+  </nav>
+
+  <!-- MAIN -->
+  <main class="main">
+    <div class="topbar">
+      <div>
+        <div class="topbar-title" id="topbarTitle">AI Agent</div>
+        <div class="topbar-sub" id="topbarSub">Erstelle alles mit einem Prompt</div>
+      </div>
+      <div class="topbar-actions">
+        <button class="btn btn-ghost">Credits: 250 ✦</button>
+        <button class="btn btn-primary">Upgrade ↑</button>
+      </div>
+    </div>
+
+    <!-- ── AGENT PANEL ── -->
+    <div class="panel active" id="panel-agent">
+      <div class="agent-hero">
+        <h1>Erstelle wie ein Profi.<br><span>Frag einfach den AI Agent.</span></h1>
+        <p>Beschreibe was du erstellen möchtest — Video, Bild, Musik oder Avatar.</p>
+      </div>
+      <div class="agent-input-box">
+        <textarea id="agentPrompt" placeholder="z.B. Erstelle ein kurzes Video von einem Sonnenuntergang am Meer mit epischer Musik…" rows="4"></textarea>
+        <div class="agent-input-actions">
+          <div class="agent-chip" onclick="triggerUpload()">📎 Bild hochladen</div>
+          <div class="agent-chip" onclick="triggerUpload()">🎯 Referenz</div>
+          <div class="toggle-chip">
+            <input type="checkbox" id="autoMode">
+            <label for="autoMode">⚡ Automatischer Modus</label>
+          </div>
+          <button class="btn btn-primary" onclick="runAgent()">✦ Erstellen</button>
+        </div>
+      </div>
+      <div class="output-area" id="agentOutput"></div>
+    </div>
+
+    <!-- ── DISCOVER PANEL ── -->
+    <div class="panel" id="panel-discover">
+      <div class="tool-header">
+        <h2>🔍 Entdecken</h2>
+        <p>Lass dich von KI-Kreationen anderer inspirieren</p>
+      </div>
+      <div class="gallery-grid" id="discoverGrid"></div>
+    </div>
+
+    <!-- ── ASSETS PANEL ── -->
+    <div class="panel" id="panel-assets">
+      <div class="tool-header">
+        <h2>🗂️ Meine Assets</h2>
+        <p>Alle deine erstellten Bilder, Videos und Audiodateien</p>
+      </div>
+      <div style="text-align:center;padding:60px 20px;color:var(--text-dim)">
+        <div style="font-size:48px;margin-bottom:16px">📭</div>
+        <p>Noch nichts erstellt. Starte mit dem AI Agent!</p>
+        <button class="btn btn-primary" style="margin-top:18px" onclick="showPanel('agent')">✦ Jetzt erstellen</button>
+      </div>
+    </div>
+
+    <!-- ── TEXT → VIDEO ── -->
+    <div class="panel" id="panel-text2video">
+      <div class="tool-header">
+        <h2>🎬 Text zu Video</h2>
+        <p>Beschreibe eine Szene — die KI generiert ein kurzes Video daraus</p>
+      </div>
+      <div class="tool-card">
+        <label>Prompt</label>
+        <textarea id="t2v-prompt" placeholder="Ein futuristisches Stadtbild bei Nacht, Neonlichter spiegeln sich im Regen, cinematisch, 4K…" rows="4"></textarea>
+        <div style="margin-top:12px;display:grid;grid-template-columns:1fr 1fr;gap:12px">
+          <div>
+            <label>Stil</label>
+            <select style="width:100%;background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;color:var(--text);font-size:13px;outline:none">
+              <option>Cinematic</option><option>Animation</option><option>Realistisch</option><option>Anime</option>
+            </select>
+          </div>
+          <div>
+            <label>Länge</label>
+            <select style="width:100%;background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;color:var(--text);font-size:13px;outline:none">
+              <option>4 Sekunden</option><option>8 Sekunden</option><option>16 Sekunden</option>
+            </select>
+          </div>
+        </div>
+        <div class="tool-actions">
+          <button class="btn btn-primary" onclick="runTool('t2v')">✦ Video generieren</button>
+        </div>
+      </div>
+      <div id="t2v-result"></div>
+    </div>
+
+    <!-- ── BILD → VIDEO ── -->
+    <div class="panel" id="panel-img2video">
+      <div class="tool-header">
+        <h2>📹 Bild zu Video</h2>
+        <p>Lade ein Bild hoch und bringe es zum Leben</p>
+      </div>
+      <div class="tool-card">
+        <label>Bild hochladen</label>
+        <div onclick="triggerUpload()" style="border:2px dashed var(--border);border-radius:10px;padding:40px;text-align:center;cursor:pointer;color:var(--text-dim);transition:border-color .15s" onmouseenter="this.style.borderColor='var(--accent)'" onmouseleave="this.style.borderColor='var(--border)'">
+          <div style="font-size:36px;margin-bottom:10px">☁️</div>
+          <div style="font-size:14px">Klicke oder ziehe ein Bild hierher</div>
+          <div style="font-size:12px;margin-top:4px;color:var(--text-muted)">PNG, JPG, WEBP bis 10 MB</div>
+        </div>
+        <label style="margin-top:14px">Bewegungsanweisung (optional)</label>
+        <textarea id="i2v-prompt" placeholder="Kamera langsam heranzoomen, Blätter im Wind…" rows="2"></textarea>
+        <div class="tool-actions">
+          <button class="btn btn-primary" onclick="runTool('i2v')">✦ Animieren</button>
+        </div>
+      </div>
+      <div id="i2v-result"></div>
+    </div>
+
+    <!-- ── KI-BILD ── -->
+    <div class="panel" id="panel-kiimage">
+      <div class="tool-header">
+        <h2>🖼️ KI-Bild</h2>
+        <p>Erstelle beeindruckende Bilder aus Text-Beschreibungen</p>
+      </div>
+      <div class="tool-card">
+        <label>Prompt</label>
+        <textarea id="img-prompt" placeholder="Porträt einer Frau mit lila Haar, futuristisch, digitale Kunst, detailreich, ultra-realistisch…" rows="3"></textarea>
+        <div style="margin-top:12px;display:grid;grid-template-columns:repeat(3,1fr);gap:10px">
+          <div>
+            <label>Stil</label>
+            <select style="width:100%;background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;color:var(--text);font-size:13px;outline:none">
+              <option>Realistisch</option><option>Digital Art</option><option>Anime</option><option>Öl-Gemälde</option><option>Aquarell</option>
+            </select>
+          </div>
+          <div>
+            <label>Format</label>
+            <select style="width:100%;background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;color:var(--text);font-size:13px;outline:none">
+              <option>1:1</option><option>16:9</option><option>9:16</option><option>4:3</option>
+            </select>
+          </div>
+          <div>
+            <label>Anzahl</label>
+            <select style="width:100%;background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;color:var(--text);font-size:13px;outline:none">
+              <option>1 Bild</option><option>2 Bilder</option><option>4 Bilder</option>
+            </select>
+          </div>
+        </div>
+        <div class="tool-actions">
+          <button class="btn btn-primary" onclick="runTool('img')">✦ Bild generieren</button>
+        </div>
+      </div>
+      <div id="img-result"></div>
+    </div>
+
+    <!-- ── KI-AVATAR ── -->
+    <div class="panel" id="panel-avatar">
+      <div class="tool-header">
+        <h2>🧑‍💻 KI-Avatar</h2>
+        <p>Erstelle einen sprechenden KI-Avatar mit deinem Text</p>
+      </div>
+      <div class="tool-card">
+        <label>Avatar-Stil wählen</label>
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px">
+          <div class="avatar-option selected" onclick="selectAvatar(this,0)">
+            <img src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=120&q=70&fit=crop&crop=faces" style="width:100%;aspect-ratio:1;object-fit:cover;border-radius:10px;display:block">
+            <div style="font-size:11px;text-align:center;margin-top:5px;color:var(--text-dim)">Business</div>
+          </div>
+          <div class="avatar-option" onclick="selectAvatar(this,1)">
+            <img src="https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=120&q=70&fit=crop&crop=faces" style="width:100%;aspect-ratio:1;object-fit:cover;border-radius:10px;display:block">
+            <div style="font-size:11px;text-align:center;margin-top:5px;color:var(--text-dim)">Casual</div>
+          </div>
+          <div class="avatar-option" onclick="selectAvatar(this,2)">
+            <img src="https://images.unsplash.com/photo-1560250097-0b93528c311a?w=120&q=70&fit=crop&crop=faces" style="width:100%;aspect-ratio:1;object-fit:cover;border-radius:10px;display:block">
+            <div style="font-size:11px;text-align:center;margin-top:5px;color:var(--text-dim)">Formal</div>
+          </div>
+          <div class="avatar-option" onclick="selectAvatar(this,3)">
+            <img src="https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=120&q=70&fit=crop&crop=faces" style="width:100%;aspect-ratio:1;object-fit:cover;border-radius:10px;display:block">
+            <div style="font-size:11px;text-align:center;margin-top:5px;color:var(--text-dim)">Modern</div>
+          </div>
+        </div>
+        <label>Skript / Text</label>
+        <textarea id="avatar-prompt" placeholder="Hallo und herzlich willkommen! Ich bin dein persönlicher KI-Avatar und freue mich…" rows="3"></textarea>
+        <div class="tool-actions">
+          <button class="btn btn-primary" onclick="runTool('avatar')">✦ Avatar erstellen</button>
+        </div>
+      </div>
+      <div id="avatar-result"></div>
+    </div>
+
+    <!-- ── KI-MUSIK ── -->
+    <div class="panel" id="panel-music">
+      <div class="tool-header">
+        <h2>🎵 KI-Musik</h2>
+        <p>Generiere individuelle Musik für deine Videos und Projekte</p>
+      </div>
+      <div class="tool-card">
+        <label>Beschreibung</label>
+        <textarea id="music-prompt" placeholder="Epischer orchestraler Soundtrack, aufbauend, motivierend, für ein Werbe-Video…" rows="3"></textarea>
+        <div style="margin-top:12px;display:grid;grid-template-columns:1fr 1fr;gap:12px">
+          <div>
+            <label>Genre</label>
+            <select style="width:100%;background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;color:var(--text);font-size:13px;outline:none">
+              <option>Cinematic</option><option>Electronic</option><option>Jazz</option><option>Ambient</option><option>Pop</option><option>Hip-Hop</option>
+            </select>
+          </div>
+          <div>
+            <label>Dauer</label>
+            <select style="width:100%;background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;color:var(--text);font-size:13px;outline:none">
+              <option>30 Sekunden</option><option>1 Minute</option><option>2 Minuten</option><option>3 Minuten</option>
+            </select>
+          </div>
+        </div>
+        <div class="tool-actions">
+          <button class="btn btn-primary" onclick="runTool('music')">✦ Musik generieren</button>
+        </div>
+      </div>
+      <div id="music-result"></div>
+    </div>
+
+    <!-- ── TEXT-ZU-SPRACHE ── -->
+    <div class="panel" id="panel-tts">
+      <div class="tool-header">
+        <h2>🔊 Text-zu-Sprache</h2>
+        <p>Verwandle Text in natürlich klingende Stimmen</p>
+      </div>
+      <div class="tool-card">
+        <label>Text eingeben</label>
+        <textarea id="tts-prompt" placeholder="Geben Sie hier den Text ein, den Sie in Sprache umwandeln möchten…" rows="4"></textarea>
+        <div style="margin-top:12px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">
+          <div>
+            <label>Stimme</label>
+            <select style="width:100%;background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;color:var(--text);font-size:13px;outline:none">
+              <option>Adam (Männlich)</option><option>Rachel (Weiblich)</option><option>Domi (Neutral)</option><option>Bella (Warm)</option>
+            </select>
+          </div>
+          <div>
+            <label>Sprache</label>
+            <select style="width:100%;background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;color:var(--text);font-size:13px;outline:none">
+              <option>Deutsch</option><option>Englisch</option><option>Spanisch</option><option>Französisch</option>
+            </select>
+          </div>
+          <div>
+            <label>Tempo</label>
+            <select style="width:100%;background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;color:var(--text);font-size:13px;outline:none">
+              <option>Normal</option><option>Langsam</option><option>Schnell</option>
+            </select>
+          </div>
+        </div>
+        <div class="tool-actions">
+          <button class="btn btn-primary" onclick="runTool('tts')">✦ Sprechen lassen</button>
+        </div>
+      </div>
+      <div id="tts-result"></div>
+    </div>
+
+  </main>
+</div>
+
+<style>
+  .avatar-option { cursor: pointer; border-radius: 12px; padding: 4px; border: 2px solid transparent; transition: border-color .15s; }
+  .avatar-option.selected { border-color: var(--accent); }
+  .avatar-option:hover { border-color: var(--accent2); }
+</style>
+
+<script>
+  const PANELS = {
+    agent:      { title: 'AI Agent',        sub: 'Erstelle alles mit einem Prompt' },
+    discover:   { title: '🔍 Entdecken',    sub: 'Lass dich inspirieren' },
+    assets:     { title: '🗂️ Meine Assets', sub: 'Deine erstellten Inhalte' },
+    text2video: { title: '🎬 Text zu Video', sub: 'KI-generierte Videos aus Text' },
+    img2video:  { title: '📹 Bild zu Video', sub: 'Bringe Bilder zum Leben' },
+    kiimage:    { title: '🖼️ KI-Bild',      sub: 'Bilder aus Text-Beschreibungen' },
+    avatar:     { title: '🧑‍💻 KI-Avatar',  sub: 'Sprechende KI-Avatare erstellen' },
+    music:      { title: '🎵 KI-Musik',      sub: 'Individuelle Musik generieren' },
+    tts:        { title: '🔊 Text-zu-Sprache', sub: 'Natürliche Stimmen aus Text' },
+  };
+
+  function showPanel(id) {
+    document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+    document.getElementById('panel-' + id).classList.add('active');
+    event?.currentTarget?.classList.add('active');
+    const info = PANELS[id] || {};
+    document.getElementById('topbarTitle').textContent = info.title || id;
+    document.getElementById('topbarSub').textContent = info.sub || '';
+
+    if (id === 'discover') buildDiscover();
+  }
+
+  // ── DISCOVER GALLERY ──
+  const GALLERY_ITEMS = [
+    { img: 'photo-1682685797406-97f364419b4a', label: 'Text zu Video', title: 'Nachtstadt im Regen', tag: 'VIDEO' },
+    { img: 'photo-1558618666-fcd25c85cd64', label: 'KI-Bild', title: 'Digitales Portrait', tag: 'BILD' },
+    { img: 'photo-1636955816868-fcb881e57954', label: 'KI-Bild', title: 'Sci-Fi Landschaft', tag: 'BILD' },
+    { img: 'photo-1705961882282-f1ce5ea31e90', label: 'Text zu Video', title: 'Ozean Drohnenflug', tag: 'VIDEO' },
+    { img: 'photo-1614850523011-8f49ffc73908', label: 'KI-Avatar', title: 'Business Präsentation', tag: 'AVATAR' },
+    { img: 'photo-1741730022505-4beaa1e2c5fe', label: 'KI-Bild', title: 'Abstrakte Komposition', tag: 'BILD' },
+    { img: 'photo-1620641788421-7a1c342ea42e', label: 'Text zu Video', title: 'Weltraum Zeitraffer', tag: 'VIDEO' },
+    { img: 'photo-1524781289445-ddf8f5695861', label: 'KI-Bild', title: 'Futuristische Architektur', tag: 'BILD' },
+  ];
+
+  function buildDiscover() {
+    const grid = document.getElementById('discoverGrid');
+    if (grid.children.length) return;
+    grid.innerHTML = GALLERY_ITEMS.map(item => `
+      <div class="gallery-card">
+        <div class="gc-badge">${item.tag}</div>
+        <img src="https://images.unsplash.com/${item.img}?w=400&q=70&auto=format&fit=crop" loading="lazy" alt="${item.title}">
+        <div class="gc-info">
+          <div class="gc-label">${item.label}</div>
+          <div class="gc-title">${item.title}</div>
+        </div>
+      </div>`).join('');
+  }
+
+  // ── AGENT RUNNER ──
+  const AGENT_RESPONSES = [
+    { type: 'img', text: 'Ich habe dein Bild generiert! Hier ist das Ergebnis:',
+      imgs: ['photo-1506905925346-21bda4d32df4','photo-1469474968028-56623f02e42e'] },
+    { type: 'img', text: 'Fertig! Dein KI-Bild wurde erfolgreich erstellt:',
+      imgs: ['photo-1682685797406-97f364419b4a','photo-1636955816868-fcb881e57954'] },
+    { type: 'video', text: 'Dein Video wurde generiert! Du kannst es jetzt herunterladen.' },
+    { type: 'audio', text: 'Die Tonspur wurde fertiggestellt. Höre dir dein Ergebnis an:' },
+  ];
+
+  let agentRound = 0;
+
+  function runAgent() {
+    const prompt = document.getElementById('agentPrompt').value.trim();
+    if (!prompt) { document.getElementById('agentPrompt').focus(); return; }
+
+    const out = document.getElementById('agentOutput');
+
+    // User bubble
+    out.insertAdjacentHTML('beforeend', `
+      <div class="output-msg" style="flex-direction:row-reverse">
+        <div class="output-avatar" style="background:var(--bg3);border:1px solid var(--border);font-size:18px">👤</div>
+        <div class="output-bubble" style="background:rgba(124,58,237,0.1);border-color:rgba(124,58,237,0.3)">${escHtml(prompt)}</div>
+      </div>`);
+
+    // Thinking bubble
+    const loadId = 'load-' + Date.now();
+    out.insertAdjacentHTML('beforeend', `
+      <div class="output-msg" id="${loadId}">
+        <div class="output-avatar">✦</div>
+        <div class="output-bubble"><div class="loading-dots"><span></span><span></span><span></span></div></div>
+      </div>`);
+
+    scrollOutput(out);
+    document.getElementById('agentPrompt').value = '';
+
+    const resp = AGENT_RESPONSES[agentRound % AGENT_RESPONSES.length];
+    agentRound++;
+
+    setTimeout(() => {
+      const loadEl = document.getElementById(loadId);
+      if (!loadEl) return;
+
+      let extra = '';
+      if (resp.type === 'img' && resp.imgs) {
+        extra = `<div class="output-img-grid">${resp.imgs.map(id =>
+          `<img src="https://images.unsplash.com/${id}?w=600&q=80&auto=format&fit=crop" loading="lazy">`
+        ).join('')}</div>`;
+      } else if (resp.type === 'video') {
+        extra = `<div class="shimmer" style="margin-top:12px;position:relative">
+          <div style="position:absolute;inset:0;display:grid;place-items:center;font-size:36px;opacity:.5">▶️</div>
+        </div>`;
+      } else if (resp.type === 'audio') {
+        extra = `<div class="audio-player" style="margin-top:10px">
+          <button class="play-btn" onclick="this.textContent=this.textContent==='▶'?'⏸':'▶'">▶</button>
+          <div class="audio-wave"></div>
+          <div class="audio-dur">0:00 / 0:32</div>
+        </div>`;
+      }
+
+      loadEl.querySelector('.output-bubble').innerHTML = resp.text + extra;
+
+      // Download button
+      loadEl.querySelector('.output-bubble').insertAdjacentHTML('beforeend',
+        `<div style="margin-top:12px;display:flex;gap:8px">
+          <button class="btn btn-ghost" style="font-size:12px">⬇ Herunterladen</button>
+          <button class="btn btn-ghost" style="font-size:12px">↗ In Assets speichern</button>
+        </div>`);
+
+      scrollOutput(out);
+    }, 2200);
+  }
+
+  function scrollOutput(el) {
+    setTimeout(() => { el.scrollTop = el.scrollHeight; }, 50);
+  }
+
+  // ── TOOL RUNNERS ──
+  const TOOL_IMGS = {
+    t2v:    ['photo-1526374965328-7f61d4dc18c5','photo-1514539079130-25950c84af65'],
+    i2v:    ['photo-1682685797406-97f364419b4a','photo-1706048859404-3bbf3fcff8e1'],
+    img:    ['photo-1558618666-fcd25c85cd64','photo-1636955816868-fcb881e57954','photo-1705961882282-f1ce5ea31e90','photo-1741730022505-4beaa1e2c5fe'],
+    avatar: ['photo-1507003211169-0a1dd7228f2d','photo-1494790108377-be9c29b29330'],
+  };
+
+  function runTool(type) {
+    const resultEl = document.getElementById(type + '-result');
+    resultEl.innerHTML = `<div class="shimmer" style="margin-top:8px"></div>`;
+
+    setTimeout(() => {
+      if (type === 'music') {
+        resultEl.innerHTML = `
+          <div class="audio-player">
+            <button class="play-btn" onclick="this.textContent=this.textContent==='▶'?'⏸':'▶'">▶</button>
+            <div class="audio-wave"></div>
+            <div class="audio-dur">0:00 / 1:03</div>
+          </div>
+          <div style="margin-top:10px;display:flex;gap:8px">
+            <button class="btn btn-ghost" style="font-size:12px">⬇ Download MP3</button>
+            <button class="btn btn-ghost" style="font-size:12px">↗ Assets</button>
+          </div>`;
+        return;
+      }
+      if (type === 'tts') {
+        resultEl.innerHTML = `
+          <div class="audio-player">
+            <button class="play-btn" onclick="this.textContent=this.textContent==='▶'?'⏸':'▶'">▶</button>
+            <div class="audio-wave"></div>
+            <div class="audio-dur">0:00 / 0:12</div>
+          </div>
+          <div style="margin-top:10px;display:flex;gap:8px">
+            <button class="btn btn-ghost" style="font-size:12px">⬇ Download MP3</button>
+          </div>`;
+        return;
+      }
+      if (type === 't2v' || type === 'i2v') {
+        const imgs = TOOL_IMGS[type] || [];
+        resultEl.innerHTML = `
+          <div class="result-card">
+            <div style="position:relative">
+              <img src="https://images.unsplash.com/${imgs[0]}?w=800&q=80&auto=format&fit=crop" style="width:100%;border-radius:12px">
+              <div style="position:absolute;inset:0;display:grid;place-items:center">
+                <div style="background:rgba(0,0,0,.5);border-radius:50%;width:60px;height:60px;display:grid;place-items:center;font-size:24px;cursor:pointer">▶</div>
+              </div>
+            </div>
+            <div class="result-actions">
+              <button class="btn btn-primary" style="font-size:12px">⬇ Download MP4</button>
+              <button class="btn btn-ghost" style="font-size:12px">↗ Assets</button>
+              <button class="btn btn-ghost" style="font-size:12px">✎ Bearbeiten</button>
+            </div>
+          </div>`;
+        return;
+      }
+      if (type === 'img') {
+        const imgs = TOOL_IMGS.img;
+        resultEl.innerHTML = `
+          <div class="result-card">
+            <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px">
+              ${imgs.map(id => `<img src="https://images.unsplash.com/${id}?w=500&q=80&auto=format&fit=crop" style="border-radius:10px;width:100%">`).join('')}
+            </div>
+            <div class="result-actions">
+              <button class="btn btn-primary" style="font-size:12px">⬇ Alle herunterladen</button>
+              <button class="btn btn-ghost" style="font-size:12px">↗ Assets</button>
+            </div>
+          </div>`;
+        return;
+      }
+      if (type === 'avatar') {
+        const imgs = TOOL_IMGS.avatar;
+        resultEl.innerHTML = `
+          <div class="result-card">
+            <div style="position:relative;max-width:360px">
+              <img src="https://images.unsplash.com/${imgs[0]}?w=500&q=80&auto=format&fit=crop&crop=faces" style="width:100%;border-radius:12px">
+              <div style="position:absolute;inset:0;display:grid;place-items:center">
+                <div style="background:rgba(0,0,0,.5);border-radius:50%;width:60px;height:60px;display:grid;place-items:center;font-size:24px;cursor:pointer">▶</div>
+              </div>
+            </div>
+            <div class="result-actions">
+              <button class="btn btn-primary" style="font-size:12px">⬇ Download MP4</button>
+              <button class="btn btn-ghost" style="font-size:12px">↗ Assets</button>
+            </div>
+          </div>`;
+      }
+    }, 2000);
+  }
+
+  function selectAvatar(el, idx) {
+    document.querySelectorAll('.avatar-option').forEach(o => o.classList.remove('selected'));
+    el.classList.add('selected');
+  }
+
+  function triggerUpload() {
+    // Demo only
+    const inp = document.createElement('input');
+    inp.type = 'file';
+    inp.accept = 'image/*';
+    inp.click();
+  }
+
+  function escHtml(s) {
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  // Enter key in agent textarea
+  document.getElementById('agentPrompt').addEventListener('keydown', e => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); runAgent(); }
+  });
+</script>
+</body>
+</html>
