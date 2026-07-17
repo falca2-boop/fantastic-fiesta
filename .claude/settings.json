@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "videoslash": {
+      "type": "http",
+      "url": "https://www.videoslash.com/api/mcp"
+    }
+  }
+}
