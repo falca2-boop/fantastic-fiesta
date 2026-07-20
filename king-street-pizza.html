@@ -419,6 +419,8 @@
       position: absolute;
       inset: -10%;
       will-change: transform;
+      background-size: cover !important;
+      background-position: center !important;
     }
     .story-panel-bg img {
       width: 100%;
@@ -1431,11 +1433,12 @@
 
   <!-- Panel 2: Mozzarella -->
   <div class="story-panel">
-    <div class="story-panel-bg" id="story-bg-2">
+    <div class="story-panel-bg" id="story-bg-2" style="background: linear-gradient(135deg,#2a2418,#1a1810) center/cover no-repeat; background-image: url('https://images.unsplash.com/photo-1634477189786-3f38bbe8fc98?w=1600&q=80&fm=webp');">
       <img
-        src="https://images.unsplash.com/photo-1551183053-bf91798d7034?w=1600&q=80&fm=webp"
+        src="https://images.unsplash.com/photo-1634477189786-3f38bbe8fc98?w=1600&q=80&fm=webp"
         alt="Echter Mozzarella"
         loading="lazy"
+        onerror="this.style.display='none'"
       />
     </div>
     <div class="story-panel-overlay" style="background: linear-gradient(to left, rgba(15,15,16,0.92) 0%, rgba(15,15,16,0.4) 60%, transparent 100%)"></div>
@@ -1452,11 +1455,12 @@
 
   <!-- Panel 3: Basilikum -->
   <div class="story-panel">
-    <div class="story-panel-bg" id="story-bg-3">
+    <div class="story-panel-bg" id="story-bg-3" style="background: linear-gradient(135deg,#0d2010,#081508) center/cover no-repeat; background-image: url('https://images.unsplash.com/photo-1620574387735-3624d75b2dbc?w=1600&q=80&fm=webp');">
       <img
-        src="https://images.unsplash.com/photo-1618375569909-3c8616cf7733?w=1600&q=80&fm=webp"
+        src="https://images.unsplash.com/photo-1620574387735-3624d75b2dbc?w=1600&q=80&fm=webp"
         alt="Frisches Basilikum"
         loading="lazy"
+        onerror="this.style.display='none'"
       />
     </div>
     <div class="story-panel-overlay" style="background: linear-gradient(to right, rgba(15,15,16,0.88) 0%, rgba(15,15,16,0.35) 60%, transparent 100%)"></div>
@@ -1473,9 +1477,10 @@
 
   <!-- Panel 4: Steinofen -->
   <div class="story-panel">
-    <div class="story-panel-bg" id="story-bg-4">
+    <div class="story-panel-bg" id="story-bg-4" style="background: linear-gradient(135deg,#1a0a05,#0d0502) center/cover no-repeat; background-image: url('https://images.unsplash.com/photo-1571997478779-2adcbbe9ab2f?w=1600&q=80&fm=webp');">
       <img
         src="https://images.unsplash.com/photo-1571997478779-2adcbbe9ab2f?w=1600&q=80&fm=webp"
+        onerror="this.style.display='none'"
         alt="Pizzaofen"
         loading="lazy"
       />
