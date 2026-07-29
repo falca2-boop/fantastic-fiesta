@@ -1,0 +1,649 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Professionelle Website erstellen lassen – Painpoint Digital</title>
+<meta name="description" content="Wir erstellen moderne, schnelle und mobiloptimierte Websites für Unternehmen in der DACH-Region — in 14 Tagen live, zu fairen Festpreisen." />
+<style>
+:root {
+  --ink: #09090F;
+  --ink2: #131620;
+  --accent: #E8411C;
+  --accent-h: #C9360F;
+  --ground: #F8F7F4;
+  --surface: #EFEDE6;
+  --text: #1C1D27;
+  --muted: #6A6D7F;
+  --border: rgba(0,0,0,0.09);
+
+  --t-xs: 0.75rem;
+  --t-sm: 0.875rem;
+  --t-base: 1.0625rem;
+  --t-lg: 1.25rem;
+  --t-xl: 1.5rem;
+  --t-2xl: 2rem;
+  --t-3xl: clamp(2rem, 3vw + 1rem, 2.75rem);
+  --t-hero: clamp(2.5rem, 4.5vw + 1rem, 4.25rem);
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --ground: #09090F;
+    --surface: #131620;
+    --text: #E2E3EC;
+    --muted: #888BAA;
+    --border: rgba(255,255,255,0.08);
+  }
+}
+:root[data-theme="light"] { --ground:#F8F7F4; --surface:#EFEDE6; --text:#1C1D27; --muted:#6A6D7F; --border:rgba(0,0,0,0.09); }
+:root[data-theme="dark"]  { --ground:#09090F; --surface:#131620; --text:#E2E3EC; --muted:#888BAA; --border:rgba(255,255,255,0.08); }
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  font-size: var(--t-base);
+  line-height: 1.65;
+  color: var(--text);
+  background: var(--ground);
+}
+a { color: inherit; text-decoration: none; }
+img { max-width: 100%; display: block; }
+
+.wrap { width: 100%; max-width: 1140px; margin: 0 auto; padding: 0 1.5rem; }
+
+.btn {
+  display: inline-flex; align-items: center; gap: .5rem;
+  padding: .875rem 1.75rem; border-radius: 7px;
+  font-size: var(--t-base); font-weight: 700; cursor: pointer; border: none;
+  transition: background .18s, transform .1s;
+  white-space: nowrap;
+}
+.btn:active { transform: translateY(1px); }
+.btn-red   { background: var(--accent); color: #fff; }
+.btn-red:hover { background: var(--accent-h); }
+.btn-ghost { background: transparent; color: #fff; border: 2px solid rgba(255,255,255,.28); }
+.btn-ghost:hover { border-color: rgba(255,255,255,.65); }
+.btn-light { background: #fff; color: var(--accent); font-weight: 800; }
+.btn-light:hover { background: #f0efec; }
+.btn-dark-card { background: var(--ink); color: #fff; }
+.btn-dark-card:hover { background: var(--ink2); }
+.btn-full { width: 100%; justify-content: center; }
+
+.eyebrow {
+  display: inline-block;
+  font-size: var(--t-xs); font-weight: 700;
+  letter-spacing: .1em; text-transform: uppercase;
+  color: var(--accent); margin-bottom: .75rem;
+}
+
+.h2 { font-size: var(--t-3xl); font-weight: 800; letter-spacing: -.035em; line-height: 1.1; text-wrap: balance; color: var(--text); }
+.h2-light { color: #fff; }
+.sub { font-size: var(--t-lg); color: var(--muted); line-height: 1.65; max-width: 580px; margin-top: .9rem; }
+.sub-light { color: rgba(255,255,255,.6); }
+
+.sec      { padding: 5.5rem 0; }
+.sec-dark { padding: 5.5rem 0; background: var(--ink); }
+.sec-surf { padding: 5.5rem 0; background: var(--surface); }
+
+.sec-hd        { margin-bottom: 3.5rem; }
+.sec-hd.center { text-align: center; }
+.sec-hd.center .sub { margin-left: auto; margin-right: auto; }
+
+/* NAV */
+.nav {
+  position: sticky; top: 0; z-index: 100;
+  background: rgba(9,9,15,.96);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border-bottom: 1px solid rgba(255,255,255,.06);
+}
+.nav-in { display: flex; align-items: center; justify-content: space-between; height: 66px; }
+.logo { font-size: 1.2rem; font-weight: 800; letter-spacing: -.04em; color: #fff; }
+.logo em { font-style: normal; color: var(--accent); }
+.nav-links { display: flex; gap: 2rem; list-style: none; }
+.nav-links a { color: rgba(255,255,255,.65); font-size: var(--t-sm); font-weight: 500; transition: color .18s; }
+.nav-links a:hover { color: #fff; }
+.nav-right { display: flex; align-items: center; gap: 1.25rem; }
+.nav-tel { font-size: var(--t-sm); font-weight: 600; color: rgba(255,255,255,.65); }
+
+/* HERO */
+.hero { background: var(--ink); padding: 6rem 0 5rem; position: relative; overflow: hidden; }
+.hero::after {
+  content: "500+";
+  position: absolute; right: -1rem; top: 50%; transform: translateY(-50%);
+  font-size: clamp(160px, 22vw, 320px);
+  font-weight: 900; letter-spacing: -.06em; line-height: 1;
+  color: rgba(255,255,255,.025);
+  pointer-events: none; user-select: none; z-index: 0;
+}
+.hero-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4rem; align-items: center; position: relative; z-index: 1; }
+.hero-badge {
+  display: inline-flex; align-items: center; gap: .4rem;
+  background: rgba(232,65,28,.14); border: 1px solid rgba(232,65,28,.3);
+  color: #FF8470; padding: .35rem .85rem; border-radius: 100px;
+  font-size: var(--t-sm); font-weight: 600; margin-bottom: 1.4rem;
+}
+.hero-badge .st { color: #F5A623; }
+.hero-h1 { font-size: var(--t-hero); font-weight: 800; letter-spacing: -.045em; line-height: 1.05; color: #fff; text-wrap: balance; margin-bottom: 1.4rem; }
+.hero-h1 em { font-style: normal; color: var(--accent); }
+.hero-p { font-size: var(--t-lg); color: rgba(255,255,255,.62); line-height: 1.65; max-width: 480px; margin-bottom: 2.25rem; }
+.hero-btns { display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 2.75rem; }
+.hero-stats { display: flex; gap: 2rem; padding-top: 2rem; border-top: 1px solid rgba(255,255,255,.08); }
+.hero-stat { font-size: var(--t-sm); color: rgba(255,255,255,.55); }
+.hero-stat strong { display: block; font-size: var(--t-xl); font-weight: 800; color: #fff; letter-spacing: -.03em; }
+
+/* Browser mock */
+.bmock { position: relative; }
+.bframe { background: #191E30; border-radius: 12px; border: 1px solid rgba(255,255,255,.1); overflow: hidden; box-shadow: 0 40px 80px rgba(0,0,0,.55), 0 0 0 1px rgba(255,255,255,.04); }
+.bbar { background: #222840; height: 38px; display: flex; align-items: center; padding: 0 .9rem; gap: .45rem; }
+.bdot { width: 11px; height: 11px; border-radius: 50%; }
+.bdot.r { background:#FF5F57; } .bdot.y { background:#FEBC2E; } .bdot.g { background:#28C840; }
+.burl { flex: 1; background: #191E30; border-radius: 4px; height: 22px; margin: 0 .75rem; display: flex; align-items: center; padding: 0 .65rem; font-size: 11px; color: rgba(255,255,255,.38); gap: .3rem; }
+.bcontent { padding: 1.25rem; }
+.mnav { background: var(--accent); height: 44px; border-radius: 5px 5px 0 0; display: flex; align-items: center; padding: 0 1rem; gap: .5rem; margin-bottom: 1px; }
+.mnav-pill { height: 8px; border-radius: 4px; background: rgba(255,255,255,.5); }
+.mhero { background: linear-gradient(135deg,#131726,#1C2340); border-radius: 0 0 5px 5px; padding: 1.5rem; margin-bottom: .9rem; }
+.ml { height: 9px; border-radius: 5px; margin-bottom: .55rem; }
+.ml.a { width: 72%; background: rgba(255,255,255,.5); }
+.ml.b { width: 52%; background: rgba(255,255,255,.3); }
+.ml.c { width: 36%; background: rgba(255,255,255,.18); }
+.mcta { display: inline-block; background: var(--accent); height: 24px; width: 88px; border-radius: 4px; margin-top: .5rem; }
+.mcards { display: grid; grid-template-columns: repeat(3,1fr); gap: .45rem; }
+.mcard { background: #222840; border-radius: 5px; padding: .7rem; }
+.mcard-ico { width: 22px; height: 22px; background: rgba(232,65,28,.22); border-radius: 4px; margin-bottom: .45rem; }
+.mcard-l { height: 6px; border-radius: 3px; background: rgba(255,255,255,.2); margin-bottom: .3rem; }
+.mcard-l.s { width: 58%; background: rgba(255,255,255,.1); }
+.bfloat { position: absolute; bottom: -1.1rem; right: -1.1rem; background: #fff; border-radius: 12px; padding: .7rem .9rem; display: flex; align-items: center; gap: .7rem; box-shadow: 0 8px 30px rgba(0,0,0,.28); }
+.bfloat-ico { width: 38px; height: 38px; background: rgba(232,65,28,.1); border-radius: 8px; display: grid; place-items: center; font-size: 18px; flex-shrink: 0; }
+.bfloat-txt { font-size: 12px; line-height: 1.35; color: #1C1D27; }
+.bfloat-txt strong { display: block; font-size: 14px; font-weight: 700; }
+
+/* TRUST BAR */
+.trustbar { background: var(--surface); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); padding: 1.35rem 0; overflow: hidden; }
+.trustbar-in { display: flex; align-items: center; gap: 2.5rem; }
+.trustbar-lbl { font-size: var(--t-sm); font-weight: 600; color: var(--muted); white-space: nowrap; flex-shrink: 0; }
+.trustbar-logos { display: flex; align-items: center; gap: 2.25rem; overflow: hidden; flex-wrap: wrap; }
+.tlogo { font-size: var(--t-sm); font-weight: 700; color: var(--muted); opacity: .55; white-space: nowrap; }
+
+/* BENEFITS */
+.ben-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 1.75rem; }
+.ben-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 1.875rem; transition: transform .2s, box-shadow .2s; }
+.ben-card:hover { transform: translateY(-4px); box-shadow: 0 14px 40px rgba(0,0,0,.07); }
+.ben-ico { width: 50px; height: 50px; border-radius: 12px; background: rgba(232,65,28,.1); display: grid; place-items: center; font-size: 22px; margin-bottom: 1.1rem; }
+.ben-card h3 { font-size: var(--t-xl); font-weight: 700; letter-spacing: -.025em; margin-bottom: .45rem; color: var(--text); }
+.ben-card p  { color: var(--muted); line-height: 1.7; font-size: var(--t-base); }
+
+/* PROCESS */
+.proc-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 2rem; margin-top: 3.5rem; position: relative; }
+.proc-grid::before { content: ""; position: absolute; top: 35px; left: calc(12.5% + 35px); right: calc(12.5% + 35px); height: 1px; background: rgba(255,255,255,.1); }
+.proc-step { text-align: center; }
+.proc-num { width: 70px; height: 70px; border-radius: 50%; background: rgba(255,255,255,.05); border: 2px solid rgba(255,255,255,.1); display: flex; align-items: center; justify-content: center; font-size: var(--t-xl); font-weight: 800; color: var(--accent); margin: 0 auto 1.1rem; position: relative; z-index: 1; }
+.proc-step h3 { font-size: var(--t-lg); font-weight: 700; letter-spacing: -.02em; color: #fff; margin-bottom: .4rem; }
+.proc-step p  { font-size: var(--t-sm); color: rgba(255,255,255,.5); line-height: 1.65; }
+
+/* PRICING */
+.price-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 1.5rem; align-items: start; margin-top: 3.5rem; }
+.price-card { border: 1px solid var(--border); border-radius: 14px; padding: 2rem 1.875rem; background: var(--surface); position: relative; }
+.price-card.feat { background: var(--ink); border-color: var(--accent); transform: translateY(-14px); }
+.feat-badge { position: absolute; top: -13px; left: 50%; transform: translateX(-50%); background: var(--accent); color: #fff; font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; padding: .28rem .85rem; border-radius: 100px; white-space: nowrap; }
+.price-card h3 { font-size: var(--t-xs); font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); margin-bottom: .9rem; }
+.price-card.feat h3 { color: rgba(255,255,255,.5); }
+.price-amt { font-size: 2.75rem; font-weight: 800; letter-spacing: -.04em; color: var(--text); line-height: 1; margin-bottom: .2rem; }
+.price-card.feat .price-amt { color: #fff; }
+.price-amt sup { font-size: 1.3rem; font-weight: 600; }
+.price-note { font-size: var(--t-sm); color: var(--muted); margin-bottom: 1.5rem; }
+.price-card.feat .price-note { color: rgba(255,255,255,.45); }
+.price-feats { list-style: none; margin-bottom: 1.75rem; }
+.pf { font-size: var(--t-sm); color: var(--text); padding: .42rem 0; display: flex; align-items: flex-start; gap: .55rem; border-bottom: 1px solid var(--border); line-height: 1.4; }
+.price-card.feat .pf { color: rgba(255,255,255,.7); border-color: rgba(255,255,255,.08); }
+.pf::before { content: "✓"; color: var(--accent); font-weight: 800; flex-shrink: 0; margin-top: .05em; }
+.pf.no::before { content: "–"; color: var(--muted); }
+.price-card.feat .pf.no::before { color: rgba(255,255,255,.25); }
+
+/* TESTIMONIALS */
+.testi-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 1.5rem; margin-top: 3.5rem; }
+.tcard { background: var(--ground); border: 1px solid var(--border); border-radius: 12px; padding: 1.625rem; }
+.tcard-stars { color: #F5A623; font-size: var(--t-base); margin-bottom: .7rem; }
+.tcard-txt { font-size: var(--t-base); line-height: 1.7; color: var(--text); margin-bottom: 1.4rem; }
+.tcard-auth { display: flex; align-items: center; gap: .7rem; }
+.tcard-av { width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: var(--t-base); color: #fff; flex-shrink: 0; }
+.tcard-name { font-weight: 700; font-size: var(--t-sm); color: var(--text); }
+.tcard-co   { font-size: var(--t-xs); color: var(--muted); }
+
+/* FAQ */
+.faq-wrap { max-width: 760px; margin: 3.5rem auto 0; }
+details { border-bottom: 1px solid var(--border); }
+details:first-of-type { border-top: 1px solid var(--border); }
+summary { display: flex; justify-content: space-between; align-items: center; padding: 1.2rem 0; font-size: var(--t-lg); font-weight: 600; color: var(--text); cursor: pointer; list-style: none; gap: 1rem; user-select: none; }
+summary::-webkit-details-marker { display: none; }
+summary::after { content: "+"; font-size: 1.75rem; font-weight: 300; color: var(--accent); flex-shrink: 0; transition: transform .2s; line-height: 1; }
+details[open] summary::after { transform: rotate(45deg); }
+.faq-a { padding: 0 0 1.4rem; color: var(--muted); line-height: 1.75; font-size: var(--t-base); }
+
+/* CTA */
+.cta-sec { background: var(--accent); padding: 4.5rem 0; }
+.cta-in  { display: flex; align-items: center; justify-content: space-between; gap: 2.5rem; }
+.cta-h   { font-size: var(--t-3xl); font-weight: 800; letter-spacing: -.035em; color: #fff; line-height: 1.1; text-wrap: balance; margin-bottom: .6rem; }
+.cta-p   { font-size: var(--t-lg); color: rgba(255,255,255,.8); }
+.cta-side { display: flex; flex-direction: column; align-items: flex-end; gap: .9rem; flex-shrink: 0; }
+.cta-tel { font-size: var(--t-sm); color: rgba(255,255,255,.75); }
+.cta-tel a { color: #fff; font-weight: 700; font-size: var(--t-lg); }
+
+/* FOOTER */
+footer { background: #07090E; padding: 3rem 0 2rem; }
+.foot-grid { display: grid; grid-template-columns: 2fr 1fr 1fr 1fr; gap: 3rem; margin-bottom: 2.5rem; }
+.foot-brand .logo { font-size: 1.15rem; display: block; margin-bottom: .65rem; }
+.foot-brand p { font-size: var(--t-sm); color: rgba(255,255,255,.38); line-height: 1.7; max-width: 230px; }
+.foot-col h4 { font-size: var(--t-xs); font-weight: 700; letter-spacing: .09em; text-transform: uppercase; color: rgba(255,255,255,.7); margin-bottom: .9rem; }
+.foot-col ul { list-style: none; }
+.foot-col li { margin-bottom: .45rem; }
+.foot-col a { font-size: var(--t-sm); color: rgba(255,255,255,.38); transition: color .18s; }
+.foot-col a:hover { color: rgba(255,255,255,.8); }
+.foot-bottom { display: flex; align-items: center; justify-content: space-between; padding-top: 1.75rem; border-top: 1px solid rgba(255,255,255,.07); font-size: var(--t-sm); color: rgba(255,255,255,.28); }
+.foot-legal { display: flex; gap: 1.5rem; }
+.foot-legal a { color: rgba(255,255,255,.28); transition: color .18s; }
+.foot-legal a:hover { color: rgba(255,255,255,.6); }
+
+/* RESPONSIVE */
+@media (max-width: 940px) {
+  .hero-grid  { grid-template-columns: 1fr; }
+  .bmock      { display: none; }
+  .ben-grid   { grid-template-columns: 1fr 1fr; }
+  .proc-grid  { grid-template-columns: 1fr 1fr; }
+  .proc-grid::before { display: none; }
+  .price-grid { grid-template-columns: 1fr; max-width: 440px; margin-left: auto; margin-right: auto; }
+  .price-card.feat { transform: none; }
+  .testi-grid { grid-template-columns: 1fr; }
+  .nav-links  { display: none; }
+  .cta-in     { flex-direction: column; text-align: center; }
+  .cta-side   { align-items: center; }
+  .foot-grid  { grid-template-columns: 1fr 1fr; }
+}
+@media (max-width: 600px) {
+  .ben-grid  { grid-template-columns: 1fr; }
+  .proc-grid { grid-template-columns: 1fr; }
+  .foot-grid { grid-template-columns: 1fr; gap: 2rem; }
+  .hero      { padding: 3.5rem 0 3rem; }
+  .sec, .sec-dark, .sec-surf { padding: 3.5rem 0; }
+  .trustbar-lbl { display: none; }
+  .foot-bottom { flex-direction: column; gap: .75rem; text-align: center; }
+  .foot-legal  { flex-wrap: wrap; justify-content: center; }
+}
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition: none !important; animation: none !important; } }
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav class="nav">
+  <div class="wrap nav-in">
+    <div class="logo">painpoint<em>.</em>digital</div>
+    <ul class="nav-links">
+      <li><a href="#leistungen">Leistungen</a></li>
+      <li><a href="#ablauf">Ablauf</a></li>
+      <li><a href="#preise">Preise</a></li>
+      <li><a href="#bewertungen">Kundenmeinungen</a></li>
+      <li><a href="#faq">FAQ</a></li>
+    </ul>
+    <div class="nav-right">
+      <span class="nav-tel">📞 0800 000 0000</span>
+      <a href="#kontakt" class="btn btn-red">Jetzt anfragen</a>
+    </div>
+  </div>
+</nav>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="wrap">
+    <div class="hero-grid">
+      <div>
+        <div class="hero-badge">
+          <span class="st">★★★★★</span> 4,9 von 5 · 312 Google-Bewertungen
+        </div>
+        <h1 class="hero-h1">Deine professionelle Website.<br><em>In 14 Tagen live.</em></h1>
+        <p class="hero-p">Wir erstellen moderne, schnelle und mobiloptimierte Websites für Selbstständige und Unternehmen in der DACH-Region — unkompliziert, zu fairen Festpreisen.</p>
+        <div class="hero-btns">
+          <a href="#kontakt" class="btn btn-red">Kostenloses Angebot anfordern</a>
+          <a href="#preise" class="btn btn-ghost">Preise ansehen</a>
+        </div>
+        <div class="hero-stats">
+          <div class="hero-stat"><strong>500+</strong> Websites erstellt</div>
+          <div class="hero-stat"><strong>14 Tage</strong> Lieferzeit</div>
+          <div class="hero-stat"><strong>100 %</strong> DSGVO-konform</div>
+        </div>
+      </div>
+      <div class="bmock">
+        <div class="bframe">
+          <div class="bbar">
+            <div class="bdot r"></div>
+            <div class="bdot y"></div>
+            <div class="bdot g"></div>
+            <div class="burl">🔒 deine-website.de</div>
+          </div>
+          <div class="bcontent">
+            <div class="mnav">
+              <div class="mnav-pill" style="width:42px;"></div>
+              <div class="mnav-pill" style="width:28px;opacity:.3;"></div>
+              <div class="mnav-pill" style="width:28px;opacity:.3;"></div>
+              <div style="flex:1;"></div>
+              <div style="width:58px;height:19px;background:rgba(255,255,255,.9);border-radius:4px;"></div>
+            </div>
+            <div class="mhero">
+              <div class="ml a"></div>
+              <div class="ml b"></div>
+              <div class="ml c"></div>
+              <div class="mcta"></div>
+            </div>
+            <div class="mcards">
+              <div class="mcard"><div class="mcard-ico"></div><div class="mcard-l"></div><div class="mcard-l s"></div></div>
+              <div class="mcard"><div class="mcard-ico"></div><div class="mcard-l"></div><div class="mcard-l s"></div></div>
+              <div class="mcard"><div class="mcard-ico"></div><div class="mcard-l"></div><div class="mcard-l s"></div></div>
+            </div>
+          </div>
+        </div>
+        <div class="bfloat">
+          <div class="bfloat-ico">🚀</div>
+          <div class="bfloat-txt"><strong>In 14 Tagen live!</strong>Jetzt beauftragen</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- TRUST BAR -->
+<div class="trustbar">
+  <div class="wrap">
+    <div class="trustbar-in">
+      <span class="trustbar-lbl">Bereits vertraut von:</span>
+      <div class="trustbar-logos">
+        <span class="tlogo">Metzgerei Wagner</span>
+        <span class="tlogo">Dr. Müller Zahnarzt</span>
+        <span class="tlogo">Elektro Becker GmbH</span>
+        <span class="tlogo">Kosmetik Lima</span>
+        <span class="tlogo">Immobilien Peters</span>
+        <span class="tlogo">Steuerberatung Held</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- BENEFITS -->
+<section class="sec" id="leistungen">
+  <div class="wrap">
+    <div class="sec-hd">
+      <span class="eyebrow">Warum Painpoint Digital?</span>
+      <h2 class="h2">Alles aus einer Hand —<br>kein Technik-Stress.</h2>
+      <p class="sub">Von der ersten Idee bis zum Go-live kümmern wir uns um alles. Du konzentrierst dich auf dein Geschäft.</p>
+    </div>
+    <div class="ben-grid">
+      <div class="ben-card">
+        <div class="ben-ico">⚡</div>
+        <h3>Schnell & zuverlässig</h3>
+        <p>Deine Website ist innerhalb von 14 Werktagen fertig und live. Keine monatelangen Wartezeiten, keine leeren Versprechen.</p>
+      </div>
+      <div class="ben-card">
+        <div class="ben-ico">💶</div>
+        <h3>Transparente Preise</h3>
+        <p>Kein Stundensatz-Chaos, keine versteckten Kosten. Du weißt von Anfang an genau, was deine Website kostet.</p>
+      </div>
+      <div class="ben-card">
+        <div class="ben-ico">📱</div>
+        <h3>Mobil optimiert</h3>
+        <p>Über 70 % deiner Besucher kommen per Smartphone. Deine Website sieht auf jedem Gerät perfekt aus — garantiert.</p>
+      </div>
+      <div class="ben-card">
+        <div class="ben-ico">🔍</div>
+        <h3>SEO-ready</h3>
+        <p>Wir bauen deine Website so, dass Google sie findet. Technische Optimierung und sauberer Code sind bei uns Standard.</p>
+      </div>
+      <div class="ben-card">
+        <div class="ben-ico">🔒</div>
+        <h3>DSGVO-konform</h3>
+        <p>Cookie-Banner, Datenschutzerklärung, Impressum — alles rechtssicher eingerichtet und geprüft für den DACH-Markt.</p>
+      </div>
+      <div class="ben-card">
+        <div class="ben-ico">🛠️</div>
+        <h3>Support inklusive</h3>
+        <p>Nach dem Launch lassen wir dich nicht allein. Unser Support-Team ist für dich da — per E-Mail, Telefon und Chat.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- PROCESS -->
+<section class="sec-dark" id="ablauf">
+  <div class="wrap">
+    <div class="sec-hd center">
+      <span class="eyebrow">So einfach geht's</span>
+      <h2 class="h2 h2-light">In 4 Schritten zur fertigen Website</h2>
+      <p class="sub sub-light" style="margin:0 auto;">Du hast Besseres zu tun, als dich mit Website-Technik zu befassen. Deshalb halten wir den Prozess so unkompliziert wie möglich.</p>
+    </div>
+    <div class="proc-grid">
+      <div class="proc-step">
+        <div class="proc-num">1</div>
+        <h3>Erstgespräch</h3>
+        <p>In einem kostenlosen 30-Minuten-Call lernen wir dein Unternehmen kennen und klären, was deine Website leisten soll.</p>
+      </div>
+      <div class="proc-step">
+        <div class="proc-num">2</div>
+        <h3>Angebot & Auftrag</h3>
+        <p>Du erhältst innerhalb von 24 Stunden ein individuelles Angebot — transparent und ohne versteckte Klauseln.</p>
+      </div>
+      <div class="proc-step">
+        <div class="proc-num">3</div>
+        <h3>Wir bauen deine Website</h3>
+        <p>Unser Team setzt alles professionell um. Du gibst Feedback, wir passen an — maximal zwei Korrekturschleifen.</p>
+      </div>
+      <div class="proc-step">
+        <div class="proc-num">4</div>
+        <h3>Go-live & Support</h3>
+        <p>Nach deiner Freigabe schalten wir live. Du bekommst eine Einweisung und dauerhaften Support von unserem Team.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- PRICING -->
+<section class="sec" id="preise">
+  <div class="wrap">
+    <div class="sec-hd center">
+      <span class="eyebrow">Unsere Pakete</span>
+      <h2 class="h2">Faire Preise. Keine Überraschungen.</h2>
+      <p class="sub" style="margin:0 auto;">Alle Pakete beinhalten Design, Entwicklung, Hosting-Einrichtung und 30 Tage kostenlosen Support nach dem Launch.</p>
+    </div>
+    <div class="price-grid">
+      <div class="price-card">
+        <h3>Starter</h3>
+        <div class="price-amt"><sup>ab </sup>799 €</div>
+        <div class="price-note">Einmalig, zzgl. MwSt.</div>
+        <ul class="price-feats">
+          <li class="pf">Bis zu 5 Seiten</li>
+          <li class="pf">Responsives Design</li>
+          <li class="pf">Kontaktformular</li>
+          <li class="pf">Google Maps Integration</li>
+          <li class="pf">DSGVO-Grundpaket</li>
+          <li class="pf no">Shop / E-Commerce</li>
+          <li class="pf no">SEO-Optimierung</li>
+          <li class="pf no">Texterstellung</li>
+        </ul>
+        <a href="#kontakt" class="btn btn-dark-card btn-full">Starter wählen</a>
+      </div>
+      <div class="price-card feat">
+        <span class="feat-badge">Beliebteste Wahl</span>
+        <h3>Business</h3>
+        <div class="price-amt"><sup>ab </sup>1.499 €</div>
+        <div class="price-note">Einmalig, zzgl. MwSt. · inkl. 3 Monate Support</div>
+        <ul class="price-feats">
+          <li class="pf">Bis zu 12 Seiten</li>
+          <li class="pf">Responsives Design</li>
+          <li class="pf">Kontaktformular & Buchungssystem</li>
+          <li class="pf">Google Maps & Social Media</li>
+          <li class="pf">DSGVO-Vollpaket</li>
+          <li class="pf">SEO-Grundoptimierung</li>
+          <li class="pf">Texterstellung (bis 10 Seiten)</li>
+          <li class="pf no">Shop / E-Commerce</li>
+        </ul>
+        <a href="#kontakt" class="btn btn-red btn-full">Business wählen</a>
+      </div>
+      <div class="price-card">
+        <h3>Premium</h3>
+        <div class="price-amt"><sup>ab </sup>2.999 €</div>
+        <div class="price-note">Einmalig, zzgl. MwSt. · inkl. 6 Monate Wartung</div>
+        <ul class="price-feats">
+          <li class="pf">Unbegrenzte Seiten</li>
+          <li class="pf">Responsives Design</li>
+          <li class="pf">Shop / E-Commerce</li>
+          <li class="pf">Vollständige SEO-Optimierung</li>
+          <li class="pf">DSGVO-Vollpaket</li>
+          <li class="pf">Texterstellung (komplett)</li>
+          <li class="pf">Professionelle Bildbearbeitung</li>
+          <li class="pf">6 Monate Wartung inklusive</li>
+        </ul>
+        <a href="#kontakt" class="btn btn-dark-card btn-full">Premium wählen</a>
+      </div>
+    </div>
+    <p style="text-align:center;color:var(--muted);font-size:var(--t-sm);margin-top:1.75rem;">Alle Preise zzgl. gesetzlicher MwSt. Individuelle Projekte auf Anfrage.</p>
+  </div>
+</section>
+
+<!-- TESTIMONIALS -->
+<section class="sec-surf" id="bewertungen">
+  <div class="wrap">
+    <div class="sec-hd center">
+      <span class="eyebrow">Kundenstimmen</span>
+      <h2 class="h2">Das sagen unsere Kunden</h2>
+      <p class="sub" style="margin:0 auto;">Über 500 Unternehmer haben uns bereits ihr Vertrauen geschenkt. Hier einige ihrer Erfahrungen.</p>
+    </div>
+    <div class="testi-grid">
+      <div class="tcard">
+        <div class="tcard-stars">★★★★★</div>
+        <p class="tcard-txt">„Ich war ehrlich gesagt skeptisch, ob man für unter 1.000 Euro eine ordentliche Website bekommt. Das Ergebnis hat mich komplett überzeugt — professionell, schnell, und der Support war wirklich top."</p>
+        <div class="tcard-auth">
+          <div class="tcard-av" style="background:#E8411C;">SM</div>
+          <div><div class="tcard-name">Stefan Müller</div><div class="tcard-co">Elektro-Betrieb, Stuttgart</div></div>
+        </div>
+      </div>
+      <div class="tcard">
+        <div class="tcard-stars">★★★★★</div>
+        <p class="tcard-txt">„Endlich eine Website, die auch auf dem Handy gut aussieht! Die Anfragen über das Kontaktformular haben sich innerhalb von zwei Monaten fast verdoppelt. Absolut empfehlenswert."</p>
+        <div class="tcard-auth">
+          <div class="tcard-av" style="background:#1A5FE8;">KH</div>
+          <div><div class="tcard-name">Katharina Hoffmann</div><div class="tcard-co">Kosmetikstudio, München</div></div>
+        </div>
+      </div>
+      <div class="tcard">
+        <div class="tcard-stars">★★★★★</div>
+        <p class="tcard-txt">„Der gesamte Ablauf war super strukturiert — ich wusste immer, was als nächstes passiert. Das Ergebnis sieht aus wie eine Seite, die das Dreifache gekostet hätte. Danke ans ganze Team!"</p>
+        <div class="tcard-auth">
+          <div class="tcard-av" style="background:#197A3E;">TW</div>
+          <div><div class="tcard-name">Thomas Wagner</div><div class="tcard-co">Steuerberater, Hamburg</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FAQ -->
+<section class="sec" id="faq">
+  <div class="wrap">
+    <div class="sec-hd center">
+      <span class="eyebrow">Häufige Fragen</span>
+      <h2 class="h2">Du hast Fragen?<br>Wir haben Antworten.</h2>
+    </div>
+    <div class="faq-wrap">
+      <details open>
+        <summary>Wie lange dauert es, bis meine Website fertig ist?</summary>
+        <div class="faq-a">In der Regel 10–14 Werktage vom Auftragseingang bis zum Go-live. Im Business- und Premium-Paket arbeiten wir intensiver zusammen, was je nach Feedback-Schleifen etwas länger dauern kann. Wir kommunizieren den Status während des gesamten Projekts transparent.</div>
+      </details>
+      <details>
+        <summary>Brauche ich technische Kenntnisse?</summary>
+        <div class="faq-a">Überhaupt nicht. Du musst dich um nichts kümmern — wir erstellen, hosten und warten deine Website vollständig. Falls du nach dem Launch Inhalte selbst anpassen möchtest, schulen wir dich gern kurz ein.</div>
+      </details>
+      <details>
+        <summary>Was passiert nach dem Launch? Gibt es Support?</summary>
+        <div class="faq-a">Alle Pakete beinhalten 30 Tage kostenlosen Support nach dem Go-live. Im Business-Paket sind 3 Monate, im Premium-Paket 6 Monate Wartung inklusive. Darüber hinaus bieten wir günstige monatliche Wartungspakete an.</div>
+      </details>
+      <details>
+        <summary>Kann ich die Website später selbst bearbeiten?</summary>
+        <div class="faq-a">Ja. Wir bauen deine Website auf einem benutzerfreundlichen CMS auf. Texte, Bilder und einfache Inhalte kannst du jederzeit selbst anpassen — ganz ohne Programmierkenntnisse.</div>
+      </details>
+      <details>
+        <summary>Ist die Website DSGVO-konform?</summary>
+        <div class="faq-a">Ja. Wir integrieren Cookie-Consent, Datenschutzerklärung, Impressum und alle nötigen technischen Maßnahmen gemäß DSGVO. Für rechtliche Spezialfragen empfehlen wir ergänzend einen Fachanwalt hinzuzuziehen.</div>
+      </details>
+      <details>
+        <summary>Gibt es einen Online-Shop in euren Paketen?</summary>
+        <div class="faq-a">E-Commerce ist im Premium-Paket enthalten. Wir setzen Online-Shops auf Basis von WooCommerce oder Shopify um — je nachdem, was am besten zu deinen Anforderungen passt. Sprich uns auch gern direkt an.</div>
+      </details>
+    </div>
+  </div>
+</section>
+
+<!-- CTA -->
+<section class="cta-sec" id="kontakt">
+  <div class="wrap">
+    <div class="cta-in">
+      <div>
+        <h2 class="cta-h">Bereit für deine neue Website?</h2>
+        <p class="cta-p">Kostenloses Erstgespräch — ohne Verpflichtung, ohne Kleingedrucktes.</p>
+      </div>
+      <div class="cta-side">
+        <a href="mailto:hallo@painpoint-digital.de" class="btn btn-light" style="font-size:var(--t-lg);padding:1rem 2rem;">Jetzt kostenlos anfragen →</a>
+        <div class="cta-tel">Oder direkt anrufen: <a href="tel:+498001234567">0800 123 4567</a></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <div class="wrap">
+    <div class="foot-grid">
+      <div class="foot-brand">
+        <span class="logo">painpoint<em>.</em>digital</span>
+        <p>Professionelle Websites für Selbstständige und Unternehmen in Deutschland, Österreich und der Schweiz.</p>
+      </div>
+      <div class="foot-col">
+        <h4>Leistungen</h4>
+        <ul>
+          <li><a href="#">Website erstellen</a></li>
+          <li><a href="#">Webdesign</a></li>
+          <li><a href="#">Online-Shop</a></li>
+          <li><a href="#">SEO-Optimierung</a></li>
+          <li><a href="#">Wartung & Support</a></li>
+        </ul>
+      </div>
+      <div class="foot-col">
+        <h4>Unternehmen</h4>
+        <ul>
+          <li><a href="#">Über uns</a></li>
+          <li><a href="#">Referenzen</a></li>
+          <li><a href="#">Blog</a></li>
+          <li><a href="#">Karriere</a></li>
+        </ul>
+      </div>
+      <div class="foot-col">
+        <h4>Kontakt</h4>
+        <ul>
+          <li><a href="#">Anfrage stellen</a></li>
+          <li><a href="tel:+498001234567">0800 123 4567</a></li>
+          <li><a href="mailto:hallo@painpoint-digital.de">hallo@painpoint-digital.de</a></li>
+          <li><a href="#">Rückruf anfragen</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="foot-bottom">
+      <span>© 2025 Painpoint Digital GmbH. Alle Rechte vorbehalten.</span>
+      <div class="foot-legal">
+        <a href="#">Impressum</a>
+        <a href="#">Datenschutz</a>
+        <a href="#">AGB</a>
+        <a href="#">Cookie-Einstellungen</a>
+      </div>
+    </div>
+  </div>
+</footer>
+
+</body>
+</html>
