@@ -1,315 +1,721 @@
 <!DOCTYPE html>
 <html lang="de">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>JARVIS</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <style>
-    :root {
-      --accent: #38d9ff;
-      --accent-dim: #1a6b8f;
-      --bg: #04070d;
-      --danger: #ff5c7a;
-      --ok: #55ffa8;
-    }
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    html, body {
-      height: 100%;
-      background: var(--bg);
-      color: #cfe9ff;
-      font-family: "Segoe UI", "Helvetica Neue", system-ui, sans-serif;
-      overflow: hidden;
-    }
-    body {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      background:
-        radial-gradient(circle at 50% 40%, rgba(56,217,255,0.08), transparent 60%),
-        radial-gradient(circle at 50% 120%, rgba(56,217,255,0.10), transparent 55%),
-        var(--bg);
-    }
-    /* subtle grid */
-    body::before {
-      content: "";
-      position: fixed;
-      inset: 0;
-      background-image:
-        linear-gradient(rgba(56,217,255,0.04) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(56,217,255,0.04) 1px, transparent 1px);
-      background-size: 46px 46px;
-      mask-image: radial-gradient(circle at 50% 45%, black, transparent 75%);
-      pointer-events: none;
-    }
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Augustin Webdesign – Website erstellen lassen in Bamberg &amp; Würzburg</title>
+<meta name="description" content="Website erstellen lassen in Bamberg und Würzburg. Erst die fertige Website sehen, dann entscheiden. Unverbindliche Einschätzung in 60 Sekunden.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300&family=Jost:wght@300;400;500;600&display=swap" rel="stylesheet">
 
-    .stage {
-      position: relative;
-      width: min(70vw, 70vh, 560px);
-      aspect-ratio: 1;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      z-index: 2;
-    }
-    canvas#orb {
-      width: 100%;
-      height: 100%;
-      cursor: pointer;
-      filter: drop-shadow(0 0 40px rgba(56,217,255,0.35));
-    }
+<!-- =====================================================================
+     HIER DEINE DATEN EINTRAGEN  →  ganz unten im <script> unter "KONFIG"
+     ===================================================================== -->
 
-    .hud-top {
-      position: fixed;
-      top: 28px;
-      left: 0; right: 0;
-      text-align: center;
-      z-index: 3;
-      pointer-events: none;
-    }
-    .hud-top .brand {
-      font-size: 13px;
-      letter-spacing: 8px;
-      color: var(--accent);
-      opacity: 0.8;
-    }
-    .state-label {
-      margin-top: 6px;
-      font-size: 12px;
-      letter-spacing: 3px;
-      text-transform: uppercase;
-      color: #6f8aa0;
-      min-height: 16px;
-    }
+<style>
+:root{
+  --ink:        #0E0D0B;
+  --ink-2:      #16140F;
+  --ink-3:      #201D16;
+  --brass:      #C9A24A;
+  --brass-hi:   #E6CE92;
+  --bone:       #F3EEE4;
+  --muted:      #9C9384;
+  --line:       rgba(201,162,74,.22);
+  --wa:         #25D366;
 
-    /* Goal panel */
-    .goal-panel {
-      position: fixed;
-      top: 90px;
-      left: 50%;
-      transform: translateX(-50%);
-      z-index: 3;
-      background: rgba(8,18,28,0.55);
-      border: 1px solid rgba(56,217,255,0.25);
-      border-radius: 14px;
-      padding: 12px 22px;
-      backdrop-filter: blur(8px);
-      text-align: center;
-      max-width: 90vw;
-      opacity: 0;
-      transition: opacity .4s;
-    }
-    .goal-panel.show { opacity: 1; }
-    .goal-panel .lbl {
-      font-size: 10px; letter-spacing: 3px; color: #5f7a90; text-transform: uppercase;
-    }
-    .goal-panel .goal-text {
-      margin-top: 4px; font-size: 18px; color: #eafaff;
-    }
-    .goal-panel .goal-amount { color: var(--accent); font-weight: 600; }
+  --display: "Cormorant Garamond", Georgia, serif;
+  --body:    "Jost", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 
-    /* Transcript / dialog */
-    .dialog {
-      position: fixed;
-      bottom: 130px;
-      left: 50%;
-      transform: translateX(-50%);
-      width: min(760px, 90vw);
-      z-index: 3;
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-      max-height: 34vh;
-      overflow: hidden;
-      -webkit-mask-image: linear-gradient(transparent, black 22%);
-      mask-image: linear-gradient(transparent, black 22%);
-    }
-    .bubble {
-      align-self: flex-start;
-      max-width: 85%;
-      padding: 10px 16px;
-      border-radius: 14px;
-      font-size: 15px;
-      line-height: 1.45;
-      animation: rise .35s ease both;
-    }
-    .bubble.user {
-      align-self: flex-end;
-      background: rgba(56,217,255,0.14);
-      border: 1px solid rgba(56,217,255,0.3);
-      color: #eafaff;
-    }
-    .bubble.jarvis {
-      background: rgba(10,22,34,0.7);
-      border: 1px solid rgba(56,217,255,0.16);
-      color: #bfe3f5;
-    }
-    .bubble.interim { opacity: .55; font-style: italic; }
-    @keyframes rise { from { opacity: 0; transform: translateY(12px);} to {opacity:1; transform:none;} }
+  --pad: clamp(1.25rem, 5vw, 4rem);
+  --maxw: 1120px;
+}
 
-    /* Controls */
-    .controls {
-      position: fixed;
-      bottom: 42px;
-      left: 50%;
-      transform: translateX(-50%);
-      z-index: 4;
-      display: flex;
-      align-items: center;
-      gap: 18px;
-    }
-    .mic-btn {
-      width: 68px; height: 68px;
-      border-radius: 50%;
-      border: 1px solid rgba(56,217,255,0.4);
-      background: rgba(10,26,38,0.8);
-      color: var(--accent);
-      cursor: pointer;
-      display: grid; place-items: center;
-      transition: all .2s;
-      position: relative;
-    }
-    .mic-btn:hover { background: rgba(20,44,60,0.9); }
-    .mic-btn.active {
-      background: var(--accent);
-      color: #04121a;
-      box-shadow: 0 0 0 0 rgba(56,217,255,0.6);
-      animation: micpulse 1.6s infinite;
-    }
-    @keyframes micpulse {
-      0% { box-shadow: 0 0 0 0 rgba(56,217,255,0.55); }
-      100% { box-shadow: 0 0 0 22px rgba(56,217,255,0); }
-    }
-    .mic-btn svg { width: 28px; height: 28px; }
-    .text-input {
-      background: rgba(8,18,28,0.7);
-      border: 1px solid rgba(56,217,255,0.25);
-      border-radius: 24px;
-      padding: 14px 20px;
-      color: #eafaff;
-      font-size: 15px;
-      width: min(420px, 60vw);
-      outline: none;
-    }
-    .text-input::placeholder { color: #4f6b80; }
-    .text-input:focus { border-color: var(--accent); }
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{
+  background:var(--ink);
+  color:var(--bone);
+  font-family:var(--body);
+  font-weight:300;
+  line-height:1.65;
+  -webkit-font-smoothing:antialiased;
+  overflow-x:hidden;
+}
+img,video{display:block;max-width:100%}
+a{color:inherit}
+button{font:inherit;cursor:pointer;border:none;background:none;color:inherit}
+:focus-visible{outline:2px solid var(--brass-hi);outline-offset:3px;border-radius:2px}
 
-    .hint {
-      position: fixed;
-      bottom: 14px;
-      left: 0; right: 0;
-      text-align: center;
-      font-size: 11px;
-      color: #40566a;
-      z-index: 3;
-    }
-    .unsupported {
-      position: fixed; inset: 0; display: none;
-      align-items: center; justify-content: center;
-      background: rgba(4,7,13,0.9); z-index: 20; text-align: center; padding: 30px;
-    }
+.wrap{max-width:var(--maxw);margin-inline:auto;padding-inline:var(--pad)}
 
-    /* API Key Setup */
-    .api-overlay {
-      position: fixed; inset: 0;
-      background: rgba(4,7,13,0.97);
-      z-index: 30;
-      display: flex; align-items: center; justify-content: center;
-      flex-direction: column; gap: 18px; padding: 30px;
-      text-align: center;
-    }
-    .api-overlay h2 { color: var(--accent); letter-spacing: 4px; font-size: 18px; }
-    .api-overlay p { color: #7fa0b5; font-size: 14px; max-width: 420px; line-height: 1.6; }
-    .api-overlay input {
-      background: rgba(8,18,28,0.8);
-      border: 1px solid rgba(56,217,255,0.35);
-      border-radius: 10px;
-      padding: 14px 20px;
-      color: #eafaff;
-      font-size: 15px;
-      width: min(380px, 90vw);
-      outline: none;
-      letter-spacing: 1px;
-    }
-    .api-overlay input:focus { border-color: var(--accent); }
-    .api-overlay button {
-      background: var(--accent);
-      color: #04121a;
-      border: none;
-      border-radius: 10px;
-      padding: 13px 36px;
-      font-size: 15px;
-      font-weight: 700;
-      cursor: pointer;
-      letter-spacing: 2px;
-    }
-    .api-overlay .skip-btn {
-      background: transparent;
-      color: #4f6b80;
-      font-size: 12px;
-      padding: 6px 12px;
-      font-weight: 400;
-      letter-spacing: 1px;
-    }
-    .api-overlay .api-hint {
-      font-size: 11px; color: #3a5060;
-    }
-  </style>
+/* ---------- Typo ---------- */
+h1,h2,h3{font-family:var(--display);font-weight:300;line-height:1.08;letter-spacing:-.01em}
+h1{font-size:clamp(2.6rem,7vw,5rem)}
+h2{font-size:clamp(2rem,4.6vw,3.4rem)}
+h3{font-size:clamp(1.25rem,2.2vw,1.6rem)}
+em{font-style:italic;color:var(--brass-hi)}
+.eyebrow{
+  font-family:var(--body);font-size:.72rem;font-weight:500;
+  letter-spacing:.22em;text-transform:uppercase;color:var(--brass);
+  display:flex;align-items:center;gap:.75rem;margin-bottom:1.4rem;
+}
+.eyebrow::after{content:"";flex:1;height:1px;background:var(--line);max-width:80px}
+.lead{font-size:clamp(1.02rem,1.5vw,1.15rem);color:#CFC7B8;max-width:52ch}
+
+/* ---------- Header ---------- */
+.topbar{
+  position:fixed;inset:0 0 auto 0;z-index:60;
+  display:flex;align-items:center;justify-content:space-between;
+  gap:1rem;padding:.85rem var(--pad);
+  transition:background .35s ease, backdrop-filter .35s ease, border-color .35s;
+  border-bottom:1px solid transparent;
+}
+.topbar.solid{
+  background:rgba(14,13,11,.9);
+  backdrop-filter:blur(14px);
+  border-bottom-color:var(--line);
+}
+.mark{display:flex;align-items:center;gap:.7rem;text-decoration:none}
+.mark .seal{
+  width:34px;height:34px;flex:none;border-radius:50%;
+  border:1px solid var(--brass);
+  display:grid;place-items:center;
+  font-family:var(--display);font-size:.85rem;color:var(--brass);letter-spacing:.02em;
+}
+.mark b{font-family:var(--display);font-size:1.12rem;font-weight:400;letter-spacing:.01em}
+.mark span{display:block;font-size:.6rem;letter-spacing:.2em;text-transform:uppercase;color:var(--muted);margin-top:-2px}
+.topbar-cta{
+  display:inline-flex;align-items:center;gap:.5rem;
+  font-size:.82rem;letter-spacing:.06em;text-decoration:none;
+  border:1px solid var(--line);border-radius:999px;
+  padding:.5rem 1.1rem;transition:.25s;
+}
+.topbar-cta:hover{border-color:var(--brass);background:rgba(201,162,74,.08)}
+@media (max-width:640px){.topbar-cta .lbl{display:none}.topbar-cta{padding:.5rem .8rem}}
+
+/* ---------- Hero ---------- */
+.hero{position:relative;min-height:100svh;display:flex;align-items:flex-end;padding-bottom:clamp(2rem,6vh,4.5rem);overflow:hidden}
+.hero-media{position:absolute;inset:0;z-index:0}
+.hero-media video{width:100%;height:100%;object-fit:cover}
+/* Standbild-Kulisse: Figur rechts, Textzone links */
+.hero-photo{
+  position:absolute;inset:0;
+  background-image:url("hero-desktop.jpg");
+  background-size:cover;
+  background-position:right center;
+}
+@media (max-width:760px){
+  .hero-photo{background-image:url("hero-mobile.jpg");background-position:center top}
+}
+/* Fallback-Kulisse, solange kein Video hinterlegt ist */
+.hero-fallback{
+  position:absolute;inset:0;
+  background:
+    radial-gradient(120% 90% at 78% 12%, rgba(201,162,74,.30), transparent 58%),
+    radial-gradient(90% 70% at 12% 88%, rgba(120,86,40,.28), transparent 60%),
+    linear-gradient(160deg,#14120E 0%,#0B0A08 55%,#171309 100%);
+}
+.hero-fallback::after{
+  content:"";position:absolute;inset:-30%;
+  background:linear-gradient(105deg,transparent 42%,rgba(230,206,146,.10) 50%,transparent 58%);
+  animation:sweep 11s linear infinite;
+}
+@keyframes sweep{0%{transform:translateX(-42%)}100%{transform:translateX(42%)}}
+.hero-scrim{
+  position:absolute;inset:0;z-index:1;
+  background:
+    linear-gradient(90deg,rgba(14,13,11,.90) 0%,rgba(14,13,11,.62) 38%,rgba(14,13,11,.18) 66%,rgba(14,13,11,.42) 100%),
+    linear-gradient(180deg,rgba(14,13,11,.72) 0%,rgba(14,13,11,.10) 26%,rgba(14,13,11,.70) 74%,var(--ink) 100%);
+}
+@media (max-width:760px){
+  .hero-scrim{
+    background:linear-gradient(180deg,rgba(14,13,11,.78) 0%,rgba(14,13,11,.15) 24%,rgba(14,13,11,.82) 66%,var(--ink) 100%);
+  }
+}
+.grain{
+  position:absolute;inset:0;z-index:2;pointer-events:none;opacity:.5;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)' opacity='.32'/%3E%3C/svg%3E");
+}
+.hero-inner{position:relative;z-index:3;width:100%}
+.hero h1{max-width:16ch;margin-bottom:1.4rem}
+.hero .lead{margin-bottom:2rem}
+.hero-facts{display:flex;flex-wrap:wrap;gap:.5rem 1.6rem;font-size:.78rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.hero-facts span{display:flex;align-items:center;gap:.5rem}
+.hero-facts span::before{content:"";width:5px;height:5px;background:var(--brass);border-radius:50%}
+.scroll-hint{margin-top:2.4rem;font-size:.75rem;letter-spacing:.18em;text-transform:uppercase;color:var(--muted);display:flex;align-items:center;gap:.7rem}
+.scroll-hint i{display:block;width:34px;height:1px;background:var(--brass);animation:pull 2.6s ease-in-out infinite}
+@keyframes pull{0%,100%{transform:scaleX(.4);transform-origin:left}50%{transform:scaleX(1);transform-origin:left}}
+
+/* ---------- Sections ---------- */
+section{padding-block:clamp(4rem,9vw,7.5rem)}
+.sec-head{margin-bottom:3rem;max-width:62ch}
+
+/* ---------- Quiz ---------- */
+#angebot{background:linear-gradient(180deg,var(--ink) 0%,var(--ink-2) 100%);scroll-margin-top:70px}
+.quiz{
+  border:1px solid var(--line);border-radius:4px;
+  background:linear-gradient(150deg,rgba(32,29,22,.9),rgba(18,16,12,.9));
+  padding:clamp(1.4rem,3.5vw,2.75rem);
+  position:relative;overflow:hidden;
+}
+.quiz::before{content:"";position:absolute;inset:0 auto 0 0;width:2px;background:linear-gradient(180deg,var(--brass),transparent)}
+.progress{display:flex;align-items:center;gap:.9rem;margin-bottom:2rem}
+.progress-track{flex:1;height:2px;background:rgba(255,255,255,.09);position:relative;overflow:hidden}
+.progress-fill{position:absolute;inset:0 auto 0 0;width:0;background:var(--brass);transition:width .45s cubic-bezier(.4,0,.2,1)}
+.progress-num{font-size:.72rem;letter-spacing:.16em;color:var(--muted);white-space:nowrap}
+
+.step{display:none;animation:fade .4s ease both}
+.step.on{display:block}
+@keyframes fade{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+.step h3{margin-bottom:.35rem}
+.step .hint{font-size:.85rem;color:var(--muted);margin-bottom:1.5rem}
+
+.opts{display:grid;gap:.6rem;grid-template-columns:repeat(auto-fit,minmax(210px,1fr))}
+.opt{
+  text-align:left;border:1px solid rgba(255,255,255,.1);border-radius:3px;
+  padding:.95rem 1.1rem;font-size:.95rem;transition:.2s;
+  display:flex;align-items:center;justify-content:space-between;gap:1rem;
+}
+.opt:hover{border-color:var(--brass);background:rgba(201,162,74,.07);transform:translateY(-1px)}
+.opt.picked{border-color:var(--brass);background:rgba(201,162,74,.12)}
+.opt .tick{opacity:0;color:var(--brass);transition:.2s}
+.opt.picked .tick{opacity:1}
+
+.field{margin-bottom:1rem}
+.field label{display:block;font-size:.75rem;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin-bottom:.45rem}
+.field input{
+  width:100%;background:rgba(0,0,0,.35);border:1px solid rgba(255,255,255,.12);
+  border-radius:3px;padding:.85rem 1rem;color:var(--bone);font-size:1rem;transition:.2s;
+}
+.field input:focus{border-color:var(--brass);outline:none;background:rgba(0,0,0,.5)}
+.field input::placeholder{color:#6E675C}
+
+.summary{border-top:1px solid var(--line);margin-top:1.5rem;padding-top:1.25rem}
+.summary-title{font-size:.72rem;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);margin-bottom:.8rem}
+.chips{display:flex;flex-wrap:wrap;gap:.4rem}
+.chip{font-size:.78rem;border:1px solid var(--line);border-radius:999px;padding:.28rem .8rem;color:var(--brass-hi)}
+.chip.empty{color:var(--muted);border-style:dashed;opacity:.5}
+
+.quiz-nav{display:flex;align-items:center;justify-content:space-between;gap:1rem;margin-top:1.75rem}
+.back{font-size:.82rem;color:var(--muted);letter-spacing:.06em;transition:.2s}
+.back:hover{color:var(--bone)}
+.back[hidden]{visibility:hidden;display:block}
+
+.btn{
+  display:inline-flex;align-items:center;justify-content:center;gap:.6rem;
+  padding:.95rem 1.9rem;border-radius:3px;font-size:.88rem;font-weight:500;
+  letter-spacing:.1em;text-transform:uppercase;text-decoration:none;transition:.25s;
+}
+.btn-primary{background:var(--brass);color:#14120D}
+.btn-primary:hover{background:var(--brass-hi);transform:translateY(-1px)}
+.btn-wa{background:var(--wa);color:#06301A}
+.btn-wa:hover{filter:brightness(1.08);transform:translateY(-1px)}
+.btn-ghost{border:1px solid var(--line);color:var(--bone)}
+.btn-ghost:hover{border-color:var(--brass);background:rgba(201,162,74,.08)}
+.btn[disabled]{opacity:.35;pointer-events:none}
+
+.final-actions{display:flex;flex-wrap:wrap;gap:.75rem;margin-top:1.5rem}
+.final-note{font-size:.8rem;color:var(--muted);margin-top:1rem;max-width:46ch}
+
+/* ---------- Ablauf ---------- */
+.steps-list{display:grid;gap:1px;background:var(--line);border:1px solid var(--line)}
+.step-row{background:var(--ink);padding:clamp(1.4rem,3vw,2.2rem);display:grid;grid-template-columns:auto 1fr;gap:1.5rem;align-items:start}
+.step-row .n{font-family:var(--display);font-size:2rem;color:var(--brass);line-height:1;min-width:2ch}
+.step-row p{color:var(--muted);font-size:.94rem;margin-top:.4rem;max-width:56ch}
+
+/* ---------- Branchen ---------- */
+.branchen{display:grid;gap:1rem;grid-template-columns:repeat(auto-fit,minmax(230px,1fr))}
+.branche{
+  border:1px solid var(--line);border-radius:3px;padding:1.6rem 1.4rem;
+  background:linear-gradient(160deg,rgba(32,29,22,.55),transparent);
+  transition:.28s;
+}
+.branche:hover{border-color:var(--brass);transform:translateY(-3px)}
+.branche h3{font-size:1.22rem;margin-bottom:.4rem}
+.branche p{font-size:.88rem;color:var(--muted)}
+
+/* ---------- Preise ---------- */
+.preise{display:grid;gap:1rem;grid-template-columns:repeat(auto-fit,minmax(260px,1fr))}
+.tier{border:1px solid var(--line);border-radius:3px;padding:1.9rem 1.6rem;display:flex;flex-direction:column;background:rgba(22,20,15,.6)}
+.tier.mid{border-color:var(--brass);background:rgba(201,162,74,.07);position:relative}
+.tier.mid::after{
+  content:"Am häufigsten gewählt";position:absolute;top:-1px;right:1.2rem;
+  transform:translateY(-50%);background:var(--brass);color:#14120D;
+  font-size:.62rem;letter-spacing:.14em;text-transform:uppercase;padding:.25rem .7rem;border-radius:999px;
+}
+.tier h3{margin-bottom:.2rem}
+.tier .price{font-family:var(--display);font-size:2.6rem;color:var(--brass-hi);line-height:1.1;margin:.6rem 0 1.2rem}
+.tier .price small{font-family:var(--body);font-size:.72rem;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);display:block;margin-top:.3rem}
+.tier ul{list-style:none;display:grid;gap:.6rem;font-size:.9rem;color:#C4BCAE;flex:1}
+.tier li{display:flex;gap:.65rem}
+.tier li::before{content:"—";color:var(--brass);flex:none}
+
+/* ---------- Kontakt ---------- */
+#kontakt{background:linear-gradient(180deg,var(--ink) 0%,var(--ink-3) 100%);text-align:center}
+#kontakt .lead{margin-inline:auto}
+.kontakt-actions{display:flex;flex-wrap:wrap;gap:.9rem;justify-content:center;margin-top:2.2rem}
+.kontakt-meta{margin-top:1.8rem;font-size:.82rem;color:var(--muted);letter-spacing:.06em}
+
+/* ---------- Footer ---------- */
+footer{border-top:1px solid var(--line);padding:3rem 0 6.5rem;font-size:.85rem;color:var(--muted)}
+.foot-grid{display:flex;flex-wrap:wrap;gap:1.5rem;justify-content:space-between;align-items:flex-start}
+.foot-links{display:flex;flex-wrap:wrap;gap:1.2rem}
+.foot-links a{text-decoration:none;transition:.2s}
+.foot-links a:hover{color:var(--brass)}
+.copy{font-size:.78rem;margin-top:2rem;opacity:.7}
+
+/* ---------- Mobile Sticky-Leiste ---------- */
+.mobile-bar{
+  position:fixed;inset:auto 0 0 0;z-index:70;display:none;
+  grid-template-columns:1fr 1fr;gap:1px;background:var(--line);
+  border-top:1px solid var(--line);
+}
+.mobile-bar a{
+  background:var(--ink-2);padding:.95rem;text-align:center;text-decoration:none;
+  font-size:.82rem;letter-spacing:.1em;text-transform:uppercase;
+  display:flex;align-items:center;justify-content:center;gap:.5rem;
+}
+.mobile-bar a.wa{color:var(--wa)}
+@media (max-width:760px){.mobile-bar{display:grid}footer{padding-bottom:6rem}}
+
+@media (prefers-reduced-motion:reduce){
+  *{animation:none!important;transition:none!important;scroll-behavior:auto!important}
+}
+</style>
 </head>
 <body>
-  <div class="hud-top">
-    <div class="brand">J · A · R · V · I · S</div>
-    <div class="state-label" id="stateLabel">Bereit</div>
+
+<!-- ================= HEADER ================= -->
+<header class="topbar" id="topbar">
+  <a class="mark" href="#top">
+    <span class="seal">AW</span>
+    <span>
+      <b>Augustin Webdesign</b>
+      <span>Bamberg · Würzburg</span>
+    </span>
+  </a>
+  <a class="topbar-cta" href="#" data-tel>
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1 1 .4 1.9.7 2.8a2 2 0 0 1-.5 2.1L8.1 9.9a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.4c.9.3 1.8.6 2.8.7a2 2 0 0 1 1.7 2Z"/></svg>
+    <span class="lbl" data-tel-label>Anrufen</span>
+  </a>
+</header>
+
+<!-- ================= HERO MIT VIDEO ================= -->
+<div id="top"></div>
+<section class="hero">
+  <div class="hero-media">
+    <div class="hero-photo" id="heroPhoto"></div>
+    <div class="hero-fallback" id="heroFallback" hidden></div>
+    <video id="heroVideo" muted loop playsinline preload="metadata" hidden></video>
   </div>
+  <div class="hero-scrim"></div>
+  <div class="grain"></div>
 
-  <div class="goal-panel" id="goalPanel">
-    <div class="lbl">Aktuelles Ziel</div>
-    <div class="goal-text" id="goalText"></div>
+  <div class="hero-inner wrap">
+    <p class="eyebrow">Websites für Betriebe in Franken</p>
+    <h1>Erst die fertige Website sehen. <em>Dann</em> entscheiden.</h1>
+    <p class="lead">Ich baue Ihre Website komplett fertig – mit Ihren Bildern, Ihren Texten, Ihren Öffnungszeiten. Sie zahlen erst, wenn sie Ihnen gefällt.</p>
+    <div class="hero-facts">
+      <span>Fertig in 2–3 Wochen</span>
+      <span>Kein Abo, kein Baukasten</span>
+      <span>Ansprechpartner bleibt derselbe</span>
+    </div>
+    <div class="scroll-hint"><i></i> In 60 Sekunden zur Einschätzung</div>
   </div>
+</section>
 
-  <div class="stage">
-    <canvas id="orb"></canvas>
-  </div>
+<!-- ================= QUIZ ================= -->
+<section id="angebot">
+  <div class="wrap">
+    <div class="sec-head">
+      <p class="eyebrow">Unverbindliche Einschätzung</p>
+      <h2>Was kostet Ihre Website?</h2>
+      <p class="lead">Fünf Fragen, etwa eine Minute. Am Ende öffnet sich WhatsApp mit Ihren Antworten – Sie schicken die Nachricht ab und bekommen meine Einschätzung meist noch am selben Tag.</p>
+    </div>
 
-  <div class="dialog" id="dialog"></div>
+    <div class="quiz" id="quiz">
+      <div class="progress">
+        <div class="progress-track"><div class="progress-fill" id="pFill"></div></div>
+        <div class="progress-num" id="pNum">Frage 1 von 6</div>
+      </div>
 
-  <div class="controls">
-    <input class="text-input" id="textInput" placeholder="Sag mir dein Ziel… (oder tippe hier)" />
-    <button class="mic-btn" id="micBtn" title="Sprechen">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-        <path d="M12 2a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/>
-        <path d="M5 11a7 7 0 0 0 14 0"/>
-        <line x1="12" y1="18" x2="12" y2="22"/>
-      </svg>
-    </button>
-  </div>
+      <!-- Schritt 1 -->
+      <div class="step on" data-step="0" data-key="vorhaben">
+        <h3>Was soll gemacht werden?</h3>
+        <p class="hint">Grobe Richtung genügt – Details klären wir im Gespräch.</p>
+        <div class="opts">
+          <button class="opt" data-val="Neue Website">Neue Website <span class="tick">✓</span></button>
+          <button class="opt" data-val="Relaunch bestehender Seite">Bestehende Seite erneuern <span class="tick">✓</span></button>
+          <button class="opt" data-val="Landingpage / Aktionsseite">Landingpage <span class="tick">✓</span></button>
+          <button class="opt" data-val="Onlineshop">Onlineshop <span class="tick">✓</span></button>
+        </div>
+      </div>
 
-  <div class="hint">Klicke auf den Orb oder das Mikrofon und sprich · Chrome/Edge empfohlen</div>
+      <!-- Schritt 2 -->
+      <div class="step" data-step="1" data-key="branche">
+        <h3>Um welche Branche geht es?</h3>
+        <p class="hint">Danach richtet sich, welche Funktionen sinnvoll sind.</p>
+        <div class="opts">
+          <button class="opt" data-val="Gastronomie / Imbiss">Gastronomie &amp; Imbiss <span class="tick">✓</span></button>
+          <button class="opt" data-val="Friseur / Beauty">Friseur &amp; Beauty <span class="tick">✓</span></button>
+          <button class="opt" data-val="Handwerk">Handwerk <span class="tick">✓</span></button>
+          <button class="opt" data-val="Andere Branche">Andere <span class="tick">✓</span></button>
+        </div>
+      </div>
 
-  <!-- API Key Setup Overlay -->
-  <div class="api-overlay" id="apiOverlay">
-    <h2>JARVIS · AKTIVIERUNG</h2>
-    <p>Gib deinen <strong style="color:#eafaff">Anthropic API Key</strong> ein, damit JARVIS mit echter KI antworten kann.<br/>
-    Der Key wird nur lokal in deinem Browser gespeichert und nirgendwo hochgeladen.</p>
-    <input type="password" id="apiKeyInput" placeholder="sk-ant-..." autocomplete="off" />
-    <button id="apiSaveBtn">JARVIS STARTEN</button>
-    <button class="skip-btn" id="apiSkipBtn">Ohne KI starten (Demo-Modus)</button>
-    <div class="api-hint">
-      Key holen: <span style="color:#38d9ff">console.anthropic.com</span> → API Keys → Create Key
+      <!-- Schritt 3 -->
+      <div class="step" data-step="2" data-key="logo">
+        <h3>Gibt es schon ein Logo?</h3>
+        <p class="hint">Falls nicht: kein Problem, das lässt sich mitmachen.</p>
+        <div class="opts">
+          <button class="opt" data-val="Logo vorhanden">Ja, vorhanden <span class="tick">✓</span></button>
+          <button class="opt" data-val="Kein Logo">Nein, noch keins <span class="tick">✓</span></button>
+          <button class="opt" data-val="Logo soll überarbeitet werden">Soll überarbeitet werden <span class="tick">✓</span></button>
+        </div>
+      </div>
+
+      <!-- Schritt 4 -->
+      <div class="step" data-step="3" data-key="inhalte">
+        <h3>Texte und Bilder?</h3>
+        <p class="hint">Fotos vom Betrieb wirken fast immer besser als Stockbilder.</p>
+        <div class="opts">
+          <button class="opt" data-val="Texte und Bilder vorhanden">Habe ich beides <span class="tick">✓</span></button>
+          <button class="opt" data-val="Texte und Bilder werden gebraucht">Brauche beides <span class="tick">✓</span></button>
+          <button class="opt" data-val="Teils vorhanden">Teils vorhanden <span class="tick">✓</span></button>
+        </div>
+      </div>
+
+      <!-- Schritt 5 -->
+      <div class="step" data-step="4" data-key="zeit">
+        <h3>Wie eilig ist es?</h3>
+        <p class="hint">Ich nehme pro Monat nur eine begrenzte Zahl an Projekten an.</p>
+        <div class="opts">
+          <button class="opt" data-val="So schnell wie möglich">So schnell wie möglich <span class="tick">✓</span></button>
+          <button class="opt" data-val="In den nächsten Wochen">In den nächsten Wochen <span class="tick">✓</span></button>
+          <button class="opt" data-val="Erst mal nur informieren">Erst mal informieren <span class="tick">✓</span></button>
+        </div>
+      </div>
+
+      <!-- Schritt 6 -->
+      <div class="step" data-step="5" data-key="final">
+        <h3>Fast geschafft.</h3>
+        <p class="hint">Nur damit ich weiß, wen ich vor mir habe.</p>
+        <div class="field">
+          <label for="qName">Name</label>
+          <input id="qName" type="text" autocomplete="name" placeholder="Vor- und Nachname">
+        </div>
+        <div class="field">
+          <label for="qBetrieb">Betrieb <span style="text-transform:none;letter-spacing:0">(optional)</span></label>
+          <input id="qBetrieb" type="text" autocomplete="organization" placeholder="z. B. Ristorante Sole, Bamberg">
+        </div>
+        <div class="final-actions">
+          <a class="btn btn-wa" id="waSend" href="#" target="_blank" rel="noopener">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor"><path d="M17.5 14.4c-.3-.2-1.7-.9-2-1-.3-.1-.5-.2-.7.1-.2.3-.7 1-.9 1.2-.2.2-.3.2-.6.1-.3-.2-1.2-.5-2.3-1.5-.9-.8-1.4-1.7-1.6-2-.2-.3 0-.5.1-.6l.5-.6c.1-.2.2-.3.3-.5 0-.2 0-.4-.1-.5l-.9-2.2c-.2-.5-.5-.5-.7-.5h-.6c-.2 0-.5.1-.8.4-.3.3-1 1-1 2.5s1.1 2.9 1.2 3.1c.2.2 2.1 3.3 5.2 4.6.7.3 1.3.5 1.7.6.7.2 1.4.2 1.9.1.6-.1 1.7-.7 2-1.4.2-.7.2-1.3.2-1.4-.1-.2-.3-.3-.6-.4M12 2a10 10 0 0 0-8.6 15L2 22l5.2-1.4A10 10 0 1 0 12 2Z"/></svg>
+            Per WhatsApp senden
+          </a>
+          <a class="btn btn-ghost" href="#" data-tel>Lieber anrufen</a>
+        </div>
+        <p class="final-note">WhatsApp öffnet sich mit fertig geschriebener Nachricht. Sie können vor dem Absenden alles ändern – und es wird nichts gespeichert, solange Sie nicht senden.</p>
+      </div>
+
+      <div class="summary">
+        <p class="summary-title">Ihre Angaben</p>
+        <div class="chips" id="chips"></div>
+      </div>
+
+      <div class="quiz-nav">
+        <button class="back" id="btnBack" hidden>← Zurück</button>
+        <span></span>
+      </div>
     </div>
   </div>
+</section>
 
-  <div class="unsupported" id="unsupported">
-    <div>
-      <h2 style="color:var(--accent)">Spracherkennung nicht verfügbar</h2>
-      <p style="margin-top:10px;max-width:420px;color:#9fc">Dein Browser unterstützt die Web Speech API nicht.
-      Nutze Chrome oder Edge — du kannst aber trotzdem über das Textfeld mit JARVIS sprechen.</p>
+<!-- ================= ABLAUF ================= -->
+<section>
+  <div class="wrap">
+    <div class="sec-head">
+      <p class="eyebrow">Ablauf</p>
+      <h2>Warum Sie nichts riskieren</h2>
+    </div>
+    <div class="steps-list">
+      <div class="step-row">
+        <span class="n">01</span>
+        <div>
+          <h3>Kurzes Gespräch</h3>
+          <p>Zehn Minuten am Telefon oder per WhatsApp. Was macht Ihr Betrieb, wen wollen Sie erreichen, was fehlt Ihnen aktuell.</p>
+        </div>
+      </div>
+      <div class="step-row">
+        <span class="n">02</span>
+        <div>
+          <h3>Ich baue die Seite fertig</h3>
+          <p>Nicht als Skizze, sondern als echte Website, die Sie im Browser anschauen und auf dem Handy durchklicken können.</p>
+        </div>
+      </div>
+      <div class="step-row">
+        <span class="n">03</span>
+        <div>
+          <h3>Sie schauen sie an</h3>
+          <p>Gefällt sie Ihnen nicht, sagen Sie ab. Es entstehen keine Kosten. Gefällt sie Ihnen, ändern wir gemeinsam die Details.</p>
+        </div>
+      </div>
+      <div class="step-row">
+        <span class="n">04</span>
+        <div>
+          <h3>Online in Ihrem Namen</h3>
+          <p>Domain, Hosting, Impressum und Datenschutz richte ich ein. Sie bekommen alle Zugänge – die Seite gehört Ihnen.</p>
+        </div>
+      </div>
     </div>
   </div>
+</section>
 
-  <script src="config.js" onerror="window.JARVIS_CONFIG={}"></script>
-  <script src="orb.js"></script>
-  <script src="jarvis.js"></script>
+<!-- ================= BRANCHEN ================= -->
+<section>
+  <div class="wrap">
+    <div class="sec-head">
+      <p class="eyebrow">Schwerpunkte</p>
+      <h2>Gebaut für Betriebe, die Kundschaft vor Ort brauchen</h2>
+    </div>
+    <div class="branchen">
+      <div class="branche"><h3>Gastronomie &amp; Imbiss</h3><p>Speisekarte, Öffnungszeiten mit Live-Anzeige, Bestellung per Telefon oder Lieferdienst – ohne Portalgebühren.</p></div>
+      <div class="branche"><h3>Friseur &amp; Beauty</h3><p>Leistungen mit Preisen, Bildergalerie der Arbeiten und ein Weg zur Terminanfrage, der auf dem Handy funktioniert.</p></div>
+      <div class="branche"><h3>Handwerk</h3><p>Leistungen, Einzugsgebiet und Referenzobjekte. Damit Sie bei „Betrieb + Ort" auch wirklich gefunden werden.</p></div>
+      <div class="branche"><h3>Druck &amp; Produktion</h3><p>Produktübersicht, Anfahrt und Anfrageweg für Kunden, die genau wissen, was sie brauchen.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= PREISE ================= -->
+<section>
+  <div class="wrap">
+    <div class="sec-head">
+      <p class="eyebrow">Preise</p>
+      <h2>Feste Preise, keine Überraschungen</h2>
+      <p class="lead">Einmalig, kein Abo. Die Hälfte bei Auftragserteilung, die Hälfte nach Ihrer Freigabe. Kleinunternehmer nach §19 UStG – es kommt keine Umsatzsteuer dazu.</p>
+    </div>
+    <div class="preise">
+      <div class="tier">
+        <h3>Auftritt</h3>
+        <p class="price">390 €<small>Einmalig</small></p>
+        <ul>
+          <li>Einseitige Website</li>
+          <li>Handy, Tablet, Desktop</li>
+          <li>Kontaktweg &amp; Anfahrt</li>
+          <li>Impressum &amp; Datenschutz</li>
+        </ul>
+      </div>
+      <div class="tier mid">
+        <h3>Betrieb</h3>
+        <p class="price">790 €<small>Einmalig</small></p>
+        <ul>
+          <li>Mehrere Unterseiten</li>
+          <li>Speisekarte oder Leistungen</li>
+          <li>Bildergalerie</li>
+          <li>Google-Eintrag eingerichtet</li>
+          <li>Domain &amp; Hosting aufgesetzt</li>
+        </ul>
+      </div>
+      <div class="tier">
+        <h3>Komplett</h3>
+        <p class="price">1.290 €<small>Einmalig</small></p>
+        <ul>
+          <li>Alles aus „Betrieb"</li>
+          <li>Texte von mir geschrieben</li>
+          <li>Fotos vor Ort</li>
+          <li>Regionale Auffindbarkeit</li>
+          <li>Drei Monate Änderungen inklusive</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= KONTAKT ================= -->
+<section id="kontakt">
+  <div class="wrap">
+    <p class="eyebrow" style="justify-content:center">Kontakt</p>
+    <h2>Reden wir kurz darüber.</h2>
+    <p class="lead">Zehn Minuten reichen, um zu klären, ob es passt. Kein Verkaufsgespräch, keine Präsentation.</p>
+    <div class="kontakt-actions">
+      <a class="btn btn-wa" href="#" data-wa>WhatsApp schreiben</a>
+      <a class="btn btn-ghost" href="#" data-tel><span data-tel-label>Anrufen</span></a>
+    </div>
+    <p class="kontakt-meta">Erreichbar Mo–Sa, 9–20 Uhr · Antwort meist innerhalb weniger Stunden</p>
+  </div>
+</section>
+
+<!-- ================= FOOTER ================= -->
+<footer>
+  <div class="wrap">
+    <div class="foot-grid">
+      <div>
+        <a class="mark" href="#top" style="margin-bottom:.8rem">
+          <span class="seal">AW</span>
+          <span><b>Augustin Webdesign</b><span>Bamberg · Würzburg</span></span>
+        </a>
+        <p style="font-size:.82rem;max-width:34ch">Websites für Betriebe in Oberfranken und Unterfranken.</p>
+      </div>
+      <div class="foot-links">
+        <a href="#angebot">Einschätzung anfordern</a>
+        <a href="#kontakt">Kontakt</a>
+        <a href="/impressum.html">Impressum</a>
+        <a href="/datenschutz.html">Datenschutz</a>
+      </div>
+    </div>
+    <p class="copy">© <span id="jahr"></span> Augustin Webdesign · Kleinunternehmer gemäß §19 UStG, kein Ausweis von Umsatzsteuer.</p>
+  </div>
+</footer>
+
+<!-- ================= MOBILE STICKY ================= -->
+<nav class="mobile-bar">
+  <a href="#" data-tel>Anrufen</a>
+  <a class="wa" href="#" data-wa>WhatsApp</a>
+</nav>
+
+<script>
+/* =====================================================================
+   KONFIG — HIER DEINE DATEN EINTRAGEN
+   ===================================================================== */
+const KONFIG = {
+  // Telefonnummer international, ohne Leerzeichen (für den Klick-Link)
+  telLink:    "+491744903375",
+  // Wie die Nummer auf der Seite angezeigt wird
+  telAnzeige: "0174 4903375",
+  // WhatsApp: Landesvorwahl ohne + und ohne führende 0
+  whatsapp:   "491744903375",
+  // Header-Hintergrund: standardmäßig das Foto (hero-desktop.jpg / hero-mobile.jpg).
+  // Sollen stattdessen die Videodateien laufen, hier die Dateinamen eintragen:
+  //   videoWebm: "hero.webm",  videoMp4: "hero.mp4"
+  videoWebm:  "",
+  videoMp4:   "",
+  // Standbild, bis das Video läuft
+  videoPoster:"hero-desktop.jpg"
+};
+/* ===================================================================== */
+
+document.getElementById("jahr").textContent = new Date().getFullYear();
+
+/* --- Kontaktlinks befüllen --- */
+document.querySelectorAll("[data-tel]").forEach(a => a.href = "tel:" + KONFIG.telLink.replace(/\s/g,""));
+document.querySelectorAll("[data-tel-label]").forEach(el => el.textContent = KONFIG.telAnzeige);
+
+const waBasis = "https://wa.me/" + KONFIG.whatsapp;
+document.querySelectorAll("[data-wa]").forEach(a => {
+  a.href = waBasis + "?text=" + encodeURIComponent("Hallo Augustin, ich interessiere mich für eine Website.");
+  a.target = "_blank"; a.rel = "noopener";
+});
+
+/* --- Hero-Video --- */
+(function(){
+  const quellen = [
+    [KONFIG.videoWebm, "video/webm"],
+    [KONFIG.videoMp4,  "video/mp4"]
+  ].filter(q => q[0]);
+  if (!quellen.length) return;
+
+  const v = document.getElementById("heroVideo");
+  const foto = document.getElementById("heroPhoto");
+  if (KONFIG.videoPoster) v.poster = KONFIG.videoPoster;
+
+  quellen.forEach(([src, typ]) => {
+    const s = document.createElement("source");
+    s.src = src; s.type = typ;
+    v.appendChild(s);
+  });
+  v.hidden = false;
+
+  // Kein Video abspielen, wenn der Nutzer Bewegung reduziert haben will
+  if (window.matchMedia("(prefers-reduced-motion: reduce)").matches){
+    v.hidden = true;                         // Foto bleibt stehen
+    return;
+  }
+
+  v.addEventListener("loadeddata", () => foto.style.display = "none");
+  v.addEventListener("error",     () => { v.hidden = true; foto.style.display = ""; }, true);
+  v.play().catch(() => {});                  // Autoplay-Sperre still abfangen
+})();
+
+/* --- Header verdichten beim Scrollen --- */
+const topbar = document.getElementById("topbar");
+addEventListener("scroll", () => topbar.classList.toggle("solid", scrollY > 60), {passive:true});
+
+/* --- Quiz --- */
+const steps   = [...document.querySelectorAll(".step")];
+const antwort = {};
+const labels  = {vorhaben:"Vorhaben", branche:"Branche", logo:"Logo", inhalte:"Inhalte", zeit:"Zeitrahmen"};
+let aktuell = 0;
+
+const pFill  = document.getElementById("pFill");
+const pNum   = document.getElementById("pNum");
+const chips  = document.getElementById("chips");
+const btnBack= document.getElementById("btnBack");
+
+function zeige(i){
+  aktuell = i;
+  steps.forEach((s,n) => s.classList.toggle("on", n === i));
+  pFill.style.width = ((i) / (steps.length - 1) * 100) + "%";
+  pNum.textContent  = "Frage " + (i + 1) + " von " + steps.length;
+  btnBack.hidden = i === 0;
+  if (i > 0) document.getElementById("quiz").scrollIntoView({block:"nearest"});
+}
+
+function chipsBauen(){
+  const keys = Object.keys(labels);
+  chips.innerHTML = keys.map(k => antwort[k]
+    ? `<span class="chip">${antwort[k]}</span>`
+    : `<span class="chip empty">${labels[k]}</span>`).join("");
+  waLinkBauen();
+}
+
+steps.forEach(step => {
+  step.querySelectorAll(".opt").forEach(btn => {
+    btn.addEventListener("click", () => {
+      step.querySelectorAll(".opt").forEach(o => o.classList.remove("picked"));
+      btn.classList.add("picked");
+      antwort[step.dataset.key] = btn.dataset.val;
+      chipsBauen();
+      setTimeout(() => zeige(Math.min(aktuell + 1, steps.length - 1)), 220);
+    });
+  });
+});
+
+btnBack.addEventListener("click", () => zeige(Math.max(aktuell - 1, 0)));
+
+/* --- WhatsApp-Nachricht zusammensetzen --- */
+const waSend  = document.getElementById("waSend");
+const qName   = document.getElementById("qName");
+const qBetrieb= document.getElementById("qBetrieb");
+
+function waLinkBauen(){
+  const zeilen = ["Hallo Augustin, ich hätte gern eine Einschätzung für eine Website.", ""];
+  for (const k in labels) if (antwort[k]) zeilen.push(labels[k] + ": " + antwort[k]);
+  if (qBetrieb.value.trim()) zeilen.push("Betrieb: " + qBetrieb.value.trim());
+  if (qName.value.trim())    zeilen.push("", "Viele Grüße, " + qName.value.trim());
+  waSend.href = waBasis + "?text=" + encodeURIComponent(zeilen.join("\n"));
+}
+[qName, qBetrieb].forEach(f => f.addEventListener("input", waLinkBauen));
+
+chipsBauen();
+zeige(0);
+
+/* --- Abschnitte beim Scrollen einblenden --- */
+if (!window.matchMedia("(prefers-reduced-motion: reduce)").matches){
+  const ziele = document.querySelectorAll(".sec-head, .step-row, .branche, .tier");
+  ziele.forEach(el => { el.style.opacity = 0; el.style.transform = "translateY(18px)"; el.style.transition = "opacity .7s ease, transform .7s ease"; });
+  const io = new IntersectionObserver(entries => {
+    entries.forEach((e,i) => {
+      if (e.isIntersecting){
+        setTimeout(() => { e.target.style.opacity = 1; e.target.style.transform = "none"; }, i * 70);
+        io.unobserve(e.target);
+      }
+    });
+  }, {threshold:.15});
+  ziele.forEach(el => io.observe(el));
+}
+</script>
 </body>
 </html>
