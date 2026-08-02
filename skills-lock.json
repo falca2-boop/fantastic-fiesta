@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "skills": {
+    "upload-post": {
+      "source": "Upload-Post/upload-post-skill",
+      "sourceType": "github",
+      "skillPath": "SKILL.md",
+      "computedHash": "7b5ed055e3ce2de7ec4c2f3ddeb98029b5b9912819c001519ee423a150d073fa"
+    }
+  }
+}
