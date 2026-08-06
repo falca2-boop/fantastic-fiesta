@@ -255,6 +255,21 @@
     .api-overlay .api-hint {
       font-size: 11px; color: #3a5060;
     }
+    .api-overlay .api-divider {
+      width: min(380px, 90vw);
+      border: none;
+      border-top: 1px solid rgba(56,217,255,0.1);
+      margin: 4px 0;
+    }
+    .api-overlay .api-optional-label {
+      font-size: 11px; color: #3a5060; letter-spacing: 2px; text-transform: uppercase;
+    }
+    .bubble img {
+      max-width: 100%;
+      border-radius: 8px;
+      margin-top: 6px;
+      display: block;
+    }
   </style>
 </head>
 <body>
@@ -297,6 +312,13 @@
     <button class="skip-btn" id="apiSkipBtn">Ohne KI starten (Demo-Modus)</button>
     <div class="api-hint">
       Key holen: <span style="color:#38d9ff">console.anthropic.com</span> → API Keys → Create Key
+    </div>
+    <hr class="api-divider" />
+    <div class="api-optional-label">Bildgenerierung · Optional</div>
+    <p style="font-size:13px;color:#5f7a90;max-width:380px;line-height:1.5;">OpenArt API Key für KI-Bildgenerierung per Sprache oder Text.</p>
+    <input type="password" id="openartKeyInput" placeholder="OpenArt API Key…" autocomplete="off" />
+    <div class="api-hint">
+      Key holen: <span style="color:#38d9ff">openart.ai/account</span> → API Key
     </div>
   </div>
 

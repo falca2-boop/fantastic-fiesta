@@ -23,8 +23,17 @@
   // Key aus config.js (lokal, nicht auf GitHub) oder localStorage
   let ANTHROPIC_KEY = (window.JARVIS_CONFIG && window.JARVIS_CONFIG.anthropicKey)
     || localStorage.getItem('jarvis_api_key') || '';
+  let OPENART_KEY = (window.JARVIS_CONFIG && window.JARVIS_CONFIG.openartKey)
+    || localStorage.getItem('jarvis_openart_key') || '';
 
   // ---------- API Key Setup ----------
+  const openartKeyInput = document.getElementById('openartKeyInput');
+
+  function saveOpenartKey() {
+    const ok = openartKeyInput ? openartKeyInput.value.trim() : '';
+    if (ok) { OPENART_KEY = ok; localStorage.setItem('jarvis_openart_key', ok); }
+  }
+
   function initApiOverlay() {
     if (ANTHROPIC_KEY) { apiOverlay.style.display = 'none'; return; }
     apiOverlay.style.display = 'flex';
@@ -33,10 +42,12 @@
       if (!k.startsWith('sk-')) { apiKeyInput.style.borderColor = '#ff5c7a'; return; }
       ANTHROPIC_KEY = k;
       localStorage.setItem('jarvis_api_key', k);
+      saveOpenartKey();
       apiOverlay.style.display = 'none';
       greetOnce();
     });
     apiSkipBtn.addEventListener('click', () => {
+      saveOpenartKey();
       apiOverlay.style.display = 'none';
       greetOnce();
     });
@@ -94,21 +105,67 @@
     goalPanel.classList.add('show');
   }
 
+  // ---------- OpenArt MCP ----------
+  async function callOpenArt(prompt) {
+    if (!OPENART_KEY) return null;
+    try {
+      const res = await fetch('https://mcp.openart.ai/mcp', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${OPENART_KEY}`,
+        },
+        body: JSON.stringify({
+          jsonrpc: '2.0',
+          method: 'tools/call',
+          params: { name: 'generate_image', arguments: { prompt } },
+          id: Date.now(),
+        }),
+      });
+      if (!res.ok) return null;
+      const data = await res.json();
+      const content = data.result?.content;
+      if (Array.isArray(content)) {
+        const img = content.find(c => c.type === 'image');
+        if (img?.url) return img.url;
+        if (img?.data) return `data:${img.mimeType || 'image/png'};base64,${img.data}`;
+        const txt = content.find(c => c.type === 'text');
+        const m = txt?.text?.match(/https?:\/\/\S+\.(png|jpg|jpeg|webp|gif)/i);
+        if (m) return m[0];
+      }
+    } catch (e) {}
+    return null;
+  }
+
+  function showImageBubble(src, alt) {
+    const b = document.createElement('div');
+    b.className = 'bubble jarvis';
+    const img = document.createElement('img');
+    img.src = src;
+    img.alt = alt || '';
+    b.appendChild(img);
+    dialog.appendChild(b);
+    while (dialog.children.length > 12) dialog.removeChild(dialog.firstChild);
+  }
+
   // ---------- Claude direkt ----------
   async function askClaude(userMessage) {
     if (!ANTHROPIC_KEY) return null;
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': ANTHROPIC_KEY,
-        'anthropic-version': '2023-06-01',
-        'anthropic-dangerous-direct-browser-access': 'true',
+
+    const tools = OPENART_KEY ? [{
+      name: 'generate_image',
+      description: 'Generates an AI image from a text description using OpenArt. Use when the user explicitly asks to create, draw, or generate an image.',
+      input_schema: {
+        type: 'object',
+        properties: {
+          prompt: { type: 'string', description: 'Detailed image description in English' },
+          style: { type: 'string', description: 'Visual style, e.g. realistic, cinematic, anime, oil painting, digital art' },
+        },
+        required: ['prompt'],
       },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-6',
-        max_tokens: 1024,
-        system: `Du bist JARVIS, ein intelligenter KI-Assistent im Stil von Iron Man. Du antwortest kurz, präzise und auf Deutsch.
+    }] : [];
+
+    const system = `Du bist JARVIS, ein intelligenter KI-Assistent im Stil von Iron Man. Du antwortest kurz, präzise und auf Deutsch.
 Wenn der Nutzer ein Ziel nennt (z.B. Geld verdienen, etwas erreichen), antworte NUR mit diesem JSON (kein weiterer Text):
 {
   "typ": "ziel",
@@ -117,26 +174,69 @@ Wenn der Nutzer ein Ziel nennt (z.B. Geld verdienen, etwas erreichen), antworte 
   "realisierbarkeit": 85,
   "antwort": "Kurze gesprochene Antwort (1-2 Sätze, direkt und motivierend)"
 }
+Wenn der Nutzer ein Bild erstellen oder generieren möchte, nutze das generate_image Tool. Der Prompt muss auf Englisch sein. Nach der Bildgenerierung antworte mit: {"typ": "chat", "antwort": "Bild wurde generiert."}
 Bei normalen Fragen oder Gesprächen antworte mit:
 {
   "typ": "chat",
   "antwort": "Deine Antwort hier"
-}`,
-        messages: [{ role: 'user', content: userMessage }],
-      }),
-    });
-    if (!res.ok) {
-      if (res.status === 401) {
-        localStorage.removeItem('jarvis_api_key');
-        ANTHROPIC_KEY = '';
-        throw new Error('invalid_key');
+}`;
+
+    const messages = [{ role: 'user', content: userMessage }];
+
+    for (let i = 0; i < 5; i++) {
+      const body = { model: 'claude-sonnet-4-6', max_tokens: 1024, system, messages };
+      if (tools.length) body.tools = tools;
+
+      const res = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': ANTHROPIC_KEY,
+          'anthropic-version': '2023-06-01',
+          'anthropic-dangerous-direct-browser-access': 'true',
+        },
+        body: JSON.stringify(body),
+      });
+
+      if (!res.ok) {
+        if (res.status === 401) {
+          localStorage.removeItem('jarvis_api_key');
+          ANTHROPIC_KEY = '';
+          throw new Error('invalid_key');
+        }
+        throw new Error('api_error_' + res.status);
       }
-      throw new Error('api_error_' + res.status);
+
+      const data = await res.json();
+
+      if (data.stop_reason === 'tool_use') {
+        const tu = data.content.find(b => b.type === 'tool_use');
+        if (tu?.name === 'generate_image') {
+          const fullPrompt = [tu.input.prompt, tu.input.style].filter(Boolean).join(', ');
+          const imageUrl = await callOpenArt(fullPrompt);
+          if (imageUrl) showImageBubble(imageUrl, tu.input.prompt);
+          messages.push({ role: 'assistant', content: data.content });
+          messages.push({
+            role: 'user',
+            content: [{
+              type: 'tool_result',
+              tool_use_id: tu.id,
+              content: imageUrl ? 'Image generated and displayed to user.' : 'Image generation failed.',
+            }],
+          });
+          continue;
+        }
+      }
+
+      const text = data.content?.find(b => b.type === 'text')?.text || '';
+      try { return JSON.parse(text); }
+      catch {
+        const m = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+        if (m) { try { return JSON.parse(m[1]); } catch {} }
+        return { typ: 'chat', antwort: text };
+      }
     }
-    const data = await res.json();
-    const text = data.content?.[0]?.text || '';
-    try { return JSON.parse(text); }
-    catch { return { typ: 'chat', antwort: text }; }
+    return { typ: 'chat', antwort: 'Verarbeitungsfehler. Bitte erneut versuchen.' };
   }
 
   // ---------- Lokaler Demo-Modus Fallback ----------
