@@ -178,7 +178,8 @@
     };
     section('Aufgaben', s.tasks.map(t => '▸ ' + t.text + (t.due ? ` (${t.due})` : '')));
     section('Erinnerungen', s.reminders.map(r => '⏰ ' + fmtTime(r.at) + ' · ' + r.text));
-    sidePanel.classList.toggle('show', !!(s.tasks.length || s.reminders.length));
+    if (s.factCount) section(`Gedächtnis (${s.factCount})`, s.facts.map(f => '🧠 ' + f));
+    sidePanel.classList.toggle('show', !!(s.tasks.length || s.reminders.length || s.factCount));
   }
 
   // ---------- Gespräch ----------

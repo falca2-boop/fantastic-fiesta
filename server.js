@@ -30,7 +30,10 @@ export function createServer(opts = {}) {
           : null)
       : opts.voice,
   };
-  const store = opts.store ?? new Store(path.join(env.DATA_DIR || path.join(ROOT, 'data'), 'store.json'));
+  const store = opts.store ?? new Store(path.join(env.DATA_DIR || path.join(ROOT, 'data'), 'store.json'), {
+    remote: env.UPSTASH_REDIS_REST_URL && env.UPSTASH_REDIS_REST_TOKEN
+      ? { url: env.UPSTASH_REDIS_REST_URL, token: env.UPSTASH_REDIS_REST_TOKEN } : null,
+  });
 
   const authorized = (req) => {
     if (!cfg.token) return true;               // nur erlaubt, wenn der Server lokal bindet (siehe main)
@@ -57,6 +60,8 @@ export function createServer(opts = {}) {
     return {
       userName: cfg.userName,
       goal: d.goal,
+      factCount: d.facts.length,
+      facts: d.facts.slice(-4),
       tasks: d.tasks.filter(t => !t.done).map(({ id, text, due }) => ({ id, text, due })),
       reminders: d.reminders.filter(r => !r.fired).sort((a, b) => new Date(a.at) - new Date(b.at)).map(({ id, text, at }) => ({ id, text, at })),
     };
@@ -81,7 +86,7 @@ export function createServer(opts = {}) {
     try {
       const { pathname } = new URL(req.url, 'http://localhost');
 
-      if (pathname === '/api/health') return json(res, 200, { ok: true, tokenRequired: !!cfg.token, keyConfigured: !!cfg.apiKey, mailWatch: !!cfg.mail, voice: !!cfg.voice });
+      if (pathname === '/api/health') return json(res, 200, { ok: true, tokenRequired: !!cfg.token, keyConfigured: !!cfg.apiKey, mailWatch: !!cfg.mail, voice: !!cfg.voice, memory: store.remote ? 'datenbank' : 'datei' });
 
       if (pathname.startsWith('/api/')) {
         if (!authorized(req)) return json(res, 401, { error: 'Zugangs-Token fehlt oder ist falsch.' });
@@ -133,6 +138,8 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const host = process.env.HOST || '127.0.0.1';
   const port = Number(process.env.PORT) || 8000;
   const { server, cfg, store } = createServer();
+  await store.init();
+  for (const sig of ['SIGTERM', 'SIGINT']) process.on(sig, async () => { await store.flush(); process.exit(0); });
   if (!isLoopback(host) && !cfg.token) {
     console.error('Abbruch: Der Server ist von außen erreichbar (HOST=' + host + '), aber JARVIS_TOKEN ist nicht gesetzt.');
     process.exit(1);

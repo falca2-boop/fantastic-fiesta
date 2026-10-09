@@ -9,6 +9,17 @@ erledigt Dinge für dich (Anrede: Augustin, einstellbar).
 - **E-Mail / Kalender / Notion** über einen optionalen n8n-Webhook (`N8N_WEBHOOK_URL`). Der Workflow muss die
   Aktionen (`send_email`, `create_event` …) selbst ausführen. JARVIS fragt vor dem Senden nach.
 
+## Gedächtnis
+
+JARVIS merkt sich dauerhaft: Fakten über dich (von selbst, per `remember`), Aufgaben, Notizen, Erinnerungen und das Ziel.
+Ältere Gespräche werden im Hintergrund zu einer kurzen **Zusammenfassung** verdichtet, die er in jedes Gespräch mitnimmt;
+die letzten Nachrichten bleiben im Wortlaut. Das Panel rechts zeigt die zuletzt gemerkten Fakten. Sag *„Was weißt du über mich?"*,
+*„Vergiss, dass ich …"* oder *„Merk dir, dass …"*.
+
+Standardmäßig liegt alles in `data/store.json`. Auf Hosting mit flüchtigem Dateisystem (Render Free) ist das nach jedem Neustart leer.
+Dort `UPSTASH_REDIS_REST_URL` und `UPSTASH_REDIS_REST_TOKEN` setzen (kostenlose Datenbank bei upstash.com). JARVIS lädt beim Start
+daraus und schreibt jede Änderung nach. Ist die Datenbank nicht erreichbar, läuft er mit dem lokalen Stand weiter.
+
 ## Meldung bei wichtigen E-Mails (Anruf und/oder Push)
 
 JARVIS prüft dein Postfach per IMAP (GMX, web.de, Outlook u. a.) und meldet **wichtige** neue Mails: per **Anruf**
@@ -75,7 +86,7 @@ npm test
 | `server.js` | HTTP-Server, Token-Prüfung, Routen `/api/chat`, `/api/state`, `/api/poll`, `/api/health` |
 | `lib/agent.js` | Claude-Schleife mit Werkzeugen, Systemprompt |
 | `lib/tools.js` | Werkzeuge (Aufgaben, Notizen, Erinnerungen, Gedächtnis, n8n) |
-| `lib/store.js` | JSON-Speicher |
+| `lib/store.js` | Speicher (Datei, optional Upstash-Redis) |
 | `lib/mail.js` | IMAP-Überwachung, Filter, Anruf (Twilio) und Push (ntfy) |
 | `public/` | Oberfläche: Orb, Spracherkennung („Hey Jarvis"), Sprachausgabe |
 
