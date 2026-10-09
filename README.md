@@ -29,6 +29,17 @@ Was wichtig ist, sagst du ihm: *„Ruf mich an bei Mails vom Finanzamt und mit �
 **Push (ntfy):** App **ntfy** installieren, ein Thema mit langem Zufallsnamen abonnieren (`NTFY_TOPIC`), Priorität „dringend" erlauben.
 Wer den Namen kennt, kann mitlesen. Betreff und Absender laufen über den ntfy-Server; `MAIL_ALERT_INCLUDE_SUBJECT=false` lässt den Betreff weg (gilt auch für den Anruf).
 
+## Stimme (ElevenLabs)
+
+Standardmäßig spricht JARVIS mit der Stimme deines Browsers. Mit einer ElevenLabs-Stimme klingt er natürlicher:
+
+1. In ElevenLabs eine Stimme wählen (Voice Library) und zu **Meine Stimmen** hinzufügen. Dort bei der Stimme **ID kopieren**.
+2. Einen API Key unter *Developers → API Keys* anlegen.
+3. `ELEVENLABS_API_KEY` und `ELEVENLABS_VOICE_ID` setzen. Der Key bleibt auf dem Server; der Browser fragt nur `/api/speak` an.
+
+Fällt die Stimme aus (kein Guthaben, Fehler), spricht JARVIS automatisch mit der Browser-Stimme weiter.
+Jede Antwort verbraucht ElevenLabs-Guthaben (pro Zeichen); Texte sind auf 800 Zeichen begrenzt.
+
 ## Starten (lokal)
 
 Voraussetzung: Node.js ab Version 20 (`node --version`).

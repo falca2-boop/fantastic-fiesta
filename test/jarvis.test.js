@@ -78,3 +78,31 @@ test('Server: Pfad-Traversal und leere Nachricht werden abgewiesen', async () =>
     assert.equal(bad.status, 400);
   });
 });
+
+test('Server: /api/speak ruft ElevenLabs mit Stimme und Key auf und liefert Audio', async () => {
+  const calls = [];
+  const fakeFetch = async (url, init) => { calls.push({ url, init }); return { ok: true, status: 200, arrayBuffer: async () => new Uint8Array([1, 2, 3]).buffer }; };
+  await withServer({ token: 'geheim', voice: { apiKey: 'xk', voiceId: 'VOICE1', model: 'm1' }, fetchFn: fakeFetch }, async (base) => {
+    const h = { Authorization: 'Bearer geheim' };
+    assert.equal((await fetch(base + '/api/speak', { method: 'POST', body: '{"text":"Hallo"}' })).status, 401);
+    assert.equal((await (await fetch(base + '/api/health')).json()).voice, true);
+    const res = await fetch(base + '/api/speak', { method: 'POST', headers: h, body: JSON.stringify({ text: 'Hallo Augustin' }) });
+    assert.equal(res.status, 200);
+    assert.equal(res.headers.get('content-type'), 'audio/mpeg');
+    assert.deepEqual([...new Uint8Array(await res.arrayBuffer())], [1, 2, 3]);
+    assert.match(calls[0].url, /text-to-speech\/VOICE1\?/);
+    assert.equal(calls[0].init.headers['xi-api-key'], 'xk');
+    assert.equal(JSON.parse(calls[0].init.body).model_id, 'm1');
+    assert.equal((await fetch(base + '/api/speak', { method: 'POST', headers: h, body: JSON.stringify({ text: 'x'.repeat(801) }) })).status, 400);
+  });
+});
+
+test('Server: /api/speak ohne Stimme-Konfiguration meldet 501, ElevenLabs-Fehler wird zu 502', async () => {
+  await withServer({ voice: null }, async (base) => {
+    assert.equal((await fetch(base + '/api/speak', { method: 'POST', body: '{"text":"Hallo"}' })).status, 501);
+    assert.equal((await (await fetch(base + '/api/health')).json()).voice, false);
+  });
+  await withServer({ voice: { apiKey: 'k', voiceId: 'v', model: 'm' }, fetchFn: async () => ({ ok: false, status: 401 }) }, async (base) => {
+    assert.equal((await fetch(base + '/api/speak', { method: 'POST', body: '{"text":"Hallo"}' })).status, 502);
+  });
+});

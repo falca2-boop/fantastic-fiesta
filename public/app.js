@@ -49,16 +49,62 @@
   }
   if (synth) { pickVoice(); synth.onvoiceschanged = pickVoice; }
 
-  function speak(text) {
+  let voiceOn = false, currentAudio = null, speakSeq = 0;
+  const isSpeaking = () => !!currentAudio || !!(synth && synth.speaking);
+
+  function startedSpeaking() {
+    setState('speaking');
+    if (recognition && listening) { try { recognition.stop(); } catch (e) {} }
+  }
+  function doneSpeaking() {
+    setState(listening ? 'listening' : 'idle');
+    if (listening) restartRecognition();
+  }
+  function stopSpeaking() {
+    speakSeq++;
+    synth && synth.cancel();
+    if (currentAudio) { const a = currentAudio; currentAudio = null; a.pause(); }
+  }
+
+  function speakBrowser(text) {
     if (!synth) return;
-    synth.cancel();
     const u = new SpeechSynthesisUtterance(text);
     if (deVoice) u.voice = deVoice;
     u.lang = 'de-DE'; u.rate = 1.02; u.pitch = 0.9;
-    u.onstart = () => { setState('speaking'); if (recognition && listening) { try { recognition.stop(); } catch (e) {} } };
-    u.onend = () => { setState(listening ? 'listening' : 'idle'); if (listening) restartRecognition(); };
-    u.onerror = u.onend;
+    u.onstart = startedSpeaking;
+    u.onend = doneSpeaking;
+    u.onerror = doneSpeaking;
     synth.speak(u);
+  }
+
+  // Server-Stimme (ElevenLabs); bei jedem Fehler fällt JARVIS auf die Browser-Stimme zurück
+  async function speak(text) {
+    stopSpeaking();
+    const seq = speakSeq;
+    if (voiceOn) {
+      try {
+        const res = await fetch('/api/speak', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...(TOKEN ? { Authorization: 'Bearer ' + TOKEN } : {}) },
+          body: JSON.stringify({ text: text.slice(0, 800) }),
+        });
+        if (!res.ok) throw new Error('speak ' + res.status);
+        const blob = await res.blob();
+        if (seq !== speakSeq) return;              // inzwischen wurde etwas anderes angefordert
+        const url = URL.createObjectURL(blob);
+        const audio = new Audio(url);
+        const finish = () => { URL.revokeObjectURL(url); if (currentAudio === audio) { currentAudio = null; doneSpeaking(); } };
+        audio.onended = finish; audio.onerror = finish;
+        currentAudio = audio;
+        startedSpeaking();
+        await audio.play();
+        return;
+      } catch (e) {
+        if (seq !== speakSeq) return;
+        currentAudio = null;
+      }
+    }
+    speakBrowser(text);
   }
 
   // ---------- UI ----------
@@ -174,9 +220,9 @@
   const ARM_MS = 10000;
 
   function restartRecognition() {
-    if (!recognition || !listening || (synth && synth.speaking)) return;
+    if (!recognition || !listening || isSpeaking()) return;
     setTimeout(() => {
-      if (!listening || (synth && synth.speaking)) return;
+      if (!listening || isSpeaking()) return;
       try { recognition.start(); } catch (e) {}
     }, 250);
   }
@@ -257,13 +303,13 @@
     if (listening) {
       // Klick während Dauer-Hören: sofort Befehl annehmen, zweiter Klick beendet das Hören
       if (Date.now() < armedUntil) { stopListening(); return; }
-      synth && synth.cancel();
+      stopSpeaking();
       armedUntil = Date.now() + ARM_MS;
       setState('listening');
       restartRecognition();
       return;
     }
-    synth && synth.cancel();
+    stopSpeaking();
     armedUntil = Date.now() + ARM_MS;
     startListening();
   }
@@ -291,6 +337,7 @@
   async function boot(afterToken) {
     let health;
     try { health = await api('/api/health'); } catch (e) { addBubble('Server nicht erreichbar.', 'jarvis'); return; }
+    voiceOn = !!health.voice;
     if (!health.keyConfigured) addBubble('Auf dem Server fehlt ANTHROPIC_API_KEY. Ohne ihn kann ich nicht antworten.', 'jarvis');
     try {
       renderState(await api('/api/state'));
