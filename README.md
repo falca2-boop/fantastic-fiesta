@@ -9,6 +9,23 @@ erledigt Dinge für dich (Anrede: Augustin, einstellbar).
 - **E-Mail / Kalender / Notion** über einen optionalen n8n-Webhook (`N8N_WEBHOOK_URL`). Der Workflow muss die
   Aktionen (`send_email`, `create_event` …) selbst ausführen. JARVIS fragt vor dem Senden nach.
 
+## Hintergrundaufträge
+
+Für längere Aufgaben startet JARVIS eine **Recherche im Hintergrund** und kehrt sofort zurück, du kannst weiterreden:
+*„Such mir die besten Angebote für eine Kaffeemaschine unter 150 Euro raus."* Er recherchiert mit mehreren Websuchen
+(Modell `JARVIS_RESEARCH_MODEL`, Standard Sonnet), speichert das Ergebnis als Notiz und meldet sich, sobald es fertig ist:
+in der App (er liest eine Kurzfassung vor, den Text siehst du im Verlauf) und, wenn `NTFY_TOPIC` gesetzt ist, per Push aufs Handy.
+Der Push nennt standardmäßig nur den Titel, nicht das Ergebnis (`JOB_PUSH_INCLUDE_RESULT=true` ändert das).
+Es laufen höchstens 2 Aufträge gleichzeitig, jeder hat ein Zeitlimit von 5 Minuten. Fertige Aufträge kannst du später abrufen:
+*„Was war das Ergebnis der Recherche?"*. Ein Neustart des Servers bricht laufende Aufträge ab.
+Der Server muss dafür laufen, siehe „Wachbleiben" unten.
+
+## Wachbleiben
+
+Der kostenlose Render-Tarif schläft nach etwa 15 Minuten ohne Aufruf und stoppt dabei auch Mail-Überwachung und Hintergrundaufträge.
+Ein bezahlter Tarif (Render *Starter* oder höher) schläft nicht. Alternativ hält ein Pinger wie UptimeRobot den Server wach:
+HTTP-Monitor auf `https://<deine-adresse>/api/health` alle 5 Minuten.
+
 ## Gedächtnis
 
 JARVIS merkt sich dauerhaft: Fakten über dich (von selbst, per `remember`), Aufgaben, Notizen, Erinnerungen und das Ziel.
@@ -87,6 +104,7 @@ npm test
 | `lib/agent.js` | Claude-Schleife mit Werkzeugen, Systemprompt |
 | `lib/tools.js` | Werkzeuge (Aufgaben, Notizen, Erinnerungen, Gedächtnis, n8n) |
 | `lib/store.js` | Speicher (Datei, optional Upstash-Redis) |
+| `lib/jobs.js` | Hintergrund-Recherchen |
 | `lib/mail.js` | IMAP-Überwachung, Filter, Anruf (Twilio) und Push (ntfy) |
 | `public/` | Oberfläche: Orb, Spracherkennung („Hey Jarvis"), Sprachausgabe |
 

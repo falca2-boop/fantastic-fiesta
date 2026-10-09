@@ -6,7 +6,8 @@ import { timingSafeEqual } from 'node:crypto';
 import { Store } from './lib/store.js';
 import { chat, AgentError } from './lib/agent.js';
 import { takeDueReminders } from './lib/tools.js';
-import { mailConfigFromEnv, startMailWatcher } from './lib/mail.js';
+import { mailConfigFromEnv, startMailWatcher, sendPush } from './lib/mail.js';
+import { startResearch, takeFinishedJobs, recoverJobs } from './lib/jobs.js';
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
 const PUBLIC_DIR = path.join(ROOT, 'public');
@@ -23,6 +24,11 @@ export function createServer(opts = {}) {
     userName: opts.userName ?? env.JARVIS_USER_NAME ?? 'Augustin',
     webhookUrl: opts.webhookUrl ?? env.N8N_WEBHOOK_URL ?? '',
     fetchFn: opts.fetchFn ?? fetch,
+    researchModel: opts.researchModel ?? env.JARVIS_RESEARCH_MODEL ?? 'claude-sonnet-5-5',
+    ntfy: opts.ntfy === undefined
+      ? (env.NTFY_TOPIC ? { server: (env.NTFY_SERVER || 'https://ntfy.sh').replace(/\/+$/, ''), topic: env.NTFY_TOPIC } : null)
+      : opts.ntfy,
+    jobPushIncludesResult: opts.jobPushIncludesResult ?? (env.JOB_PUSH_INCLUDE_RESULT === 'true'),
     mail: opts.mail === undefined ? mailConfigFromEnv(env) : opts.mail,
     voice: opts.voice === undefined
       ? (env.ELEVENLABS_API_KEY && env.ELEVENLABS_VOICE_ID
@@ -63,9 +69,23 @@ export function createServer(opts = {}) {
       factCount: d.facts.length,
       facts: d.facts.slice(-4),
       tasks: d.tasks.filter(t => !t.done).map(({ id, text, due }) => ({ id, text, due })),
+      jobs: d.jobs.filter(j => j.status === 'running').map(j => j.title),
       reminders: d.reminders.filter(r => !r.fired).sort((a, b) => new Date(a.at) - new Date(b.at)).map(({ id, text, at }) => ({ id, text, at })),
     };
   };
+
+  recoverJobs(store);
+  const notifyJob = async (job) => {
+    if (!cfg.ntfy) return;
+    const ok = job.status === 'done';
+    await sendPush({
+      ntfy: cfg.ntfy,
+      title: ok ? 'Recherche fertig' : 'Recherche fehlgeschlagen',
+      message: ok && cfg.jobPushIncludesResult ? job.result.slice(0, 300) : job.title,
+      fetchFn: cfg.fetchFn,
+    });
+  };
+  const startJob = (request) => startResearch({ store, request, apiKey: cfg.apiKey, model: cfg.researchModel, fetchFn: cfg.fetchFn, notify: notifyJob });
 
   // Chat-Anfragen nacheinander abarbeiten, damit der Speicher konsistent bleibt
   let queue = Promise.resolve();
@@ -92,7 +112,10 @@ export function createServer(opts = {}) {
         if (!authorized(req)) return json(res, 401, { error: 'Zugangs-Token fehlt oder ist falsch.' });
 
         if (pathname === '/api/state' && req.method === 'GET') return json(res, 200, publicState());
-        if (pathname === '/api/poll' && req.method === 'GET') return json(res, 200, { fired: takeDueReminders(store).map(({ id, text }) => ({ id, text })), state: publicState() });
+        if (pathname === '/api/poll' && req.method === 'GET') {
+          const jobs = takeFinishedJobs(store).map(({ id, title, status, result }) => ({ id, title, status, result }));
+          return json(res, 200, { fired: takeDueReminders(store).map(({ id, text }) => ({ id, text })), jobs, state: publicState() });
+        }
 
         if (pathname === '/api/chat' && req.method === 'POST') {
           let body;
@@ -100,7 +123,7 @@ export function createServer(opts = {}) {
           const message = typeof body.message === 'string' ? body.message.trim() : '';
           if (!message || message.length > 4000) return json(res, 400, { error: 'Nachricht fehlt oder ist zu lang.' });
           const offsetMinutes = Number.isFinite(body.offsetMinutes) ? Math.max(-840, Math.min(840, body.offsetMinutes)) : 0;
-          const reply = await enqueue(() => chat({ store, message, offsetMinutes, apiKey: cfg.apiKey, model: cfg.model, userName: cfg.userName, webhookUrl: cfg.webhookUrl, mailEnabled: !!cfg.mail, fetchFn: cfg.fetchFn }));
+          const reply = await enqueue(() => chat({ store, message, offsetMinutes, apiKey: cfg.apiKey, model: cfg.model, userName: cfg.userName, webhookUrl: cfg.webhookUrl, mailEnabled: !!cfg.mail, startResearch: cfg.apiKey ? startJob : undefined, fetchFn: cfg.fetchFn }));
           return json(res, 200, { reply, state: publicState() });
         }
         if (pathname === '/api/speak' && req.method === 'POST') {

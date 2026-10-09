@@ -177,9 +177,10 @@
       items.forEach(t => { const d = document.createElement('div'); d.className = 'item'; d.textContent = t; sidePanel.appendChild(d); });
     };
     section('Aufgaben', s.tasks.map(t => '▸ ' + t.text + (t.due ? ` (${t.due})` : '')));
+    section('Läuft im Hintergrund', (s.jobs || []).map(t => '⏳ ' + t));
     section('Erinnerungen', s.reminders.map(r => '⏰ ' + fmtTime(r.at) + ' · ' + r.text));
     if (s.factCount) section(`Gedächtnis (${s.factCount})`, s.facts.map(f => '🧠 ' + f));
-    sidePanel.classList.toggle('show', !!(s.tasks.length || s.reminders.length || s.factCount));
+    sidePanel.classList.toggle('show', !!(s.tasks.length || s.reminders.length || s.factCount || (s.jobs || []).length));
   }
 
   // ---------- Gespräch ----------
@@ -208,6 +209,13 @@
       const data = await api('/api/poll');
       renderState(data.state);
       data.fired.forEach(r => jarvisSay('Erinnerung: ' + r.text));
+      (data.jobs || []).forEach(j => {
+        if (j.status === 'done') {
+          addBubble(j.result.slice(0, 900), 'jarvis');
+          const lead = j.result.split(/(?<=[.!?])\s+/).slice(0, 2).join(' ');
+          speak(`${USER_NAME}, die Recherche ist fertig: ${j.title}. ${lead}`.slice(0, 600));
+        } else jarvisSay(`${USER_NAME}, die Recherche „${j.title}“ hat nicht geklappt.`);
+      });
       if (data.fired.length && window.Notification && Notification.permission === 'granted') {
         data.fired.forEach(r => { try { new Notification('JARVIS', { body: r.text }); } catch (e) {} });
       }
