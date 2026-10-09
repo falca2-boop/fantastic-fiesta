@@ -9,7 +9,7 @@
   },
   "scripts": {
     "start": "node server.js",
-    "test": "node --test test/jarvis.test.js test/mail.test.js"
+    "test": "node --test test/jarvis.test.js test/mail.test.js test/memory.test.js test/jobs.test.js test/links.test.js test/products.test.js"
   },
   "dependencies": {
     "imapflow": "2.3.0"

@@ -49,8 +49,8 @@
   }
   if (synth) { pickVoice(); synth.onvoiceschanged = pickVoice; }
 
-  let voiceOn = false, currentAudio = null, speakSeq = 0;
-  const isSpeaking = () => !!currentAudio || !!(synth && synth.speaking);
+  let voiceOn = false, currentAudio = null, speakSeq = 0, audioActive = false;
+  const isSpeaking = () => audioActive || !!currentAudio || !!(synth && synth.speaking);
 
   function startedSpeaking() {
     setState('speaking');
@@ -62,12 +62,13 @@
   }
   function stopSpeaking() {
     speakSeq++;
+    audioActive = false;
     synth && synth.cancel();
     if (currentAudio) { const a = currentAudio; currentAudio = null; a.pause(); }
   }
 
   function speakBrowser(text) {
-    if (!synth) return;
+    if (!synth) { doneSpeaking(); return; }
     const u = new SpeechSynthesisUtterance(text);
     if (deVoice) u.voice = deVoice;
     u.lang = 'de-DE'; u.rate = 1.02; u.pitch = 0.9;
@@ -77,34 +78,60 @@
     synth.speak(u);
   }
 
-  // Server-Stimme (ElevenLabs); bei jedem Fehler fällt JARVIS auf die Browser-Stimme zurück
+  // Kurze Sätze zusammenfassen, damit der erste Teil schnell fertig ist und sofort loslaufen kann
+  function splitSentences(text) {
+    const parts = text.match(/[^.!?]+[.!?]+|\S[^.!?]*$/g) || [text];
+    const out = []; let cur = '';
+    for (const p of parts) { cur += p; if (cur.trim().length >= 40) { out.push(cur.trim()); cur = ''; } }
+    if (cur.trim()) out.push(cur.trim());
+    return out.slice(0, 6);
+  }
+
+  async function fetchAudio(text) {
+    const res = await fetch('/api/speak', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...(TOKEN ? { Authorization: 'Bearer ' + TOKEN } : {}) },
+      body: JSON.stringify({ text: text.slice(0, 800) }),
+    });
+    if (!res.ok) throw new Error('speak ' + res.status);
+    return res.blob();
+  }
+
+  function playBlob(blob) {
+    return new Promise((resolve) => {
+      const url = URL.createObjectURL(blob);
+      const audio = new Audio(url);
+      let done = false;
+      const finish = () => { if (done) return; done = true; URL.revokeObjectURL(url); if (currentAudio === audio) currentAudio = null; resolve(); };
+      audio.onended = finish; audio.onerror = finish; audio.onpause = finish;
+      currentAudio = audio;
+      audio.play().catch(finish);
+    });
+  }
+
+  // Server-Stimme (ElevenLabs), satzweise geladen: Der erste Satz spielt, während die nächsten schon kommen.
+  // Bei jedem Fehler spricht JARVIS den Rest mit der Browser-Stimme.
   async function speak(text) {
     stopSpeaking();
     const seq = speakSeq;
-    if (voiceOn) {
-      try {
-        const res = await fetch('/api/speak', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', ...(TOKEN ? { Authorization: 'Bearer ' + TOKEN } : {}) },
-          body: JSON.stringify({ text: text.slice(0, 800) }),
-        });
-        if (!res.ok) throw new Error('speak ' + res.status);
-        const blob = await res.blob();
-        if (seq !== speakSeq) return;              // inzwischen wurde etwas anderes angefordert
-        const url = URL.createObjectURL(blob);
-        const audio = new Audio(url);
-        const finish = () => { URL.revokeObjectURL(url); if (currentAudio === audio) { currentAudio = null; doneSpeaking(); } };
-        audio.onended = finish; audio.onerror = finish;
-        currentAudio = audio;
-        startedSpeaking();
-        await audio.play();
-        return;
-      } catch (e) {
-        if (seq !== speakSeq) return;
-        currentAudio = null;
-      }
+    if (!voiceOn) { speakBrowser(text); return; }
+    const chunks = splitSentences(text);
+    const pending = [];
+    const want = (i) => { if (i < chunks.length && !pending[i]) pending[i] = fetchAudio(chunks[i]).catch(() => null); };
+    want(0); want(1);
+    audioActive = true;
+    let started = false;
+    for (let i = 0; i < chunks.length; i++) {
+      const blob = await pending[i];
+      if (seq !== speakSeq) return;
+      if (!blob) { audioActive = false; speakBrowser(chunks.slice(i).join(' ')); return; }
+      want(i + 2);
+      if (!started) { started = true; startedSpeaking(); }
+      await playBlob(blob);
+      if (seq !== speakSeq) return;
     }
-    speakBrowser(text);
+    audioActive = false;
+    doneSpeaking();
   }
 
   // ---------- UI ----------
@@ -121,6 +148,58 @@
     while (dialog.children.length > 10) dialog.removeChild(dialog.firstChild);
     return b;
   }
+  // Nur http(s)-Links werden zu echten Links; alles andere wird verworfen
+  function safeHref(u) {
+    try { const x = new URL(u); return (x.protocol === 'https:' || x.protocol === 'http:') ? x.href : ''; } catch (e) { return ''; }
+  }
+  function addLinkBubble(name, url) {
+    const href = safeHref(url);
+    if (!href) return;
+    const b = document.createElement('div');
+    b.className = 'bubble jarvis';
+    const a = document.createElement('a');
+    a.href = href; a.target = '_blank'; a.rel = 'noopener noreferrer';
+    a.textContent = 'Öffnen: ' + name + ' ↗';
+    a.style.cssText = 'color:var(--accent);font-weight:600;text-decoration:none';
+    b.appendChild(a);
+    dialog.appendChild(b);
+    while (dialog.children.length > 10) dialog.removeChild(dialog.firstChild);
+    // Direktes Öffnen klappt nur, wenn der Browser es erlaubt; der Button bleibt in jedem Fall als Ausweg
+    try { window.open(href, '_blank', 'noopener,noreferrer'); } catch (e) {}
+  }
+
+  // Dateien brauchen den Token im Header, deshalb per fetch laden und als Blob speichern
+  async function downloadProduct(id, format, label) {
+    try {
+      const res = await fetch(`/api/jobs/${encodeURIComponent(id)}/download?format=${format}`, { headers: TOKEN ? { Authorization: 'Bearer ' + TOKEN } : {} });
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const disp = res.headers.get('Content-Disposition') || '';
+      const name = (disp.match(/filename="([^"]+)"/) || [])[1] || `produkt.${format}`;
+      const url = URL.createObjectURL(await res.blob());
+      const a = document.createElement('a'); a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 10000);
+    } catch (e) { addBubble('Der Download hat nicht geklappt (' + (label || format) + ').', 'jarvis'); }
+  }
+  function productButtons(id) {
+    const wrap = document.createElement('span');
+    [['html', 'HTML (als PDF druckbar)'], ['md', 'Text (.md)']].forEach(([fmt, label], i) => {
+      const b = document.createElement('button');
+      b.type = 'button'; b.textContent = '⬇ ' + label;
+      b.style.cssText = 'margin:' + (i ? '0 0 0 8px' : '0') + ';padding:6px 10px;border-radius:8px;border:1px solid var(--accent);background:transparent;color:var(--accent);cursor:pointer;font-size:13px';
+      b.addEventListener('click', () => downloadProduct(id, fmt, label));
+      wrap.appendChild(b);
+    });
+    return wrap;
+  }
+  function addProductBubble(job) {
+    const b = document.createElement('div');
+    b.className = 'bubble jarvis';
+    const t = document.createElement('div'); t.textContent = job.title; t.style.marginBottom = '8px';
+    b.append(t, productButtons(job.id));
+    dialog.appendChild(b);
+    while (dialog.children.length > 10) dialog.removeChild(dialog.firstChild);
+  }
+
   function jarvisSay(text) { addBubble(text, 'jarvis'); speak(text); }
 
   const fmtTime = (iso) => new Date(iso).toLocaleString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
@@ -150,8 +229,31 @@
       items.forEach(t => { const d = document.createElement('div'); d.className = 'item'; d.textContent = t; sidePanel.appendChild(d); });
     };
     section('Aufgaben', s.tasks.map(t => '▸ ' + t.text + (t.due ? ` (${t.due})` : '')));
+    section('Läuft im Hintergrund', (s.jobs || []).map(t => '⏳ ' + t));
     section('Erinnerungen', s.reminders.map(r => '⏰ ' + fmtTime(r.at) + ' · ' + r.text));
-    sidePanel.classList.toggle('show', !!(s.tasks.length || s.reminders.length));
+    if ((s.links || []).length) {
+      const h = document.createElement('div'); h.className = 'lbl'; h.textContent = 'Schnellzugriff'; sidePanel.appendChild(h);
+      const row = document.createElement('div'); row.className = 'item';
+      s.links.forEach(l => {
+        const href = safeHref(l.url); if (!href) return;
+        const a = document.createElement('a');
+        a.href = href; a.target = '_blank'; a.rel = 'noopener noreferrer'; a.textContent = l.name;
+        a.style.cssText = 'color:var(--accent);margin-right:12px;text-decoration:none';
+        row.appendChild(a);
+      });
+      sidePanel.appendChild(row);
+    }
+    if ((s.products || []).length) {
+      const h = document.createElement('div'); h.className = 'lbl'; h.textContent = 'Produkte'; sidePanel.appendChild(h);
+      s.products.forEach(p => {
+        const row = document.createElement('div'); row.className = 'item';
+        const t = document.createElement('div'); t.textContent = p.title; t.style.marginBottom = '6px';
+        row.append(t, productButtons(p.id));
+        sidePanel.appendChild(row);
+      });
+    }
+    if (s.factCount) section(`Gedächtnis (${s.factCount})`, s.facts.map(f => '🧠 ' + f));
+    sidePanel.classList.toggle('show', !!(s.tasks.length || s.reminders.length || s.factCount || (s.jobs || []).length || (s.links || []).length || (s.products || []).length));
   }
 
   // ---------- Gespräch ----------
@@ -161,6 +263,7 @@
       const data = await api('/api/chat', { method: 'POST', body: JSON.stringify({ message: text, offsetMinutes: new Date().getTimezoneOffset() }) });
       renderState(data.state);
       jarvisSay(data.reply);
+      (data.actions || []).forEach(a => { if (a.type === 'open') addLinkBubble(a.name, a.url); });
     } catch (err) {
       if (err.code === 401) { askToken('Bitte Zugangs-Token eingeben.'); setState('idle'); return; }
       jarvisSay('Das hat nicht geklappt. ' + (err.message || '') );
@@ -180,6 +283,16 @@
       const data = await api('/api/poll');
       renderState(data.state);
       data.fired.forEach(r => jarvisSay('Erinnerung: ' + r.text));
+      (data.jobs || []).forEach(j => {
+        if (j.kind === 'product' && j.status === 'done') {
+          addProductBubble(j);
+          speak(`${USER_NAME}, das Produkt ist fertig: ${j.title}. Du kannst es jetzt herunterladen.`);
+        } else if (j.status === 'done') {
+          addBubble(j.result.slice(0, 900), 'jarvis');
+          const lead = j.result.split(/(?<=[.!?])\s+/).slice(0, 2).join(' ');
+          speak(`${USER_NAME}, die Recherche ist fertig: ${j.title}. ${lead}`.slice(0, 600));
+        } else jarvisSay(`${USER_NAME}, die Recherche „${j.title}“ hat nicht geklappt.`);
+      });
       if (data.fired.length && window.Notification && Notification.permission === 'granted') {
         data.fired.forEach(r => { try { new Notification('JARVIS', { body: r.text }); } catch (e) {} });
       }
@@ -346,7 +459,7 @@
       if (e.code === 401) { askToken(TOKEN ? 'Token ist falsch.' : ''); return; }
     }
     if (afterToken) { greeted = false; greetOnce(); }
-    else window.addEventListener('pointerdown', greetOnce, { once: true });
+    else window.addEventListener('click', greetOnce, { once: true });   // click statt pointerdown: die Begrüßung verschiebt sonst das Layout, bevor der Klick ankommt
   }
   boot(false);
 })();

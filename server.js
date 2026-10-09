@@ -6,7 +6,9 @@ import { timingSafeEqual } from 'node:crypto';
 import { Store } from './lib/store.js';
 import { chat, AgentError } from './lib/agent.js';
 import { takeDueReminders } from './lib/tools.js';
-import { mailConfigFromEnv, startMailWatcher } from './lib/mail.js';
+import { mailConfigFromEnv, startMailWatcher, sendPush } from './lib/mail.js';
+import { startResearch, takeFinishedJobs, recoverJobs } from './lib/jobs.js';
+import { startProduct, renderProductHtml, productFilename } from './lib/products.js';
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
 const PUBLIC_DIR = path.join(ROOT, 'public');
@@ -19,18 +21,27 @@ export function createServer(opts = {}) {
   const cfg = {
     apiKey: opts.apiKey ?? env.ANTHROPIC_API_KEY ?? '',
     token: opts.token ?? env.JARVIS_TOKEN ?? '',
-    model: opts.model ?? env.JARVIS_MODEL ?? 'claude-sonnet-5-5',
+    model: opts.model ?? env.JARVIS_MODEL ?? 'claude-haiku-5-5',
     userName: opts.userName ?? env.JARVIS_USER_NAME ?? 'Augustin',
     webhookUrl: opts.webhookUrl ?? env.N8N_WEBHOOK_URL ?? '',
     fetchFn: opts.fetchFn ?? fetch,
+    researchModel: opts.researchModel ?? env.JARVIS_RESEARCH_MODEL ?? 'claude-sonnet-5-5',
+    productModel: opts.productModel ?? env.JARVIS_PRODUCT_MODEL ?? env.JARVIS_RESEARCH_MODEL ?? 'claude-sonnet-5-5',
+    ntfy: opts.ntfy === undefined
+      ? (env.NTFY_TOPIC ? { server: (env.NTFY_SERVER || 'https://ntfy.sh').replace(/\/+$/, ''), topic: env.NTFY_TOPIC } : null)
+      : opts.ntfy,
+    jobPushIncludesResult: opts.jobPushIncludesResult ?? (env.JOB_PUSH_INCLUDE_RESULT === 'true'),
     mail: opts.mail === undefined ? mailConfigFromEnv(env) : opts.mail,
     voice: opts.voice === undefined
       ? (env.ELEVENLABS_API_KEY && env.ELEVENLABS_VOICE_ID
-          ? { apiKey: env.ELEVENLABS_API_KEY, voiceId: env.ELEVENLABS_VOICE_ID, model: env.ELEVENLABS_MODEL || 'eleven_multilingual_v2' }
+          ? { apiKey: env.ELEVENLABS_API_KEY, voiceId: env.ELEVENLABS_VOICE_ID, model: env.ELEVENLABS_MODEL || 'eleven_flash_v2_5' }
           : null)
       : opts.voice,
   };
-  const store = opts.store ?? new Store(path.join(env.DATA_DIR || path.join(ROOT, 'data'), 'store.json'));
+  const store = opts.store ?? new Store(path.join(env.DATA_DIR || path.join(ROOT, 'data'), 'store.json'), {
+    remote: env.UPSTASH_REDIS_REST_URL && env.UPSTASH_REDIS_REST_TOKEN
+      ? { url: env.UPSTASH_REDIS_REST_URL, token: env.UPSTASH_REDIS_REST_TOKEN } : null,
+  });
 
   const authorized = (req) => {
     if (!cfg.token) return true;               // nur erlaubt, wenn der Server lokal bindet (siehe main)
@@ -57,9 +68,45 @@ export function createServer(opts = {}) {
     return {
       userName: cfg.userName,
       goal: d.goal,
+      factCount: d.facts.length,
+      facts: d.facts.slice(-4),
       tasks: d.tasks.filter(t => !t.done).map(({ id, text, due }) => ({ id, text, due })),
+      products: d.jobs.filter(j => j.kind === 'product' && j.status === 'done').slice(-5).map(({ id, title }) => ({ id, title })),
+      links: d.links.map(({ name, url }) => ({ name, url })),
+      jobs: d.jobs.filter(j => j.status === 'running').map(j => j.title),
       reminders: d.reminders.filter(r => !r.fired).sort((a, b) => new Date(a.at) - new Date(b.at)).map(({ id, text, at }) => ({ id, text, at })),
     };
+  };
+
+  recoverJobs(store);
+  const notifyJob = async (job) => {
+    if (!cfg.ntfy) return;
+    const ok = job.status === 'done';
+    await sendPush({
+      ntfy: cfg.ntfy,
+      title: job.kind === 'product' ? (ok ? 'Produkt fertig' : 'Produkt fehlgeschlagen') : (ok ? 'Recherche fertig' : 'Recherche fehlgeschlagen'),
+      message: ok && cfg.jobPushIncludesResult ? job.result.slice(0, 300) : job.title,
+      fetchFn: cfg.fetchFn,
+    });
+  };
+  const startJob = (request) => startResearch({ store, request, apiKey: cfg.apiKey, model: cfg.researchModel, fetchFn: cfg.fetchFn, notify: notifyJob });
+
+  const startProductJob = (spec) => startProduct({ store, ...spec, apiKey: cfg.apiKey, model: cfg.productModel, fetchFn: cfg.fetchFn, notify: notifyJob });
+
+  // Klartext-Übersicht für den Nutzer: was ist eingerichtet, was fehlt (ohne Geheimnisse preiszugeben)
+  const systemStatus = () => {
+    const line = (ok, name, fix) => `${ok ? 'AN' : 'AUS'}: ${name}${ok ? '' : ' – fehlt: ' + fix}`;
+    return [
+      line(!!cfg.apiKey, 'Denken (Anthropic)', 'ANTHROPIC_API_KEY'),
+      line(!!cfg.token, 'Passwortschutz', 'JARVIS_TOKEN'),
+      line(!!cfg.voice, 'Stimme (ElevenLabs)', 'ELEVENLABS_API_KEY und ELEVENLABS_VOICE_ID; sonst Browser-Stimme'),
+      line(!!store.remote, 'Dauerhaftes Gedächtnis (Datenbank)', 'UPSTASH_REDIS_REST_URL und UPSTASH_REDIS_REST_TOKEN; sonst gehen Daten bei Neustart verloren'),
+      line(!!cfg.mail, 'Mail-Überwachung', 'IMAP_HOST, IMAP_USER, IMAP_PASSWORD und NTFY_TOPIC oder Twilio'),
+      line(!!(cfg.mail && cfg.mail.call), 'Anruf bei wichtigen Mails', 'TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_FROM, CALL_TO'),
+      line(!!cfg.ntfy, 'Push aufs Handy', 'NTFY_TOPIC'),
+      line(!!cfg.webhookUrl, 'E-Mail/Kalender über n8n', 'N8N_WEBHOOK_URL'),
+      `Modelle: Chat ${cfg.model}, Recherche ${cfg.researchModel}`,
+    ].join('\n');
   };
 
   // Chat-Anfragen nacheinander abarbeiten, damit der Speicher konsistent bleibt
@@ -81,13 +128,16 @@ export function createServer(opts = {}) {
     try {
       const { pathname } = new URL(req.url, 'http://localhost');
 
-      if (pathname === '/api/health') return json(res, 200, { ok: true, tokenRequired: !!cfg.token, keyConfigured: !!cfg.apiKey, mailWatch: !!cfg.mail, voice: !!cfg.voice });
+      if (pathname === '/api/health') return json(res, 200, { ok: true, tokenRequired: !!cfg.token, keyConfigured: !!cfg.apiKey, mailWatch: !!cfg.mail, voice: !!cfg.voice, memory: store.remote ? 'datenbank' : 'datei' });
 
       if (pathname.startsWith('/api/')) {
         if (!authorized(req)) return json(res, 401, { error: 'Zugangs-Token fehlt oder ist falsch.' });
 
         if (pathname === '/api/state' && req.method === 'GET') return json(res, 200, publicState());
-        if (pathname === '/api/poll' && req.method === 'GET') return json(res, 200, { fired: takeDueReminders(store).map(({ id, text }) => ({ id, text })), state: publicState() });
+        if (pathname === '/api/poll' && req.method === 'GET') {
+          const jobs = takeFinishedJobs(store).map(({ id, title, status, result, kind }) => ({ id, title, status, kind, result: kind === 'product' && status === 'done' ? result.slice(0, 300) : result }));
+          return json(res, 200, { fired: takeDueReminders(store).map(({ id, text }) => ({ id, text })), jobs, state: publicState() });
+        }
 
         if (pathname === '/api/chat' && req.method === 'POST') {
           let body;
@@ -95,8 +145,22 @@ export function createServer(opts = {}) {
           const message = typeof body.message === 'string' ? body.message.trim() : '';
           if (!message || message.length > 4000) return json(res, 400, { error: 'Nachricht fehlt oder ist zu lang.' });
           const offsetMinutes = Number.isFinite(body.offsetMinutes) ? Math.max(-840, Math.min(840, body.offsetMinutes)) : 0;
-          const reply = await enqueue(() => chat({ store, message, offsetMinutes, apiKey: cfg.apiKey, model: cfg.model, userName: cfg.userName, webhookUrl: cfg.webhookUrl, mailEnabled: !!cfg.mail, fetchFn: cfg.fetchFn }));
-          return json(res, 200, { reply, state: publicState() });
+          const actions = [];
+          const reply = await enqueue(() => chat({ store, actions, message, offsetMinutes, apiKey: cfg.apiKey, model: cfg.model, userName: cfg.userName, webhookUrl: cfg.webhookUrl, mailEnabled: !!cfg.mail, startResearch: cfg.apiKey ? startJob : undefined, startProduct: cfg.apiKey ? startProductJob : undefined, systemStatus, fetchFn: cfg.fetchFn }));
+          return json(res, 200, { reply, actions, state: publicState() });
+        }
+        const dl = pathname.match(/^\/api\/jobs\/([a-f0-9]+)\/download$/);
+        if (dl && req.method === 'GET') {
+          const job = store.data.jobs.find(j => j.id === dl[1] && j.kind === 'product' && j.status === 'done');
+          if (!job) return json(res, 404, { error: 'Produkt nicht gefunden.' });
+          const asHtml = new URL(req.url, 'http://localhost').searchParams.get('format') !== 'md';
+          const body = asHtml ? renderProductHtml(job.title, job.result) : job.result;
+          res.writeHead(200, {
+            'Content-Type': asHtml ? 'text/html; charset=utf-8' : 'text/markdown; charset=utf-8',
+            'Content-Disposition': `attachment; filename="${productFilename(job.title, asHtml ? 'html' : 'md')}"`,
+            'Cache-Control': 'no-store',
+          });
+          return res.end(body);
         }
         if (pathname === '/api/speak' && req.method === 'POST') {
           if (!cfg.voice) return json(res, 501, { error: 'Keine ElevenLabs-Stimme konfiguriert.' });
@@ -133,6 +197,8 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const host = process.env.HOST || '127.0.0.1';
   const port = Number(process.env.PORT) || 8000;
   const { server, cfg, store } = createServer();
+  await store.init();
+  for (const sig of ['SIGTERM', 'SIGINT']) process.on(sig, async () => { await store.flush(); process.exit(0); });
   if (!isLoopback(host) && !cfg.token) {
     console.error('Abbruch: Der Server ist von außen erreichbar (HOST=' + host + '), aber JARVIS_TOKEN ist nicht gesetzt.');
     process.exit(1);

@@ -9,6 +9,57 @@ erledigt Dinge für dich (Anrede: Augustin, einstellbar).
 - **E-Mail / Kalender / Notion** über einen optionalen n8n-Webhook (`N8N_WEBHOOK_URL`). Der Workflow muss die
   Aktionen (`send_email`, `create_event` …) selbst ausführen. JARVIS fragt vor dem Senden nach.
 
+## Digitale Produkte
+
+JARVIS schreibt im Hintergrund **Prompt-Pakete** (ca. 30 fertige KI-Prompts in 5 Kapiteln mit Bonus-Beispielen) und **Anleitungen**
+(7 Schritte, Checkliste, häufige Fehler, FAQ), je ca. 2500 bis 3500 Wörter. Sag z. B.
+*„Erstelle ein Prompt-Paket für Selbstständige, die KI für Angebote und Mails nutzen wollen."* Er klärt Thema und Zielgruppe, startet den Auftrag
+und meldet sich. Das fertige Produkt lädst du über die Buttons im Verlauf oder im Panel „Produkte" herunter:
+**HTML** (im Browser öffnen und über *Drucken → Als PDF speichern* zum PDF machen) oder **Markdown**.
+
+- Jedes Produkt verbraucht API-Guthaben (bis zu 8000 Ausgabe-Token plus bis zu 3 Websuchen). Modell: `JARVIS_PRODUCT_MODEL`.
+- **Prüfe jedes Produkt selbst**, bevor du es weitergibst oder verkaufst: Inhalt, Fakten, Rechtschreibung, Platzhalter. KI-Texte können Fehler enthalten.
+  JARVIS verspricht keine Einnahmen und schreibt keine Erfolgsversprechen, erfundenen Zahlen oder Testimonials ins Produkt.
+- Beachte beim Verkauf die Regeln der Plattform (z. B. zu KI-Inhalten), Impressum, Steuern und Widerrufsrecht für digitale Produkte.
+- Es werden die letzten 12 Aufträge gespeichert (jedes Produkt bis 35.000 Zeichen); lade Fertiges also herunter und archiviere es selbst.
+
+## Gespeicherte Seiten (Schnellzugriff)
+
+JARVIS kennt Seiten, die du öffnen willst. Standardmäßig **World Monitor** (`worldmonitor.app`) und **Amazon** (`amazon.de`, mit Suche).
+Sag *„Öffne World Monitor"* oder *„Such bei Amazon nach einer Kaffeemaschine"*: JARVIS stellt einen **Öffnen-Button** in den Verlauf
+und versucht die Seite zusätzlich direkt in einem neuen Tab zu öffnen (Browser blockieren das manchmal, der Button funktioniert immer).
+Im Panel rechts stehen alle gespeicherten Seiten als Links. Neue Seiten: *„Speichere die Seite https://de.wikipedia.org als Wikipedia mit Suche"*,
+entfernen: *„Entferne Wikipedia"*. Erlaubt sind nur `http`- und `https`-Adressen. JARVIS öffnet Seiten nur, loggt sich dort aber nie ein
+und kauft nichts.
+
+## Hintergrundaufträge
+
+Für längere Aufgaben startet JARVIS eine **Recherche im Hintergrund** und kehrt sofort zurück, du kannst weiterreden:
+*„Such mir die besten Angebote für eine Kaffeemaschine unter 150 Euro raus."* Er recherchiert mit mehreren Websuchen
+(Modell `JARVIS_RESEARCH_MODEL`, Standard Sonnet), speichert das Ergebnis als Notiz und meldet sich, sobald es fertig ist:
+in der App (er liest eine Kurzfassung vor, den Text siehst du im Verlauf) und, wenn `NTFY_TOPIC` gesetzt ist, per Push aufs Handy.
+Der Push nennt standardmäßig nur den Titel, nicht das Ergebnis (`JOB_PUSH_INCLUDE_RESULT=true` ändert das).
+Es laufen höchstens 2 Aufträge gleichzeitig, jeder hat ein Zeitlimit von 5 Minuten. Fertige Aufträge kannst du später abrufen:
+*„Was war das Ergebnis der Recherche?"*. Ein Neustart des Servers bricht laufende Aufträge ab.
+Der Server muss dafür laufen, siehe „Wachbleiben" unten.
+
+## Wachbleiben
+
+Der kostenlose Render-Tarif schläft nach etwa 15 Minuten ohne Aufruf und stoppt dabei auch Mail-Überwachung und Hintergrundaufträge.
+Ein bezahlter Tarif (Render *Starter* oder höher) schläft nicht. Alternativ hält ein Pinger wie UptimeRobot den Server wach:
+HTTP-Monitor auf `https://<deine-adresse>/api/health` alle 5 Minuten.
+
+## Gedächtnis
+
+JARVIS merkt sich dauerhaft: Fakten über dich (von selbst, per `remember`), Aufgaben, Notizen, Erinnerungen und das Ziel.
+Ältere Gespräche werden im Hintergrund zu einer kurzen **Zusammenfassung** verdichtet, die er in jedes Gespräch mitnimmt;
+die letzten Nachrichten bleiben im Wortlaut. Das Panel rechts zeigt die zuletzt gemerkten Fakten. Sag *„Was weißt du über mich?"*,
+*„Vergiss, dass ich …"* oder *„Merk dir, dass …"*.
+
+Standardmäßig liegt alles in `data/store.json`. Auf Hosting mit flüchtigem Dateisystem (Render Free) ist das nach jedem Neustart leer.
+Dort `UPSTASH_REDIS_REST_URL` und `UPSTASH_REDIS_REST_TOKEN` setzen (kostenlose Datenbank bei upstash.com). JARVIS lädt beim Start
+daraus und schreibt jede Änderung nach. Ist die Datenbank nicht erreichbar, läuft er mit dem lokalen Stand weiter.
+
 ## Meldung bei wichtigen E-Mails (Anruf und/oder Push)
 
 JARVIS prüft dein Postfach per IMAP (GMX, web.de, Outlook u. a.) und meldet **wichtige** neue Mails: per **Anruf**
@@ -75,7 +126,9 @@ npm test
 | `server.js` | HTTP-Server, Token-Prüfung, Routen `/api/chat`, `/api/state`, `/api/poll`, `/api/health` |
 | `lib/agent.js` | Claude-Schleife mit Werkzeugen, Systemprompt |
 | `lib/tools.js` | Werkzeuge (Aufgaben, Notizen, Erinnerungen, Gedächtnis, n8n) |
-| `lib/store.js` | JSON-Speicher |
+| `lib/store.js` | Speicher (Datei, optional Upstash-Redis) |
+| `lib/jobs.js` | Hintergrundaufträge (Recherchen) |
+| `lib/products.js` | Digitale Produkte, Markdown → HTML |
 | `lib/mail.js` | IMAP-Überwachung, Filter, Anruf (Twilio) und Push (ntfy) |
 | `public/` | Oberfläche: Orb, Spracherkennung („Hey Jarvis"), Sprachausgabe |
 
