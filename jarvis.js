@@ -58,8 +58,9 @@
     const u = new SpeechSynthesisUtterance(text);
     if (deVoice) u.voice = deVoice;
     u.lang = 'de-DE'; u.rate = 1.02; u.pitch = 0.9;
-    u.onstart = () => setState('speaking');
-    u.onend = () => setState(listening ? 'listening' : 'idle');
+    u.onstart = () => { setState('speaking'); if (recognition && listening) { try { recognition.stop(); } catch (e) {} } };
+    u.onend = () => { setState(listening ? 'listening' : 'idle'); if (listening) restartRecognition(); };
+    u.onerror = u.onend;
     synth.speak(u);
   }
 
@@ -199,7 +200,7 @@
   // ---------- Claude Agent ----------
   function systemPrompt() {
     const open = store.tasks.filter(t => !t.done).map(t => `${t.id}: ${t.text}${t.due ? ' (' + t.due + ')' : ''}`).join('; ') || 'keine';
-    return `Du bist JARVIS, der persönliche KI-Assistent des Nutzers im Stil von Iron Man: souverän, trocken-höflich, effizient. Du arbeitest FÜR den Nutzer und erledigst Dinge aktiv mit deinen Werkzeugen, statt nur Ratschläge zu geben.
+    return `Du bist JARVIS, der persönliche KI-Assistent von Augustin (so heißt der Nutzer; sprich ihn am Anfang deiner Antwort oder bei Bestätigungen mit seinem Namen an, aber nicht in jedem Satz) im Stil von Iron Man: souverän, trocken-höflich, effizient. Du arbeitest FÜR den Nutzer und erledigst Dinge aktiv mit deinen Werkzeugen, statt nur Ratschläge zu geben.
 Antworte auf Deutsch, gesprochen und kurz (1-3 Sätze), ohne Markdown, Listen oder Emojis, weil deine Antwort vorgelesen wird. Nutze Werkzeuge direkt, wenn der Nutzer etwas speichern, planen, erinnern oder recherchieren will. Für aktuelle Fakten nutze web_search und fasse knapp zusammen. Fürs Tagesplanen: lies Aufgaben und Erinnerungen und schlage eine konkrete Reihenfolge vor. Speichere dauerhaft relevante Infos über den Nutzer mit remember. Vor externen Aktionen (E-Mail senden usw.) bestätige den Inhalt erst mit dem Nutzer. Erfinde keine Ergebnisse; wenn ein Werkzeug fehlt, sage es ehrlich.
 Aktuelle Zeit: ${new Date().toLocaleString('de-DE', { dateStyle: 'full', timeStyle: 'short' })} (ISO lokal: ${new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16)}).
 Bekannte Fakten über den Nutzer: ${store.facts.join('; ') || 'noch keine'}.
@@ -304,13 +305,41 @@ Aktuelles Ziel: ${store.goal ? store.goal.text : 'keins'}.`;
     window.Orb && window.Orb.setAudioLevel(0);
   }
 
-  // ---------- Spracherkennung ----------
+  // ---------- Spracherkennung mit Wake-Word "Hey Jarvis" ----------
+  const USER_NAME = 'Augustin';
+  const WAKE_RE = /(?:dsch|tsch|sch|j|y)ar[vw][iy]s+/i;   // erkennt auch "Dscharvis", "Jarwis" …
+  let armedUntil = 0;           // bis wann JARVIS auf einen Befehl wartet
+  const ARM_MS = 10000;
+
+  function restartRecognition() {
+    if (!recognition || !listening || (synth && synth.speaking)) return;
+    setTimeout(() => {
+      if (!listening || (synth && synth.speaking)) return;
+      try { recognition.start(); } catch (e) {}
+    }, 250);
+  }
+
+  function onFinalSpeech(raw) {
+    const text = raw.trim();
+    if (!text) return;
+    const m = text.match(WAKE_RE);
+    if (m) {
+      // alles nach dem Wake-Word ist der Befehl
+      const cmd = text.slice(m.index + m[0].length).replace(/^[\s,.:!?-]+/, '');
+      if (cmd.length > 2) { armedUntil = 0; handleInput(cmd); }
+      else { armedUntil = Date.now() + ARM_MS; jarvisSay(`Ja, ${USER_NAME}?`); }
+      return;
+    }
+    if (Date.now() < armedUntil) { armedUntil = 0; handleInput(text); }
+    // sonst: Gespräch im Raum ignorieren
+  }
+
   function initRecognition() {
     if (!SR) { unsupported.style.display = 'flex'; return; }
     recognition = new SR();
     recognition.lang = 'de-DE';
     recognition.interimResults = true;
-    recognition.continuous = false;
+    recognition.continuous = true;
     recognition.onresult = (ev) => {
       let interim = '', final = '';
       for (let i = ev.resultIndex; i < ev.results.length; i++) {
@@ -318,35 +347,63 @@ Aktuelles Ziel: ${store.goal ? store.goal.text : 'keins'}.`;
         if (r.isFinal) final += r[0].transcript;
         else interim += r[0].transcript;
       }
-      if (interim) {
+      if (interim && (Date.now() < armedUntil || WAKE_RE.test(interim))) {
         if (!interimBubble) interimBubble = addBubble(interim, 'user', true);
         else interimBubble.textContent = interim;
       }
       if (final) {
         if (interimBubble) { interimBubble.remove(); interimBubble = null; }
-        handleInput(final);
+        onFinalSpeech(final);
       }
     };
     recognition.onend = () => {
       if (interimBubble) { interimBubble.remove(); interimBubble = null; }
-      listening = false;
+      if (listening) { restartRecognition(); return; }
       micBtn.classList.remove('active');
       stopMicMeter();
       if (window.Orb.getMode() !== 'speaking') setState('idle');
     };
-    recognition.onerror = () => { listening = false; micBtn.classList.remove('active'); stopMicMeter(); setState('idle'); };
+    recognition.onerror = (e) => {
+      if (e.error === 'not-allowed' || e.error === 'service-not-allowed') {
+        listening = false; micBtn.classList.remove('active'); stopMicMeter(); setState('idle');
+        addBubble('Mikrofon-Zugriff wurde blockiert. Bitte im Browser erlauben.', 'jarvis');
+      }
+      // andere Fehler (no-speech, aborted): onend startet neu
+    };
   }
 
-  function toggleListen() {
-    if (apiOverlay.style.display !== 'none') return;
-    if (!recognition) { textInput.focus(); return; }
-    if (listening) { recognition.stop(); return; }
-    synth && synth.cancel();
+  function startListening() {
+    if (!recognition || listening) return;
     listening = true;
     micBtn.classList.add('active');
     setState('listening');
     startMicMeter();
     try { recognition.start(); } catch (e) {}
+  }
+  function stopListening() {
+    listening = false;
+    armedUntil = 0;
+    try { recognition.stop(); } catch (e) {}
+    micBtn.classList.remove('active');
+    stopMicMeter();
+    setState('idle');
+  }
+
+  function toggleListen() {
+    if (apiOverlay.style.display !== 'none') return;
+    if (!recognition) { textInput.focus(); return; }
+    if (listening) {
+      // Klick während Dauer-Hören: sofort Befehl annehmen, zweiter Klick beendet das Hören
+      if (Date.now() < armedUntil) { stopListening(); return; }
+      synth && synth.cancel();
+      armedUntil = Date.now() + ARM_MS;
+      setState('listening');
+      restartRecognition();
+      return;
+    }
+    synth && synth.cancel();
+    armedUntil = Date.now() + ARM_MS;
+    startListening();
   }
 
   micBtn.addEventListener('click', toggleListen);
@@ -361,11 +418,14 @@ Aktuelles Ziel: ${store.goal ? store.goal.text : 'keins'}.`;
   checkReminders();
 
   let greeted = false;
-  function greetOnce() {
+  function greetOnce(ev) {
     if (greeted) return; greeted = true;
+    // Klick auf Mikro/Orb startet das Hören selbst – dann keine Begrüßung
+    if (ev && ev.target && (ev.target === micBtn || micBtn.contains(ev.target) || ev.target === orbCanvas)) return;
+    startListening();
     const open = store.tasks.filter(t => !t.done).length;
     jarvisSay(ANTHROPIC_KEY
-      ? `Systeme online.${open ? ` Du hast ${open} offene Aufgabe${open > 1 ? 'n' : ''}.` : ''} Was soll ich für dich erledigen?`
+      ? `Systeme online, ${USER_NAME}. Sag Hey Jarvis, wenn du mich brauchst.${open ? ` Du hast ${open} offene Aufgabe${open > 1 ? 'n' : ''}.` : ''}`
       : 'Systeme online, aber ohne API Key kann ich nicht für dich arbeiten.');
   }
 
