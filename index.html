@@ -109,6 +109,11 @@
     }
     .goal-panel .goal-amount { color: var(--accent); font-weight: 600; }
 
+    .side-panel { position: fixed; top: 90px; right: 24px; z-index: 3; width: min(300px, 40vw); display: none; flex-direction: column; gap: 6px; }
+    .side-panel.show { display: flex; }
+    .side-panel .lbl { font-size: 10px; letter-spacing: 3px; color: #5f7a90; text-transform: uppercase; margin-top: 8px; }
+    .side-panel .item { font-size: 13px; color: #bfe3f5; background: rgba(10,22,34,0.6); border: 1px solid rgba(56,217,255,0.14); border-radius: 8px; padding: 6px 10px; }
+
     /* Transcript / dialog */
     .dialog {
       position: fixed;
@@ -272,10 +277,12 @@
     <canvas id="orb"></canvas>
   </div>
 
+  <div class="side-panel" id="sidePanel"></div>
+
   <div class="dialog" id="dialog"></div>
 
   <div class="controls">
-    <input class="text-input" id="textInput" placeholder="Sag mir dein Ziel… (oder tippe hier)" />
+    <input class="text-input" id="textInput" placeholder="Was soll ich für dich erledigen?" />
     <button class="mic-btn" id="micBtn" title="Sprechen">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
         <path d="M12 2a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/>
@@ -294,7 +301,7 @@
     Der Key wird nur lokal in deinem Browser gespeichert und nirgendwo hochgeladen.</p>
     <input type="password" id="apiKeyInput" placeholder="sk-ant-..." autocomplete="off" />
     <button id="apiSaveBtn">JARVIS STARTEN</button>
-    <button class="skip-btn" id="apiSkipBtn">Ohne KI starten (Demo-Modus)</button>
+    <button class="skip-btn" id="apiSkipBtn">Ohne Key starten (eingeschränkt)</button>
     <div class="api-hint">
       Key holen: <span style="color:#38d9ff">console.anthropic.com</span> → API Keys → Create Key
     </div>

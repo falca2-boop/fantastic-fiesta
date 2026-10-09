@@ -35,24 +35,38 @@ Dann:
 2. Sprich, z. B.: *„JARVIS, du sollst 500 Euro verdienen."*
 3. JARVIS setzt das Ziel und schlägt Schritte vor. Sag *„Plan zeigen"* für Details.
 
-## Sprachbefehle (Beispiele)
+## Was JARVIS für dich erledigt
 
-| Du sagst | JARVIS |
-|----------|--------|
-| „Verdiene 500 Euro" | setzt Ziel + Vorschlag |
-| „Plan zeigen" | zeigt alle Schritte |
-| „Status" | nennt das aktuelle Ziel |
-| „Hallo JARVIS" | Begrüßung |
+JARVIS ist ein Agent mit Werkzeugen (Claude Tool-Use, läuft direkt im Browser):
+
+| Du sagst | JARVIS tut |
+|----------|-----------|
+| „Was ist heute in den Nachrichten zu …?" | sucht live im Web und fasst zusammen |
+| „Setz Milch kaufen auf meine Liste" | speichert eine Aufgabe (Panel rechts) |
+| „Erinnere mich um 15 Uhr an den Anruf" | spricht die Erinnerung zur Zeit (Tab muss offen sein) |
+| „Notiere: Idee für …" | speichert eine Notiz |
+| „Merk dir, dass ich vegetarisch esse" | dauerhaftes Gedächtnis über den Nutzer |
+| „Plan meinen Tag" | ordnet Aufgaben und Erinnerungen zu einem Tagesplan |
+| „Mein Ziel ist 500 €" | setzt Ziel + Plan |
+
+Alle Daten liegen im `localStorage` deines Browsers (keine Cloud).
+
+### E-Mail / Kalender / Notion (optional)
+
+Dafür braucht JARVIS einen n8n-Workflow. Lege eine `config.js` an (steht in `.gitignore`):
+
+```js
+window.JARVIS_CONFIG = {
+  anthropicKey: 'sk-ant-...',          // optional, sonst Eingabe beim Start
+  n8nWebhook: 'https://DEIN.n8n.cloud/webhook/jarvis-action'
+};
+```
+
+JARVIS sendet `{action, details}` an den Webhook (z. B. `send_email`) und bestätigt
+vorher den Inhalt mit dir. Der Workflow muss die Aktionen selbst implementieren.
 
 ## Dateien
 
 - `index.html` — Layout, HUD, Ziel-Panel, Dialog, Steuerung.
 - `orb.js` — Canvas-Animation des Orbs (`window.Orb` API).
 - `jarvis.js` — Spracherkennung, Sprachausgabe, Ziel- & Dialoglogik.
-
-## Hinweis
-
-Die „Geld-verdienen"-Logik ist aktuell ein **Demo-Assistent**: JARVIS erkennt das Ziel
-und formuliert einen Plan, führt aber keine echten Transaktionen aus. Das Interface ist
-so aufgebaut, dass echte Aktionen (z. B. n8n-Workflows, APIs) später leicht angebunden
-werden können — die Zielverarbeitung sitzt gebündelt in `respond()` in `jarvis.js`.

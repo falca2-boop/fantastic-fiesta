@@ -81,22 +81,133 @@
 
   function jarvisSay(text) { addBubble(text, 'jarvis'); speak(text); }
 
-  // ---------- Ziel-Panel ----------
-  const state = { goal: null };
+  // ---------- Persistenter Speicher ----------
+  const STORE_KEY = 'jarvis_store_v2';
+  const store = (() => {
+    try { return Object.assign({ tasks: [], notes: [], reminders: [], facts: [], goal: null, history: [] },
+      JSON.parse(localStorage.getItem(STORE_KEY) || '{}')); }
+    catch { return { tasks: [], notes: [], reminders: [], facts: [], goal: null, history: [] }; }
+  })();
+  function save() { try { localStorage.setItem(STORE_KEY, JSON.stringify(store)); } catch (e) {} renderPanel(); }
+  const uid = () => Math.random().toString(36).slice(2, 8);
+  const fmtTime = (iso) => new Date(iso).toLocaleString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
 
-  function setGoal(displayHtml, raw, schritte, realisierbarkeit) {
-    state.goal = { displayHtml, raw, schritte: schritte || [], realisierbarkeit };
-    let html = displayHtml;
-    if (realisierbarkeit != null) {
-      html += ` <span style="font-size:11px;color:#6f8aa0;letter-spacing:2px"> · ${realisierbarkeit}% realisierbar</span>`;
+  // ---------- Ziel- & Aufgaben-Panel ----------
+  function setGoal(text, schritte, realisierbarkeit) {
+    store.goal = { text, schritte: schritte || [], realisierbarkeit };
+    save();
+  }
+  function renderPanel() {
+    if (store.goal) {
+      let html = `Ziel: <strong style="color:#eafaff"></strong>`;
+      goalText.innerHTML = html;
+      goalText.querySelector('strong').textContent = store.goal.text.slice(0, 80);
+      if (store.goal.realisierbarkeit != null) {
+        const sp = document.createElement('span');
+        sp.style.cssText = 'font-size:11px;color:#6f8aa0;letter-spacing:2px';
+        sp.textContent = ` · ${store.goal.realisierbarkeit}% realisierbar`;
+        goalText.appendChild(sp);
+      }
+      goalPanel.classList.add('show');
     }
-    goalText.innerHTML = html;
-    goalPanel.classList.add('show');
+    const open = store.tasks.filter(t => !t.done);
+    const rem = store.reminders.filter(r => !r.fired).sort((x, y) => new Date(x.at) - new Date(y.at));
+    const el = document.getElementById('sidePanel');
+    if (!el) return;
+    el.innerHTML = '';
+    const section = (title, items) => {
+      if (!items.length) return;
+      const h = document.createElement('div'); h.className = 'lbl'; h.textContent = title; el.appendChild(h);
+      items.forEach(t => { const d = document.createElement('div'); d.className = 'item'; d.textContent = t; el.appendChild(d); });
+    };
+    section('Aufgaben', open.map(t => '▸ ' + t.text + (t.due ? ` (${t.due})` : '')));
+    section('Erinnerungen', rem.map(r => '⏰ ' + fmtTime(r.at) + ' · ' + r.text));
+    el.classList.toggle('show', !!(open.length || rem.length));
   }
 
-  // ---------- Claude direkt ----------
-  async function askClaude(userMessage) {
-    if (!ANTHROPIC_KEY) return null;
+  // ---------- Erinnerungen ----------
+  function checkReminders() {
+    const now = Date.now();
+    let changed = false;
+    store.reminders.forEach(r => {
+      if (!r.fired && new Date(r.at).getTime() <= now) {
+        r.fired = true; changed = true;
+        const msg = 'Erinnerung: ' + r.text;
+        jarvisSay(msg);
+        try { if (window.Notification && Notification.permission === 'granted') new Notification('JARVIS', { body: r.text }); } catch (e) {}
+      }
+    });
+    if (changed) save();
+  }
+  setInterval(checkReminders, 15000);
+
+  // ---------- Werkzeuge ----------
+  const N8N_URL = (window.JARVIS_CONFIG && window.JARVIS_CONFIG.n8nWebhook) || '';
+
+  const TOOLS = [
+    { type: 'web_search_20250305', name: 'web_search', max_uses: 4 },
+    { name: 'add_task', description: 'Fügt eine Aufgabe zur To-do-Liste hinzu.',
+      input_schema: { type: 'object', properties: { text: { type: 'string' }, due: { type: 'string', description: 'Optional: Fälligkeit, z.B. "morgen" oder 2026-10-12' } }, required: ['text'] } },
+    { name: 'list_tasks', description: 'Listet alle Aufgaben mit IDs und Status.', input_schema: { type: 'object', properties: {} } },
+    { name: 'complete_task', description: 'Markiert eine Aufgabe als erledigt (ID aus list_tasks oder Systemkontext).',
+      input_schema: { type: 'object', properties: { id: { type: 'string' } }, required: ['id'] } },
+    { name: 'add_note', description: 'Speichert eine Notiz.', input_schema: { type: 'object', properties: { text: { type: 'string' } }, required: ['text'] } },
+    { name: 'list_notes', description: 'Listet alle gespeicherten Notizen.', input_schema: { type: 'object', properties: {} } },
+    { name: 'set_reminder', description: 'Setzt eine Erinnerung, die JARVIS zur Zeit laut ausspricht (Tab muss offen sein). Zeit als lokales Datum "YYYY-MM-DDTHH:MM", berechnet aus der aktuellen Zeit im Systemkontext.',
+      input_schema: { type: 'object', properties: { text: { type: 'string' }, at: { type: 'string' } }, required: ['text', 'at'] } },
+    { name: 'remember', description: 'Merkt dauerhaft einen Fakt über den Nutzer (Vorlieben, Namen, Routinen, Hintergrund).',
+      input_schema: { type: 'object', properties: { fact: { type: 'string' } }, required: ['fact'] } },
+    { name: 'forget', description: 'Vergisst gespeicherte Fakten, die den Suchtext enthalten.',
+      input_schema: { type: 'object', properties: { contains: { type: 'string' } }, required: ['contains'] } },
+    { name: 'set_goal', description: 'Setzt das aktuelle Hauptziel des Nutzers mit Plan.',
+      input_schema: { type: 'object', properties: { text: { type: 'string' }, schritte: { type: 'array', items: { type: 'string' } }, realisierbarkeit: { type: 'number', description: '0-100' } }, required: ['text'] } },
+  ];
+  if (N8N_URL) {
+    TOOLS.push({ name: 'external_action',
+      description: 'Führt eine Aktion in externen Diensten über n8n aus (E-Mail senden, Kalendereintrag, Notion-Seite …). Vorher IMMER Inhalt mit dem Nutzer bestätigen, nie ungefragt senden.',
+      input_schema: { type: 'object', properties: { action: { type: 'string', description: 'z.B. send_email, create_event, create_notion_page' }, details: { type: 'object' } }, required: ['action', 'details'] } });
+  }
+
+  async function runTool(name, input) {
+    switch (name) {
+      case 'add_task': { const t = { id: uid(), text: input.text, due: input.due || '', done: false }; store.tasks.push(t); save(); return `Aufgabe gespeichert (ID ${t.id}).`; }
+      case 'list_tasks': return store.tasks.length ? store.tasks.map(t => `${t.id} [${t.done ? 'x' : ' '}] ${t.text}${t.due ? ' (' + t.due + ')' : ''}`).join('\n') : 'Keine Aufgaben.';
+      case 'complete_task': { const t = store.tasks.find(x => x.id === input.id); if (!t) return 'Aufgabe nicht gefunden.'; t.done = true; save(); return 'Erledigt: ' + t.text; }
+      case 'add_note': store.notes.push({ id: uid(), text: input.text, ts: new Date().toISOString() }); save(); return 'Notiz gespeichert.';
+      case 'list_notes': return store.notes.length ? store.notes.map(n => `- ${n.text} (${fmtTime(n.ts)})`).join('\n') : 'Keine Notizen.';
+      case 'set_reminder': {
+        const d = new Date(input.at);
+        if (isNaN(d)) return 'Ungültige Zeit. Format: YYYY-MM-DDTHH:MM';
+        if (d.getTime() < Date.now()) return 'Die Zeit liegt in der Vergangenheit.';
+        store.reminders.push({ id: uid(), text: input.text, at: d.toISOString(), fired: false });
+        save();
+        try { if (window.Notification && Notification.permission === 'default') Notification.requestPermission(); } catch (e) {}
+        return 'Erinnerung gesetzt für ' + fmtTime(d.toISOString()) + '.';
+      }
+      case 'remember': if (!store.facts.includes(input.fact)) store.facts.push(input.fact); save(); return 'Gemerkt.';
+      case 'forget': { const n = store.facts.length; store.facts = store.facts.filter(f => !f.toLowerCase().includes(input.contains.toLowerCase())); save(); return `${n - store.facts.length} Fakt(en) vergessen.`; }
+      case 'set_goal': setGoal(input.text, input.schritte, input.realisierbarkeit); return 'Ziel gesetzt.';
+      case 'external_action': {
+        const res = await fetch(N8N_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input) });
+        const body = await res.text();
+        return res.ok ? (body.slice(0, 1500) || 'Ausgeführt.') : 'Fehler vom Workflow: HTTP ' + res.status;
+      }
+      default: return 'Unbekanntes Werkzeug.';
+    }
+  }
+
+  // ---------- Claude Agent ----------
+  function systemPrompt() {
+    const open = store.tasks.filter(t => !t.done).map(t => `${t.id}: ${t.text}${t.due ? ' (' + t.due + ')' : ''}`).join('; ') || 'keine';
+    return `Du bist JARVIS, der persönliche KI-Assistent des Nutzers im Stil von Iron Man: souverän, trocken-höflich, effizient. Du arbeitest FÜR den Nutzer und erledigst Dinge aktiv mit deinen Werkzeugen, statt nur Ratschläge zu geben.
+Antworte auf Deutsch, gesprochen und kurz (1-3 Sätze), ohne Markdown, Listen oder Emojis, weil deine Antwort vorgelesen wird. Nutze Werkzeuge direkt, wenn der Nutzer etwas speichern, planen, erinnern oder recherchieren will. Für aktuelle Fakten nutze web_search und fasse knapp zusammen. Fürs Tagesplanen: lies Aufgaben und Erinnerungen und schlage eine konkrete Reihenfolge vor. Speichere dauerhaft relevante Infos über den Nutzer mit remember. Vor externen Aktionen (E-Mail senden usw.) bestätige den Inhalt erst mit dem Nutzer. Erfinde keine Ergebnisse; wenn ein Werkzeug fehlt, sage es ehrlich.
+Aktuelle Zeit: ${new Date().toLocaleString('de-DE', { dateStyle: 'full', timeStyle: 'short' })} (ISO lokal: ${new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16)}).
+Bekannte Fakten über den Nutzer: ${store.facts.join('; ') || 'noch keine'}.
+Offene Aufgaben: ${open}.
+Aktuelles Ziel: ${store.goal ? store.goal.text : 'keins'}.`;
+  }
+
+  async function callApi(messages) {
     const res = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
@@ -105,144 +216,58 @@
         'anthropic-version': '2023-06-01',
         'anthropic-dangerous-direct-browser-access': 'true',
       },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-6',
-        max_tokens: 1024,
-        system: `Du bist JARVIS, ein intelligenter KI-Assistent im Stil von Iron Man. Du antwortest kurz, präzise und auf Deutsch.
-Wenn der Nutzer ein Ziel nennt (z.B. Geld verdienen, etwas erreichen), antworte NUR mit diesem JSON (kein weiterer Text):
-{
-  "typ": "ziel",
-  "analyse": "Kurze Analyse des Ziels (1-2 Sätze)",
-  "schritte": ["Schritt 1", "Schritt 2", "Schritt 3"],
-  "realisierbarkeit": 85,
-  "antwort": "Kurze gesprochene Antwort (1-2 Sätze, direkt und motivierend)"
-}
-Bei normalen Fragen oder Gesprächen antworte mit:
-{
-  "typ": "chat",
-  "antwort": "Deine Antwort hier"
-}`,
-        messages: [{ role: 'user', content: userMessage }],
-      }),
+      body: JSON.stringify({ model: 'claude-sonnet-5-5', max_tokens: 1500, system: systemPrompt(), tools: TOOLS, messages }),
     });
     if (!res.ok) {
-      if (res.status === 401) {
-        localStorage.removeItem('jarvis_api_key');
-        ANTHROPIC_KEY = '';
-        throw new Error('invalid_key');
-      }
+      if (res.status === 401) { localStorage.removeItem('jarvis_api_key'); ANTHROPIC_KEY = ''; throw new Error('invalid_key'); }
       throw new Error('api_error_' + res.status);
     }
-    const data = await res.json();
-    const text = data.content?.[0]?.text || '';
-    try { return JSON.parse(text); }
-    catch { return { typ: 'chat', antwort: text }; }
+    return res.json();
   }
 
-  // ---------- Lokaler Demo-Modus Fallback ----------
-  function localRespond(text) {
-    const lower = text.toLowerCase();
-    const amountMatch = text.replace(/\./g, '').match(/(\d[\d\s]*)\s*(€|euro|eur)/i);
-    const amount = amountMatch ? parseInt(amountMatch[1].replace(/\s/g, ''), 10) : null;
-
-    if (/^(hallo|hey|hi|jarvis|guten)/.test(lower)) {
-      return { typ: 'chat', antwort: 'Guten Tag. Ich bin JARVIS im Demo-Modus. Füge einen API Key hinzu für echte KI-Antworten.' };
+  async function askClaude(userMessage) {
+    if (!ANTHROPIC_KEY) return null;
+    const messages = store.history.concat([{ role: 'user', content: userMessage }]);
+    let data;
+    for (let i = 0; i < 8; i++) {
+      data = await callApi(messages);
+      if (data.stop_reason === 'tool_use') {
+        messages.push({ role: 'assistant', content: data.content });
+        const results = [];
+        for (const block of data.content) {
+          if (block.type !== 'tool_use') continue;
+          let out;
+          try { out = await runTool(block.name, block.input || {}); }
+          catch (e) { out = 'Fehler: ' + e.message; }
+          results.push({ type: 'tool_result', tool_use_id: block.id, content: String(out) });
+        }
+        messages.push({ role: 'user', content: results });
+      } else if (data.stop_reason === 'pause_turn') {
+        messages.push({ role: 'assistant', content: data.content });
+      } else break;
     }
-    if (amount) {
-      return {
-        typ: 'ziel',
-        analyse: `${amount.toLocaleString('de-DE')} € ist ein erreichbares Ziel mit der richtigen Strategie.`,
-        schritte: [
-          `Freelance-Aufträge über Plattformen — ca. ${Math.ceil(amount / 50)} Aufträge à 50 €`,
-          'Digitales Produkt erstellen und mehrfach verkaufen (E-Book, Vorlage, Kurs)',
-          'Micro-Angebot definieren und 5 potenzielle Kunden direkt ansprechen',
-        ],
-        realisierbarkeit: 78,
-        antwort: `Ziel gesetzt: ${amount.toLocaleString('de-DE')} Euro. Ich habe 3 Schritte vorbereitet. Sage "Plan zeigen" für Details.`,
-      };
-    }
-    return {
-      typ: 'ziel',
-      analyse: 'Ziel aufgenommen.',
-      schritte: ['Ziel konkretisieren', 'Ersten Schritt heute umsetzen', 'Fortschritt täglich messen'],
-      realisierbarkeit: 80,
-      antwort: `Ich habe dein Ziel notiert. Sage "Plan zeigen" für die nächsten Schritte.`,
-    };
+    const text = (data.content || []).filter(b => b.type === 'text').map(b => b.text).join(' ').trim()
+      || 'Erledigt.';
+    store.history.push({ role: 'user', content: userMessage }, { role: 'assistant', content: text });
+    store.history = store.history.slice(-20);
+    save();
+    return text;
   }
 
   // ---------- Hauptlogik ----------
   async function respond(text) {
     setState('thinking');
-    const lower = text.toLowerCase();
-
-    // Lokale Schnellbefehle
-    if (/^(hallo|hey|hi|jarvis|guten)\b/.test(lower) && !/\d/.test(text) && !ANTHROPIC_KEY) {
-      jarvisSay('Guten Tag. Ich bin JARVIS. Nenne mir dein Ziel.');
+    if (!ANTHROPIC_KEY) {
+      jarvisSay('Ich brauche einen API Key, um für dich zu arbeiten. Lade die Seite neu und gib ihn ein.');
       return;
     }
-    if (/^(plan|schritte|zeig)/.test(lower) && state.goal?.schritte?.length) {
-      const list = state.goal.schritte.map((s, i) => `${i + 1}. ${s}`).join('\n');
-      addBubble('Plan:\n' + list, 'jarvis');
-      speak('Hier sind deine Schritte: ' + state.goal.schritte.join('. '));
-      return;
-    }
-    if (/^(status|wie weit|fortschritt)/.test(lower)) {
-      jarvisSay(state.goal ? `Aktuelles Ziel: ${state.goal.raw}.` : 'Kein Ziel gesetzt. Nenne mir eines.');
-      return;
-    }
-    if (/^(danke|stop|ende|tschüss)/.test(lower)) {
-      jarvisSay('Immer zu Diensten. Ich stehe bereit.');
-      return;
-    }
-
-    // Claude oder Demo
-    let result;
     try {
-      result = ANTHROPIC_KEY ? await askClaude(text) : localRespond(text);
+      jarvisSay(await askClaude(text));
     } catch (err) {
-      if (err.message === 'invalid_key') {
-        jarvisSay('Der API Key ist ungültig. Bitte lade die Seite neu und gib einen gültigen Key ein.');
-      } else {
-        jarvisSay('Verbindungsfehler. Bitte versuche es erneut.');
-      }
+      jarvisSay(err.message === 'invalid_key'
+        ? 'Der API Key ist ungültig. Bitte lade die Seite neu und gib einen gültigen Key ein.'
+        : 'Verbindungsfehler. Bitte versuche es erneut.');
       setState('idle');
-      return;
-    }
-
-    if (!result) { jarvisSay('Kein API Key vorhanden. Lade die Seite neu, um einen einzugeben.'); return; }
-
-    if (result.typ === 'ziel') {
-      const amountMatch = text.replace(/\./g, '').match(/(\d[\d\s]*)\s*(€|euro|eur)/i);
-      const amount = amountMatch ? parseInt(amountMatch[1].replace(/\s/g, ''), 10) : null;
-      const displayHtml = amount
-        ? `Ziel: <span class="goal-amount">${amount.toLocaleString('de-DE')} €</span>`
-        : `Ziel: <strong style="color:#eafaff">${text.slice(0, 60)}</strong>`;
-      setGoal(displayHtml, text, result.schritte, result.realisierbarkeit);
-      if (result.analyse) addBubble('Analyse: ' + result.analyse, 'jarvis');
-      jarvisSay(result.antwort);
-
-      // Echte Aktion in n8n auslösen
-      triggerN8NAction({ goal: text, amount: amount || 0, schritte: result.schritte, realisierbarkeit: result.realisierbarkeit });
-    } else {
-      jarvisSay(result.antwort);
-    }
-  }
-
-  async function triggerN8NAction(payload) {
-    try {
-      const res = await fetch('https://falca.app.n8n.cloud/webhook/jarvis-action', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-      if (res.ok) {
-        const data = await res.json().catch(() => ({}));
-        if (data.message) {
-          setTimeout(() => addBubble('✓ ' + data.message, 'jarvis'), 800);
-        }
-      }
-    } catch (e) {
-      // n8n nicht erreichbar — kein Fehler zeigen, JARVIS läuft weiter
     }
   }
 
@@ -332,12 +357,16 @@ Bei normalen Fragen oder Gesprächen antworte mit:
 
   initRecognition();
   setState('idle');
+  renderPanel();
+  checkReminders();
 
   let greeted = false;
   function greetOnce() {
     if (greeted) return; greeted = true;
-    const mode = ANTHROPIC_KEY ? 'KI-Modus aktiv' : 'Demo-Modus';
-    jarvisSay(`Systeme online. ${mode}. Ich bin JARVIS. Wie kann ich dir heute helfen?`);
+    const open = store.tasks.filter(t => !t.done).length;
+    jarvisSay(ANTHROPIC_KEY
+      ? `Systeme online.${open ? ` Du hast ${open} offene Aufgabe${open > 1 ? 'n' : ''}.` : ''} Was soll ich für dich erledigen?`
+      : 'Systeme online, aber ohne API Key kann ich nicht für dich arbeiten.');
   }
 
   initApiOverlay();
