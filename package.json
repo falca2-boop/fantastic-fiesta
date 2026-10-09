@@ -4,9 +4,14 @@
   "description": "Persönlicher Sprachassistent mit Server-Backend (Claude, Aufgaben, Erinnerungen, Websuche)",
   "type": "module",
   "private": true,
-  "engines": { "node": ">=20" },
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "start": "node server.js",
-    "test": "node --test test/jarvis.test.js"
+    "test": "node --test test/jarvis.test.js test/mail.test.js"
+  },
+  "dependencies": {
+    "imapflow": "2.3.0"
   }
 }

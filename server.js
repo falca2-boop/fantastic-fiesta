@@ -6,6 +6,7 @@ import { timingSafeEqual } from 'node:crypto';
 import { Store } from './lib/store.js';
 import { chat, AgentError } from './lib/agent.js';
 import { takeDueReminders } from './lib/tools.js';
+import { mailConfigFromEnv, startMailWatcher } from './lib/mail.js';
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
 const PUBLIC_DIR = path.join(ROOT, 'public');
@@ -22,6 +23,7 @@ export function createServer(opts = {}) {
     userName: opts.userName ?? env.JARVIS_USER_NAME ?? 'Augustin',
     webhookUrl: opts.webhookUrl ?? env.N8N_WEBHOOK_URL ?? '',
     fetchFn: opts.fetchFn ?? fetch,
+    mail: opts.mail === undefined ? mailConfigFromEnv(env) : opts.mail,
   };
   const store = opts.store ?? new Store(path.join(env.DATA_DIR || path.join(ROOT, 'data'), 'store.json'));
 
@@ -74,7 +76,7 @@ export function createServer(opts = {}) {
     try {
       const { pathname } = new URL(req.url, 'http://localhost');
 
-      if (pathname === '/api/health') return json(res, 200, { ok: true, tokenRequired: !!cfg.token, keyConfigured: !!cfg.apiKey });
+      if (pathname === '/api/health') return json(res, 200, { ok: true, tokenRequired: !!cfg.token, keyConfigured: !!cfg.apiKey, mailWatch: !!cfg.mail });
 
       if (pathname.startsWith('/api/')) {
         if (!authorized(req)) return json(res, 401, { error: 'Zugangs-Token fehlt oder ist falsch.' });
@@ -88,7 +90,7 @@ export function createServer(opts = {}) {
           const message = typeof body.message === 'string' ? body.message.trim() : '';
           if (!message || message.length > 4000) return json(res, 400, { error: 'Nachricht fehlt oder ist zu lang.' });
           const offsetMinutes = Number.isFinite(body.offsetMinutes) ? Math.max(-840, Math.min(840, body.offsetMinutes)) : 0;
-          const reply = await enqueue(() => chat({ store, message, offsetMinutes, apiKey: cfg.apiKey, model: cfg.model, userName: cfg.userName, webhookUrl: cfg.webhookUrl, fetchFn: cfg.fetchFn }));
+          const reply = await enqueue(() => chat({ store, message, offsetMinutes, apiKey: cfg.apiKey, model: cfg.model, userName: cfg.userName, webhookUrl: cfg.webhookUrl, mailEnabled: !!cfg.mail, fetchFn: cfg.fetchFn }));
           return json(res, 200, { reply, state: publicState() });
         }
         return json(res, 404, { error: 'Unbekannte Route.' });
@@ -110,11 +112,12 @@ export function createServer(opts = {}) {
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const host = process.env.HOST || '127.0.0.1';
   const port = Number(process.env.PORT) || 8000;
-  const { server, cfg } = createServer();
+  const { server, cfg, store } = createServer();
   if (!isLoopback(host) && !cfg.token) {
     console.error('Abbruch: Der Server ist von außen erreichbar (HOST=' + host + '), aber JARVIS_TOKEN ist nicht gesetzt.');
     process.exit(1);
   }
   if (!cfg.apiKey) console.warn('Warnung: ANTHROPIC_API_KEY ist nicht gesetzt – JARVIS kann nicht antworten.');
+  if (cfg.mail) { startMailWatcher({ store, config: cfg.mail }); console.log('Mail-Überwachung aktiv für ' + cfg.mail.imap.user); }
   server.listen(port, host, () => console.log(`JARVIS läuft auf http://${host}:${port}`));
 }

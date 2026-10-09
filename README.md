@@ -9,6 +9,21 @@ erledigt Dinge für dich (Anrede: Augustin, einstellbar).
 - **E-Mail / Kalender / Notion** über einen optionalen n8n-Webhook (`N8N_WEBHOOK_URL`). Der Workflow muss die
   Aktionen (`send_email`, `create_event` …) selbst ausführen. JARVIS fragt vor dem Senden nach.
 
+## Push aufs Handy bei wichtigen E-Mails
+
+JARVIS prüft dein Postfach per IMAP (GMX, web.de, Outlook u. a.) und schickt bei **wichtigen** neuen Mails eine
+laute Push-Nachricht über [ntfy](https://ntfy.sh). Er liest nur Absender und Betreff, nie den Mail-Text.
+
+1. Im Postfach IMAP freischalten (GMX/web.de: *Einstellungen → POP3/IMAP*).
+2. Auf dem Handy die App **ntfy** installieren und ein Thema mit einem langen Zufallsnamen abonnieren. In der App für dieses Thema die Priorität „dringend" erlauben.
+3. In Render (oder `.env`) setzen: `IMAP_HOST`, `IMAP_USER`, `IMAP_PASSWORD`, `NTFY_TOPIC` (siehe `.env.example`).
+4. Sag JARVIS, was wichtig ist: *„Melde mich bei Mails vom Finanzamt und mit ‚dringend' im Betreff."*
+
+Alte Mails lösen nichts aus, nur Mails, die nach dem Start eintreffen. Ohne Filter gibt es keine Meldung.
+Wer das Thema kennt, kann mitlesen, deshalb den Namen geheim halten. Betreff und Absender laufen über den ntfy-Server;
+mit `MAIL_ALERT_INCLUDE_SUBJECT=false` enthält die Meldung keinen Betreff.
+Hinweis: Outlook.com/Microsoft 365 erlauben Passwort-Anmeldung per IMAP oft nicht mehr.
+
 ## Starten (lokal)
 
 Voraussetzung: Node.js ab Version 20 (`node --version`).
@@ -45,6 +60,7 @@ npm test
 | `lib/agent.js` | Claude-Schleife mit Werkzeugen, Systemprompt |
 | `lib/tools.js` | Werkzeuge (Aufgaben, Notizen, Erinnerungen, Gedächtnis, n8n) |
 | `lib/store.js` | JSON-Speicher |
+| `lib/mail.js` | IMAP-Überwachung, Filter, Push über ntfy |
 | `public/` | Oberfläche: Orb, Spracherkennung („Hey Jarvis"), Sprachausgabe |
 
 Einschränkungen: Spracherkennung und -ausgabe nutzen die Browser-Funktionen (Chrome/Edge); Erinnerungen werden
