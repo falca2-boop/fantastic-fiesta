@@ -69,6 +69,7 @@ export function createServer(opts = {}) {
       factCount: d.facts.length,
       facts: d.facts.slice(-4),
       tasks: d.tasks.filter(t => !t.done).map(({ id, text, due }) => ({ id, text, due })),
+      links: d.links.map(({ name, url }) => ({ name, url })),
       jobs: d.jobs.filter(j => j.status === 'running').map(j => j.title),
       reminders: d.reminders.filter(r => !r.fired).sort((a, b) => new Date(a.at) - new Date(b.at)).map(({ id, text, at }) => ({ id, text, at })),
     };
@@ -123,8 +124,9 @@ export function createServer(opts = {}) {
           const message = typeof body.message === 'string' ? body.message.trim() : '';
           if (!message || message.length > 4000) return json(res, 400, { error: 'Nachricht fehlt oder ist zu lang.' });
           const offsetMinutes = Number.isFinite(body.offsetMinutes) ? Math.max(-840, Math.min(840, body.offsetMinutes)) : 0;
-          const reply = await enqueue(() => chat({ store, message, offsetMinutes, apiKey: cfg.apiKey, model: cfg.model, userName: cfg.userName, webhookUrl: cfg.webhookUrl, mailEnabled: !!cfg.mail, startResearch: cfg.apiKey ? startJob : undefined, fetchFn: cfg.fetchFn }));
-          return json(res, 200, { reply, state: publicState() });
+          const actions = [];
+          const reply = await enqueue(() => chat({ store, actions, message, offsetMinutes, apiKey: cfg.apiKey, model: cfg.model, userName: cfg.userName, webhookUrl: cfg.webhookUrl, mailEnabled: !!cfg.mail, startResearch: cfg.apiKey ? startJob : undefined, fetchFn: cfg.fetchFn }));
+          return json(res, 200, { reply, actions, state: publicState() });
         }
         if (pathname === '/api/speak' && req.method === 'POST') {
           if (!cfg.voice) return json(res, 501, { error: 'Keine ElevenLabs-Stimme konfiguriert.' });

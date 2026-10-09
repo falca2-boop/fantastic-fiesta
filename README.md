@@ -9,6 +9,15 @@ erledigt Dinge für dich (Anrede: Augustin, einstellbar).
 - **E-Mail / Kalender / Notion** über einen optionalen n8n-Webhook (`N8N_WEBHOOK_URL`). Der Workflow muss die
   Aktionen (`send_email`, `create_event` …) selbst ausführen. JARVIS fragt vor dem Senden nach.
 
+## Gespeicherte Seiten (Schnellzugriff)
+
+JARVIS kennt Seiten, die du öffnen willst. Standardmäßig **World Monitor** (`worldmonitor.app`) und **Amazon** (`amazon.de`, mit Suche).
+Sag *„Öffne World Monitor"* oder *„Such bei Amazon nach einer Kaffeemaschine"*: JARVIS stellt einen **Öffnen-Button** in den Verlauf
+und versucht die Seite zusätzlich direkt in einem neuen Tab zu öffnen (Browser blockieren das manchmal, der Button funktioniert immer).
+Im Panel rechts stehen alle gespeicherten Seiten als Links. Neue Seiten: *„Speichere die Seite https://de.wikipedia.org als Wikipedia mit Suche"*,
+entfernen: *„Entferne Wikipedia"*. Erlaubt sind nur `http`- und `https`-Adressen. JARVIS öffnet Seiten nur, loggt sich dort aber nie ein
+und kauft nichts.
+
 ## Hintergrundaufträge
 
 Für längere Aufgaben startet JARVIS eine **Recherche im Hintergrund** und kehrt sofort zurück, du kannst weiterreden:

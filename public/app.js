@@ -148,6 +148,26 @@
     while (dialog.children.length > 10) dialog.removeChild(dialog.firstChild);
     return b;
   }
+  // Nur http(s)-Links werden zu echten Links; alles andere wird verworfen
+  function safeHref(u) {
+    try { const x = new URL(u); return (x.protocol === 'https:' || x.protocol === 'http:') ? x.href : ''; } catch (e) { return ''; }
+  }
+  function addLinkBubble(name, url) {
+    const href = safeHref(url);
+    if (!href) return;
+    const b = document.createElement('div');
+    b.className = 'bubble jarvis';
+    const a = document.createElement('a');
+    a.href = href; a.target = '_blank'; a.rel = 'noopener noreferrer';
+    a.textContent = 'Öffnen: ' + name + ' ↗';
+    a.style.cssText = 'color:var(--accent);font-weight:600;text-decoration:none';
+    b.appendChild(a);
+    dialog.appendChild(b);
+    while (dialog.children.length > 10) dialog.removeChild(dialog.firstChild);
+    // Direktes Öffnen klappt nur, wenn der Browser es erlaubt; der Button bleibt in jedem Fall als Ausweg
+    try { window.open(href, '_blank', 'noopener,noreferrer'); } catch (e) {}
+  }
+
   function jarvisSay(text) { addBubble(text, 'jarvis'); speak(text); }
 
   const fmtTime = (iso) => new Date(iso).toLocaleString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
@@ -179,8 +199,20 @@
     section('Aufgaben', s.tasks.map(t => '▸ ' + t.text + (t.due ? ` (${t.due})` : '')));
     section('Läuft im Hintergrund', (s.jobs || []).map(t => '⏳ ' + t));
     section('Erinnerungen', s.reminders.map(r => '⏰ ' + fmtTime(r.at) + ' · ' + r.text));
+    if ((s.links || []).length) {
+      const h = document.createElement('div'); h.className = 'lbl'; h.textContent = 'Schnellzugriff'; sidePanel.appendChild(h);
+      const row = document.createElement('div'); row.className = 'item';
+      s.links.forEach(l => {
+        const href = safeHref(l.url); if (!href) return;
+        const a = document.createElement('a');
+        a.href = href; a.target = '_blank'; a.rel = 'noopener noreferrer'; a.textContent = l.name;
+        a.style.cssText = 'color:var(--accent);margin-right:12px;text-decoration:none';
+        row.appendChild(a);
+      });
+      sidePanel.appendChild(row);
+    }
     if (s.factCount) section(`Gedächtnis (${s.factCount})`, s.facts.map(f => '🧠 ' + f));
-    sidePanel.classList.toggle('show', !!(s.tasks.length || s.reminders.length || s.factCount || (s.jobs || []).length));
+    sidePanel.classList.toggle('show', !!(s.tasks.length || s.reminders.length || s.factCount || (s.jobs || []).length || (s.links || []).length));
   }
 
   // ---------- Gespräch ----------
@@ -190,6 +222,7 @@
       const data = await api('/api/chat', { method: 'POST', body: JSON.stringify({ message: text, offsetMinutes: new Date().getTimezoneOffset() }) });
       renderState(data.state);
       jarvisSay(data.reply);
+      (data.actions || []).forEach(a => { if (a.type === 'open') addLinkBubble(a.name, a.url); });
     } catch (err) {
       if (err.code === 401) { askToken('Bitte Zugangs-Token eingeben.'); setState('idle'); return; }
       jarvisSay('Das hat nicht geklappt. ' + (err.message || '') );
