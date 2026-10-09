@@ -88,6 +88,22 @@ export function createServer(opts = {}) {
   };
   const startJob = (request) => startResearch({ store, request, apiKey: cfg.apiKey, model: cfg.researchModel, fetchFn: cfg.fetchFn, notify: notifyJob });
 
+  // Klartext-Übersicht für den Nutzer: was ist eingerichtet, was fehlt (ohne Geheimnisse preiszugeben)
+  const systemStatus = () => {
+    const line = (ok, name, fix) => `${ok ? 'AN ' : 'AUS'} ${name}${ok ? '' : ' – fehlt: ' + fix}`;
+    return [
+      line(!!cfg.apiKey, 'Denken (Anthropic)', 'ANTHROPIC_API_KEY'),
+      line(!!cfg.token, 'Passwortschutz', 'JARVIS_TOKEN'),
+      line(!!cfg.voice, 'Stimme (ElevenLabs)', 'ELEVENLABS_API_KEY und ELEVENLABS_VOICE_ID; sonst Browser-Stimme'),
+      line(!!store.remote, 'Dauerhaftes Gedächtnis (Datenbank)', 'UPSTASH_REDIS_REST_URL und UPSTASH_REDIS_REST_TOKEN; sonst gehen Daten bei Neustart verloren'),
+      line(!!cfg.mail, 'Mail-Überwachung', 'IMAP_HOST, IMAP_USER, IMAP_PASSWORD und NTFY_TOPIC oder Twilio'),
+      line(!!(cfg.mail && cfg.mail.call), 'Anruf bei wichtigen Mails', 'TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_FROM, CALL_TO'),
+      line(!!cfg.ntfy, 'Push aufs Handy', 'NTFY_TOPIC'),
+      line(!!cfg.webhookUrl, 'E-Mail/Kalender über n8n', 'N8N_WEBHOOK_URL'),
+      `Modelle: Chat ${cfg.model}, Recherche ${cfg.researchModel}`,
+    ].join('\n');
+  };
+
   // Chat-Anfragen nacheinander abarbeiten, damit der Speicher konsistent bleibt
   let queue = Promise.resolve();
   const enqueue = (fn) => { const run = queue.then(fn, fn); queue = run.catch(() => {}); return run; };
@@ -125,7 +141,7 @@ export function createServer(opts = {}) {
           if (!message || message.length > 4000) return json(res, 400, { error: 'Nachricht fehlt oder ist zu lang.' });
           const offsetMinutes = Number.isFinite(body.offsetMinutes) ? Math.max(-840, Math.min(840, body.offsetMinutes)) : 0;
           const actions = [];
-          const reply = await enqueue(() => chat({ store, actions, message, offsetMinutes, apiKey: cfg.apiKey, model: cfg.model, userName: cfg.userName, webhookUrl: cfg.webhookUrl, mailEnabled: !!cfg.mail, startResearch: cfg.apiKey ? startJob : undefined, fetchFn: cfg.fetchFn }));
+          const reply = await enqueue(() => chat({ store, actions, message, offsetMinutes, apiKey: cfg.apiKey, model: cfg.model, userName: cfg.userName, webhookUrl: cfg.webhookUrl, mailEnabled: !!cfg.mail, startResearch: cfg.apiKey ? startJob : undefined, systemStatus, fetchFn: cfg.fetchFn }));
           return json(res, 200, { reply, actions, state: publicState() });
         }
         if (pathname === '/api/speak' && req.method === 'POST') {

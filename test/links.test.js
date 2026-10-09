@@ -40,3 +40,28 @@ test('Alter Speicherstand ohne links bekommt die Standardseiten', () => {
   s.data = { ...s.data, ...{} };
   assert.equal(s.data.links.length, 2);
 });
+
+test('system_status liefert Übersicht ohne Geheimnisse', async () => {
+  const { createServer } = await import('../server.js');
+  const bodies = []; let n = 0;
+  const fetchFn = async (url, init) => { bodies.push(JSON.parse(init.body)); return { ok: true, status: 200, json: async () => (++n === 1
+    ? { stop_reason: 'tool_use', content: [{ type: 'tool_use', id: 't', name: 'system_status', input: {} }] }
+    : { stop_reason: 'end_turn', content: [{ type: 'text', text: 'ok' }] }) }; };
+  const { server } = createServer({ store: new Store(null), apiKey: 'SECRET-KEY', token: 'SECRET-TOKEN', mail: null, voice: null, ntfy: null, fetchFn });
+  await new Promise(r => server.listen(0, '127.0.0.1', r));
+  try {
+    const res = await fetch(`http://127.0.0.1:${server.address().port}/api/chat`, { method: 'POST', headers: { Authorization: 'Bearer SECRET-TOKEN' }, body: JSON.stringify({ message: 'Was fehlt noch?' }) });
+    assert.equal(res.status, 200);
+    const result = bodies[1].messages.at(-1).content[0].content;
+    assert.match(result, /AN {1}Denken/);
+    assert.match(result, /AUS Stimme \(ElevenLabs\) – fehlt: ELEVENLABS_API_KEY/);
+    assert.match(result, /AUS Mail-Überwachung/);
+    assert.ok(!result.includes('SECRET'));
+  } finally { await new Promise(r => server.close(r)); }
+});
+
+test('system_status direkt: zeigt AN/AUS und fehlende Variablen, nie Werte', async () => {
+  const text = await runTool(new Store(null), 'system_status', {}, { systemStatus: () => 'AN Denken\nAUS Stimme – fehlt: ELEVENLABS_API_KEY' });
+  assert.match(text, /AUS Stimme – fehlt: ELEVENLABS_API_KEY/);
+  assert.match(await runTool(new Store(null), 'system_status', {}), /Keine Statusinformation/);
+});
