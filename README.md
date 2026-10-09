@@ -1,72 +1,51 @@
-# JARVIS — Futuristisches Voice-Interface
+# JARVIS
 
-Ein Iron-Man-artiges Sprachinterface mit einem großen, animierten, reaktiven **Orb**.
-Du sprichst mit JARVIS und nennst ihm dein Ziel — zum Beispiel *„Verdiene 500 €"* —
-und er bestätigt das Ziel und schlägt einen Plan vor.
+Persönlicher Sprachassistent mit eigenem Server. Du sagst **„Hey Jarvis"**, er hört zu, antwortet und
+erledigt Dinge für dich (Anrede: Augustin, einstellbar).
 
-![JARVIS Orb](https://img.shields.io/badge/interface-JARVIS-38d9ff)
+- **Websuche** (live), **Aufgaben**, **Notizen**, **Erinnerungen** (er spricht sie zur Zeit aus), **Gedächtnis** über dich, **Tagesplan**
+- **Server-Backend (Node, keine Abhängigkeiten):** Der Anthropic API Key liegt nur auf dem Server, nie im Browser.
+  Daten liegen in `data/store.json` und sind auf jedem Gerät dieselben.
+- **E-Mail / Kalender / Notion** über einen optionalen n8n-Webhook (`N8N_WEBHOOK_URL`). Der Workflow muss die
+  Aktionen (`send_email`, `create_event` …) selbst ausführen. JARVIS fragt vor dem Senden nach.
 
-## Features
+## Starten (lokal)
 
-- **Großer futuristischer Orb** — auf `<canvas>` gerendert, mit Glow, rotierenden
-  Partikelringen und wellenförmigem Kern.
-- **Reagiert live** auf deine Stimme: Der Orb pulsiert stärker, je lauter du sprichst
-  (Mikrofon-Pegel über die Web Audio API).
-- **Zustände**: Bereit · Höre zu · Verarbeite · Spreche — jeder mit eigener Animation.
-- **Deutsche Spracherkennung** (Web Speech API) + **Sprachausgabe**.
-- **Ziel-Erkennung**: erkennt Beträge wie „500 €" und setzt sie als aktives Ziel.
-- **Texteingabe** als Fallback, falls kein Mikrofon / keine Spracherkennung verfügbar.
-
-## Nutzung
-
-Einfach `index.html` in **Chrome** oder **Edge** öffnen
-(die Web Speech API wird von diesen Browsern am besten unterstützt).
-
-Lokal starten (empfohlen, damit das Mikrofon freigegeben wird):
+Voraussetzung: Node.js ab Version 20 (`node --version`).
 
 ```bash
-# eine der beiden Varianten
-python3 -m http.server 8000
-# dann http://localhost:8000 öffnen
+cp .env.example .env     # ANTHROPIC_API_KEY eintragen
+set -a; . ./.env; set +a
+npm start                # → http://127.0.0.1:8000 in Chrome oder Edge
 ```
 
-Dann:
-1. Auf den **Orb** oder das **Mikrofon-Symbol** klicken.
-2. Sprich, z. B.: *„JARVIS, du sollst 500 Euro verdienen."*
-3. JARVIS setzt das Ziel und schlägt Schritte vor. Sag *„Plan zeigen"* für Details.
+Das Mikrofon funktioniert auf `localhost` und über `https://`.
 
-## Was JARVIS für dich erledigt
+## Im Netz betreiben (z. B. Render, Railway, Fly.io)
 
-JARVIS ist ein Agent mit Werkzeugen (Claude Tool-Use, läuft direkt im Browser):
+Der Server braucht einen dauerhaft laufenden Node-Prozess, deshalb reicht Vercel/GitHub Pages nicht.
+Es liegt ein `Dockerfile` bei.
 
-| Du sagst | JARVIS tut |
-|----------|-----------|
-| „Was ist heute in den Nachrichten zu …?" | sucht live im Web und fasst zusammen |
-| „Setz Milch kaufen auf meine Liste" | speichert eine Aufgabe (Panel rechts) |
-| „Erinnere mich um 15 Uhr an den Anruf" | spricht die Erinnerung zur Zeit (Tab muss offen sein) |
-| „Notiere: Idee für …" | speichert eine Notiz |
-| „Merk dir, dass ich vegetarisch esse" | dauerhaftes Gedächtnis über den Nutzer |
-| „Plan meinen Tag" | ordnet Aufgaben und Erinnerungen zu einem Tagesplan |
-| „Mein Ziel ist 500 €" | setzt Ziel + Plan |
+1. Dienst aus diesem Repo anlegen (Docker oder `npm start`).
+2. Umgebungsvariablen setzen: `ANTHROPIC_API_KEY`, **`JARVIS_TOKEN`** (langer Zufallswert), `HOST=0.0.0.0`.
+3. Ein persistentes Volume auf `/data` (bzw. `DATA_DIR`) einhängen, sonst gehen Aufgaben bei Neustart verloren.
+4. Adresse öffnen, Token eingeben, Mikrofon erlauben.
 
-Alle Daten liegen im `localStorage` deines Browsers (keine Cloud).
+Der Server startet **nicht**, wenn er von außen erreichbar ist und `JARVIS_TOKEN` fehlt.
 
-### E-Mail / Kalender / Notion (optional)
+## Entwicklung
 
-Dafür braucht JARVIS einen n8n-Workflow. Lege eine `config.js` an (steht in `.gitignore`):
-
-```js
-window.JARVIS_CONFIG = {
-  anthropicKey: 'sk-ant-...',          // optional, sonst Eingabe beim Start
-  n8nWebhook: 'https://DEIN.n8n.cloud/webhook/jarvis-action'
-};
+```bash
+npm test
 ```
 
-JARVIS sendet `{action, details}` an den Webhook (z. B. `send_email`) und bestätigt
-vorher den Inhalt mit dir. Der Workflow muss die Aktionen selbst implementieren.
+| Datei | Aufgabe |
+|---|---|
+| `server.js` | HTTP-Server, Token-Prüfung, Routen `/api/chat`, `/api/state`, `/api/poll`, `/api/health` |
+| `lib/agent.js` | Claude-Schleife mit Werkzeugen, Systemprompt |
+| `lib/tools.js` | Werkzeuge (Aufgaben, Notizen, Erinnerungen, Gedächtnis, n8n) |
+| `lib/store.js` | JSON-Speicher |
+| `public/` | Oberfläche: Orb, Spracherkennung („Hey Jarvis"), Sprachausgabe |
 
-## Dateien
-
-- `index.html` — Layout, HUD, Ziel-Panel, Dialog, Steuerung.
-- `orb.js` — Canvas-Animation des Orbs (`window.Orb` API).
-- `jarvis.js` — Spracherkennung, Sprachausgabe, Ziel- & Dialoglogik.
+Einschränkungen: Spracherkennung und -ausgabe nutzen die Browser-Funktionen (Chrome/Edge); Erinnerungen werden
+gesprochen, solange ein Tab offen ist, sonst beim nächsten Öffnen nachgeholt. Der Speicher ist für **einen** Nutzer ausgelegt.

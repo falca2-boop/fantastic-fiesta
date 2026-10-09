@@ -294,17 +294,13 @@
 
   <div class="hint">Sag „Hey Jarvis“ oder klicke auf den Orb · Chrome/Edge empfohlen</div>
 
-  <!-- API Key Setup Overlay -->
-  <div class="api-overlay" id="apiOverlay">
-    <h2>JARVIS · AKTIVIERUNG</h2>
-    <p>Gib deinen <strong style="color:#eafaff">Anthropic API Key</strong> ein, damit JARVIS mit echter KI antworten kann.<br/>
-    Der Key wird nur lokal in deinem Browser gespeichert und nirgendwo hochgeladen.</p>
-    <input type="password" id="apiKeyInput" placeholder="sk-ant-..." autocomplete="off" />
-    <button id="apiSaveBtn">JARVIS STARTEN</button>
-    <button class="skip-btn" id="apiSkipBtn">Ohne Key starten (eingeschränkt)</button>
-    <div class="api-hint">
-      Key holen: <span style="color:#38d9ff">console.anthropic.com</span> → API Keys → Create Key
-    </div>
+  <!-- Zugang -->
+  <div class="api-overlay" id="apiOverlay" style="display:none">
+    <h2>JARVIS · ZUGANG</h2>
+    <p>Gib deinen <strong style="color:#eafaff">Zugangs-Token</strong> ein. Er steht in der Server-Einstellung <code>JARVIS_TOKEN</code>.</p>
+    <input type="password" id="tokenInput" placeholder="Zugangs-Token" autocomplete="off" />
+    <button id="tokenSaveBtn">ENTSPERREN</button>
+    <div class="api-hint" id="tokenError" style="color:#ff5c7a"></div>
   </div>
 
   <div class="unsupported" id="unsupported">
@@ -315,8 +311,7 @@
     </div>
   </div>
 
-  <script src="config.js" onerror="window.JARVIS_CONFIG={}"></script>
   <script src="orb.js"></script>
-  <script src="jarvis.js"></script>
+  <script src="app.js"></script>
 </body>
 </html>
