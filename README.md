@@ -9,20 +9,25 @@ erledigt Dinge für dich (Anrede: Augustin, einstellbar).
 - **E-Mail / Kalender / Notion** über einen optionalen n8n-Webhook (`N8N_WEBHOOK_URL`). Der Workflow muss die
   Aktionen (`send_email`, `create_event` …) selbst ausführen. JARVIS fragt vor dem Senden nach.
 
-## Push aufs Handy bei wichtigen E-Mails
+## Meldung bei wichtigen E-Mails (Anruf und/oder Push)
 
-JARVIS prüft dein Postfach per IMAP (GMX, web.de, Outlook u. a.) und schickt bei **wichtigen** neuen Mails eine
-laute Push-Nachricht über [ntfy](https://ntfy.sh). Er liest nur Absender und Betreff, nie den Mail-Text.
+JARVIS prüft dein Postfach per IMAP (GMX, web.de, Outlook u. a.) und meldet **wichtige** neue Mails: per **Anruf**
+(Twilio liest „Augustin, du hast eine wichtige E-Mail von …" vor) und/oder per **Push** (ntfy). Er liest nur Absender
+und Betreff, nie den Mail-Text. Alte Mails lösen nichts aus, nur Mails, die nach dem Start eintreffen. Ohne Filter gibt es keine Meldung.
+Was wichtig ist, sagst du ihm: *„Ruf mich an bei Mails vom Finanzamt und mit ‚dringend' im Betreff."*
 
-1. Im Postfach IMAP freischalten (GMX/web.de: *Einstellungen → POP3/IMAP*).
-2. Auf dem Handy die App **ntfy** installieren und ein Thema mit einem langen Zufallsnamen abonnieren. In der App für dieses Thema die Priorität „dringend" erlauben.
-3. In Render (oder `.env`) setzen: `IMAP_HOST`, `IMAP_USER`, `IMAP_PASSWORD`, `NTFY_TOPIC` (siehe `.env.example`).
-4. Sag JARVIS, was wichtig ist: *„Melde mich bei Mails vom Finanzamt und mit ‚dringend' im Betreff."*
+**Gemeinsam:** Im Postfach IMAP freischalten (GMX/web.de: *Einstellungen → POP3/IMAP*). In Render oder `.env`
+`IMAP_HOST`, `IMAP_USER`, `IMAP_PASSWORD` setzen (siehe `.env.example`). Outlook.com/Microsoft 365 erlauben Passwort-Anmeldung per IMAP oft nicht mehr.
 
-Alte Mails lösen nichts aus, nur Mails, die nach dem Start eintreffen. Ohne Filter gibt es keine Meldung.
-Wer das Thema kennt, kann mitlesen, deshalb den Namen geheim halten. Betreff und Absender laufen über den ntfy-Server;
-mit `MAIL_ALERT_INCLUDE_SUBJECT=false` enthält die Meldung keinen Betreff.
-Hinweis: Outlook.com/Microsoft 365 erlauben Passwort-Anmeldung per IMAP oft nicht mehr.
+**Anruf (Twilio):**
+1. Konto auf twilio.com anlegen, eine Telefonnummer mit Sprachfunktion kaufen (`TWILIO_FROM`).
+2. Account SID und Auth Token aus der Twilio-Konsole in `TWILIO_ACCOUNT_SID` / `TWILIO_AUTH_TOKEN`, deine Handynummer im Format `+49…` in `CALL_TO`.
+3. Im Testzugang ruft Twilio nur verifizierte Nummern an. Verifiziere dein Handy in der Konsole oder wechsle auf ein bezahltes Konto.
+4. Es gibt höchstens einen Anruf pro Zeitfenster (`MAIL_CALL_MIN_INTERVAL_SECONDS`, Standard 5 Minuten). Mehrere Mails in einem Durchlauf werden in einem Anruf zusammengefasst. Mails, die in die Pause fallen, melden nur Push (falls aktiv), sonst gar nicht.
+5. Kosten: pro Anrufminute plus Nummer, auch bei Fehlalarmen. Halte die Filter eng.
+
+**Push (ntfy):** App **ntfy** installieren, ein Thema mit langem Zufallsnamen abonnieren (`NTFY_TOPIC`), Priorität „dringend" erlauben.
+Wer den Namen kennt, kann mitlesen. Betreff und Absender laufen über den ntfy-Server; `MAIL_ALERT_INCLUDE_SUBJECT=false` lässt den Betreff weg (gilt auch für den Anruf).
 
 ## Starten (lokal)
 
@@ -60,7 +65,7 @@ npm test
 | `lib/agent.js` | Claude-Schleife mit Werkzeugen, Systemprompt |
 | `lib/tools.js` | Werkzeuge (Aufgaben, Notizen, Erinnerungen, Gedächtnis, n8n) |
 | `lib/store.js` | JSON-Speicher |
-| `lib/mail.js` | IMAP-Überwachung, Filter, Push über ntfy |
+| `lib/mail.js` | IMAP-Überwachung, Filter, Anruf (Twilio) und Push (ntfy) |
 | `public/` | Oberfläche: Orb, Spracherkennung („Hey Jarvis"), Sprachausgabe |
 
 Einschränkungen: Spracherkennung und -ausgabe nutzen die Browser-Funktionen (Chrome/Edge); Erinnerungen werden
