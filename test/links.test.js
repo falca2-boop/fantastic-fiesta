@@ -53,9 +53,9 @@ test('system_status liefert Übersicht ohne Geheimnisse', async () => {
     const res = await fetch(`http://127.0.0.1:${server.address().port}/api/chat`, { method: 'POST', headers: { Authorization: 'Bearer SECRET-TOKEN' }, body: JSON.stringify({ message: 'Was fehlt noch?' }) });
     assert.equal(res.status, 200);
     const result = bodies[1].messages.at(-1).content[0].content;
-    assert.match(result, /AN {1}Denken/);
-    assert.match(result, /AUS Stimme \(ElevenLabs\) – fehlt: ELEVENLABS_API_KEY/);
-    assert.match(result, /AUS Mail-Überwachung/);
+    assert.match(result, /AN: Denken/);
+    assert.match(result, /AUS: Stimme \(ElevenLabs\) – fehlt: ELEVENLABS_API_KEY/);
+    assert.match(result, /AUS: Mail-Überwachung/);
     assert.ok(!result.includes('SECRET'));
   } finally { await new Promise(r => server.close(r)); }
 });

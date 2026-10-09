@@ -90,7 +90,7 @@ export function createServer(opts = {}) {
 
   // Klartext-Übersicht für den Nutzer: was ist eingerichtet, was fehlt (ohne Geheimnisse preiszugeben)
   const systemStatus = () => {
-    const line = (ok, name, fix) => `${ok ? 'AN ' : 'AUS'} ${name}${ok ? '' : ' – fehlt: ' + fix}`;
+    const line = (ok, name, fix) => `${ok ? 'AN' : 'AUS'}: ${name}${ok ? '' : ' – fehlt: ' + fix}`;
     return [
       line(!!cfg.apiKey, 'Denken (Anthropic)', 'ANTHROPIC_API_KEY'),
       line(!!cfg.token, 'Passwortschutz', 'JARVIS_TOKEN'),
