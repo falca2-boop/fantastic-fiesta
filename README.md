@@ -9,6 +9,20 @@ erledigt Dinge für dich (Anrede: Augustin, einstellbar).
 - **E-Mail / Kalender / Notion** über einen optionalen n8n-Webhook (`N8N_WEBHOOK_URL`). Der Workflow muss die
   Aktionen (`send_email`, `create_event` …) selbst ausführen. JARVIS fragt vor dem Senden nach.
 
+## Digitale Produkte
+
+JARVIS schreibt im Hintergrund **Prompt-Pakete** (ca. 30 fertige KI-Prompts in 5 Kapiteln mit Bonus-Beispielen) und **Anleitungen**
+(7 Schritte, Checkliste, häufige Fehler, FAQ), je ca. 2500 bis 3500 Wörter. Sag z. B.
+*„Erstelle ein Prompt-Paket für Selbstständige, die KI für Angebote und Mails nutzen wollen."* Er klärt Thema und Zielgruppe, startet den Auftrag
+und meldet sich. Das fertige Produkt lädst du über die Buttons im Verlauf oder im Panel „Produkte" herunter:
+**HTML** (im Browser öffnen und über *Drucken → Als PDF speichern* zum PDF machen) oder **Markdown**.
+
+- Jedes Produkt verbraucht API-Guthaben (bis zu 8000 Ausgabe-Token plus bis zu 3 Websuchen). Modell: `JARVIS_PRODUCT_MODEL`.
+- **Prüfe jedes Produkt selbst**, bevor du es weitergibst oder verkaufst: Inhalt, Fakten, Rechtschreibung, Platzhalter. KI-Texte können Fehler enthalten.
+  JARVIS verspricht keine Einnahmen und schreibt keine Erfolgsversprechen, erfundenen Zahlen oder Testimonials ins Produkt.
+- Beachte beim Verkauf die Regeln der Plattform (z. B. zu KI-Inhalten), Impressum, Steuern und Widerrufsrecht für digitale Produkte.
+- Es werden die letzten 12 Aufträge gespeichert (jedes Produkt bis 35.000 Zeichen); lade Fertiges also herunter und archiviere es selbst.
+
 ## Gespeicherte Seiten (Schnellzugriff)
 
 JARVIS kennt Seiten, die du öffnen willst. Standardmäßig **World Monitor** (`worldmonitor.app`) und **Amazon** (`amazon.de`, mit Suche).
@@ -113,7 +127,8 @@ npm test
 | `lib/agent.js` | Claude-Schleife mit Werkzeugen, Systemprompt |
 | `lib/tools.js` | Werkzeuge (Aufgaben, Notizen, Erinnerungen, Gedächtnis, n8n) |
 | `lib/store.js` | Speicher (Datei, optional Upstash-Redis) |
-| `lib/jobs.js` | Hintergrund-Recherchen |
+| `lib/jobs.js` | Hintergrundaufträge (Recherchen) |
+| `lib/products.js` | Digitale Produkte, Markdown → HTML |
 | `lib/mail.js` | IMAP-Überwachung, Filter, Anruf (Twilio) und Push (ntfy) |
 | `public/` | Oberfläche: Orb, Spracherkennung („Hey Jarvis"), Sprachausgabe |
 

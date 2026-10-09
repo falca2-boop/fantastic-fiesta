@@ -8,6 +8,7 @@ import { chat, AgentError } from './lib/agent.js';
 import { takeDueReminders } from './lib/tools.js';
 import { mailConfigFromEnv, startMailWatcher, sendPush } from './lib/mail.js';
 import { startResearch, takeFinishedJobs, recoverJobs } from './lib/jobs.js';
+import { startProduct, renderProductHtml, productFilename } from './lib/products.js';
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
 const PUBLIC_DIR = path.join(ROOT, 'public');
@@ -25,6 +26,7 @@ export function createServer(opts = {}) {
     webhookUrl: opts.webhookUrl ?? env.N8N_WEBHOOK_URL ?? '',
     fetchFn: opts.fetchFn ?? fetch,
     researchModel: opts.researchModel ?? env.JARVIS_RESEARCH_MODEL ?? 'claude-sonnet-5-5',
+    productModel: opts.productModel ?? env.JARVIS_PRODUCT_MODEL ?? env.JARVIS_RESEARCH_MODEL ?? 'claude-sonnet-5-5',
     ntfy: opts.ntfy === undefined
       ? (env.NTFY_TOPIC ? { server: (env.NTFY_SERVER || 'https://ntfy.sh').replace(/\/+$/, ''), topic: env.NTFY_TOPIC } : null)
       : opts.ntfy,
@@ -69,6 +71,7 @@ export function createServer(opts = {}) {
       factCount: d.facts.length,
       facts: d.facts.slice(-4),
       tasks: d.tasks.filter(t => !t.done).map(({ id, text, due }) => ({ id, text, due })),
+      products: d.jobs.filter(j => j.kind === 'product' && j.status === 'done').slice(-5).map(({ id, title }) => ({ id, title })),
       links: d.links.map(({ name, url }) => ({ name, url })),
       jobs: d.jobs.filter(j => j.status === 'running').map(j => j.title),
       reminders: d.reminders.filter(r => !r.fired).sort((a, b) => new Date(a.at) - new Date(b.at)).map(({ id, text, at }) => ({ id, text, at })),
@@ -81,12 +84,14 @@ export function createServer(opts = {}) {
     const ok = job.status === 'done';
     await sendPush({
       ntfy: cfg.ntfy,
-      title: ok ? 'Recherche fertig' : 'Recherche fehlgeschlagen',
+      title: job.kind === 'product' ? (ok ? 'Produkt fertig' : 'Produkt fehlgeschlagen') : (ok ? 'Recherche fertig' : 'Recherche fehlgeschlagen'),
       message: ok && cfg.jobPushIncludesResult ? job.result.slice(0, 300) : job.title,
       fetchFn: cfg.fetchFn,
     });
   };
   const startJob = (request) => startResearch({ store, request, apiKey: cfg.apiKey, model: cfg.researchModel, fetchFn: cfg.fetchFn, notify: notifyJob });
+
+  const startProductJob = (spec) => startProduct({ store, ...spec, apiKey: cfg.apiKey, model: cfg.productModel, fetchFn: cfg.fetchFn, notify: notifyJob });
 
   // Klartext-Übersicht für den Nutzer: was ist eingerichtet, was fehlt (ohne Geheimnisse preiszugeben)
   const systemStatus = () => {
@@ -130,7 +135,7 @@ export function createServer(opts = {}) {
 
         if (pathname === '/api/state' && req.method === 'GET') return json(res, 200, publicState());
         if (pathname === '/api/poll' && req.method === 'GET') {
-          const jobs = takeFinishedJobs(store).map(({ id, title, status, result }) => ({ id, title, status, result }));
+          const jobs = takeFinishedJobs(store).map(({ id, title, status, result, kind }) => ({ id, title, status, kind, result: kind === 'product' && status === 'done' ? result.slice(0, 300) : result }));
           return json(res, 200, { fired: takeDueReminders(store).map(({ id, text }) => ({ id, text })), jobs, state: publicState() });
         }
 
@@ -141,8 +146,21 @@ export function createServer(opts = {}) {
           if (!message || message.length > 4000) return json(res, 400, { error: 'Nachricht fehlt oder ist zu lang.' });
           const offsetMinutes = Number.isFinite(body.offsetMinutes) ? Math.max(-840, Math.min(840, body.offsetMinutes)) : 0;
           const actions = [];
-          const reply = await enqueue(() => chat({ store, actions, message, offsetMinutes, apiKey: cfg.apiKey, model: cfg.model, userName: cfg.userName, webhookUrl: cfg.webhookUrl, mailEnabled: !!cfg.mail, startResearch: cfg.apiKey ? startJob : undefined, systemStatus, fetchFn: cfg.fetchFn }));
+          const reply = await enqueue(() => chat({ store, actions, message, offsetMinutes, apiKey: cfg.apiKey, model: cfg.model, userName: cfg.userName, webhookUrl: cfg.webhookUrl, mailEnabled: !!cfg.mail, startResearch: cfg.apiKey ? startJob : undefined, startProduct: cfg.apiKey ? startProductJob : undefined, systemStatus, fetchFn: cfg.fetchFn }));
           return json(res, 200, { reply, actions, state: publicState() });
+        }
+        const dl = pathname.match(/^\/api\/jobs\/([a-f0-9]+)\/download$/);
+        if (dl && req.method === 'GET') {
+          const job = store.data.jobs.find(j => j.id === dl[1] && j.kind === 'product' && j.status === 'done');
+          if (!job) return json(res, 404, { error: 'Produkt nicht gefunden.' });
+          const asHtml = new URL(req.url, 'http://localhost').searchParams.get('format') !== 'md';
+          const body = asHtml ? renderProductHtml(job.title, job.result) : job.result;
+          res.writeHead(200, {
+            'Content-Type': asHtml ? 'text/html; charset=utf-8' : 'text/markdown; charset=utf-8',
+            'Content-Disposition': `attachment; filename="${productFilename(job.title, asHtml ? 'html' : 'md')}"`,
+            'Cache-Control': 'no-store',
+          });
+          return res.end(body);
         }
         if (pathname === '/api/speak' && req.method === 'POST') {
           if (!cfg.voice) return json(res, 501, { error: 'Keine ElevenLabs-Stimme konfiguriert.' });

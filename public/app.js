@@ -168,6 +168,38 @@
     try { window.open(href, '_blank', 'noopener,noreferrer'); } catch (e) {}
   }
 
+  // Dateien brauchen den Token im Header, deshalb per fetch laden und als Blob speichern
+  async function downloadProduct(id, format, label) {
+    try {
+      const res = await fetch(`/api/jobs/${encodeURIComponent(id)}/download?format=${format}`, { headers: TOKEN ? { Authorization: 'Bearer ' + TOKEN } : {} });
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const disp = res.headers.get('Content-Disposition') || '';
+      const name = (disp.match(/filename="([^"]+)"/) || [])[1] || `produkt.${format}`;
+      const url = URL.createObjectURL(await res.blob());
+      const a = document.createElement('a'); a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 10000);
+    } catch (e) { addBubble('Der Download hat nicht geklappt (' + (label || format) + ').', 'jarvis'); }
+  }
+  function productButtons(id) {
+    const wrap = document.createElement('span');
+    [['html', 'HTML (als PDF druckbar)'], ['md', 'Text (.md)']].forEach(([fmt, label], i) => {
+      const b = document.createElement('button');
+      b.type = 'button'; b.textContent = '⬇ ' + label;
+      b.style.cssText = 'margin:' + (i ? '0 0 0 8px' : '0') + ';padding:6px 10px;border-radius:8px;border:1px solid var(--accent);background:transparent;color:var(--accent);cursor:pointer;font-size:13px';
+      b.addEventListener('click', () => downloadProduct(id, fmt, label));
+      wrap.appendChild(b);
+    });
+    return wrap;
+  }
+  function addProductBubble(job) {
+    const b = document.createElement('div');
+    b.className = 'bubble jarvis';
+    const t = document.createElement('div'); t.textContent = job.title; t.style.marginBottom = '8px';
+    b.append(t, productButtons(job.id));
+    dialog.appendChild(b);
+    while (dialog.children.length > 10) dialog.removeChild(dialog.firstChild);
+  }
+
   function jarvisSay(text) { addBubble(text, 'jarvis'); speak(text); }
 
   const fmtTime = (iso) => new Date(iso).toLocaleString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
@@ -211,8 +243,17 @@
       });
       sidePanel.appendChild(row);
     }
+    if ((s.products || []).length) {
+      const h = document.createElement('div'); h.className = 'lbl'; h.textContent = 'Produkte'; sidePanel.appendChild(h);
+      s.products.forEach(p => {
+        const row = document.createElement('div'); row.className = 'item';
+        const t = document.createElement('div'); t.textContent = p.title; t.style.marginBottom = '6px';
+        row.append(t, productButtons(p.id));
+        sidePanel.appendChild(row);
+      });
+    }
     if (s.factCount) section(`Gedächtnis (${s.factCount})`, s.facts.map(f => '🧠 ' + f));
-    sidePanel.classList.toggle('show', !!(s.tasks.length || s.reminders.length || s.factCount || (s.jobs || []).length || (s.links || []).length));
+    sidePanel.classList.toggle('show', !!(s.tasks.length || s.reminders.length || s.factCount || (s.jobs || []).length || (s.links || []).length || (s.products || []).length));
   }
 
   // ---------- Gespräch ----------
@@ -243,7 +284,10 @@
       renderState(data.state);
       data.fired.forEach(r => jarvisSay('Erinnerung: ' + r.text));
       (data.jobs || []).forEach(j => {
-        if (j.status === 'done') {
+        if (j.kind === 'product' && j.status === 'done') {
+          addProductBubble(j);
+          speak(`${USER_NAME}, das Produkt ist fertig: ${j.title}. Du kannst es jetzt herunterladen.`);
+        } else if (j.status === 'done') {
           addBubble(j.result.slice(0, 900), 'jarvis');
           const lead = j.result.split(/(?<=[.!?])\s+/).slice(0, 2).join(' ');
           speak(`${USER_NAME}, die Recherche ist fertig: ${j.title}. ${lead}`.slice(0, 600));
@@ -415,7 +459,7 @@
       if (e.code === 401) { askToken(TOKEN ? 'Token ist falsch.' : ''); return; }
     }
     if (afterToken) { greeted = false; greetOnce(); }
-    else window.addEventListener('pointerdown', greetOnce, { once: true });
+    else window.addEventListener('click', greetOnce, { once: true });   // click statt pointerdown: die Begrüßung verschiebt sonst das Layout, bevor der Klick ankommt
   }
   boot(false);
 })();
