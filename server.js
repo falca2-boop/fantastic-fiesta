@@ -19,14 +19,14 @@ export function createServer(opts = {}) {
   const cfg = {
     apiKey: opts.apiKey ?? env.ANTHROPIC_API_KEY ?? '',
     token: opts.token ?? env.JARVIS_TOKEN ?? '',
-    model: opts.model ?? env.JARVIS_MODEL ?? 'claude-sonnet-5-5',
+    model: opts.model ?? env.JARVIS_MODEL ?? 'claude-haiku-5-5',
     userName: opts.userName ?? env.JARVIS_USER_NAME ?? 'Augustin',
     webhookUrl: opts.webhookUrl ?? env.N8N_WEBHOOK_URL ?? '',
     fetchFn: opts.fetchFn ?? fetch,
     mail: opts.mail === undefined ? mailConfigFromEnv(env) : opts.mail,
     voice: opts.voice === undefined
       ? (env.ELEVENLABS_API_KEY && env.ELEVENLABS_VOICE_ID
-          ? { apiKey: env.ELEVENLABS_API_KEY, voiceId: env.ELEVENLABS_VOICE_ID, model: env.ELEVENLABS_MODEL || 'eleven_multilingual_v2' }
+          ? { apiKey: env.ELEVENLABS_API_KEY, voiceId: env.ELEVENLABS_VOICE_ID, model: env.ELEVENLABS_MODEL || 'eleven_flash_v2_5' }
           : null)
       : opts.voice,
   };

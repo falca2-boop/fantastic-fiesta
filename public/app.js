@@ -49,8 +49,8 @@
   }
   if (synth) { pickVoice(); synth.onvoiceschanged = pickVoice; }
 
-  let voiceOn = false, currentAudio = null, speakSeq = 0;
-  const isSpeaking = () => !!currentAudio || !!(synth && synth.speaking);
+  let voiceOn = false, currentAudio = null, speakSeq = 0, audioActive = false;
+  const isSpeaking = () => audioActive || !!currentAudio || !!(synth && synth.speaking);
 
   function startedSpeaking() {
     setState('speaking');
@@ -62,12 +62,13 @@
   }
   function stopSpeaking() {
     speakSeq++;
+    audioActive = false;
     synth && synth.cancel();
     if (currentAudio) { const a = currentAudio; currentAudio = null; a.pause(); }
   }
 
   function speakBrowser(text) {
-    if (!synth) return;
+    if (!synth) { doneSpeaking(); return; }
     const u = new SpeechSynthesisUtterance(text);
     if (deVoice) u.voice = deVoice;
     u.lang = 'de-DE'; u.rate = 1.02; u.pitch = 0.9;
@@ -77,34 +78,60 @@
     synth.speak(u);
   }
 
-  // Server-Stimme (ElevenLabs); bei jedem Fehler fällt JARVIS auf die Browser-Stimme zurück
+  // Kurze Sätze zusammenfassen, damit der erste Teil schnell fertig ist und sofort loslaufen kann
+  function splitSentences(text) {
+    const parts = text.match(/[^.!?]+[.!?]+|\S[^.!?]*$/g) || [text];
+    const out = []; let cur = '';
+    for (const p of parts) { cur += p; if (cur.trim().length >= 40) { out.push(cur.trim()); cur = ''; } }
+    if (cur.trim()) out.push(cur.trim());
+    return out.slice(0, 6);
+  }
+
+  async function fetchAudio(text) {
+    const res = await fetch('/api/speak', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...(TOKEN ? { Authorization: 'Bearer ' + TOKEN } : {}) },
+      body: JSON.stringify({ text: text.slice(0, 800) }),
+    });
+    if (!res.ok) throw new Error('speak ' + res.status);
+    return res.blob();
+  }
+
+  function playBlob(blob) {
+    return new Promise((resolve) => {
+      const url = URL.createObjectURL(blob);
+      const audio = new Audio(url);
+      let done = false;
+      const finish = () => { if (done) return; done = true; URL.revokeObjectURL(url); if (currentAudio === audio) currentAudio = null; resolve(); };
+      audio.onended = finish; audio.onerror = finish; audio.onpause = finish;
+      currentAudio = audio;
+      audio.play().catch(finish);
+    });
+  }
+
+  // Server-Stimme (ElevenLabs), satzweise geladen: Der erste Satz spielt, während die nächsten schon kommen.
+  // Bei jedem Fehler spricht JARVIS den Rest mit der Browser-Stimme.
   async function speak(text) {
     stopSpeaking();
     const seq = speakSeq;
-    if (voiceOn) {
-      try {
-        const res = await fetch('/api/speak', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', ...(TOKEN ? { Authorization: 'Bearer ' + TOKEN } : {}) },
-          body: JSON.stringify({ text: text.slice(0, 800) }),
-        });
-        if (!res.ok) throw new Error('speak ' + res.status);
-        const blob = await res.blob();
-        if (seq !== speakSeq) return;              // inzwischen wurde etwas anderes angefordert
-        const url = URL.createObjectURL(blob);
-        const audio = new Audio(url);
-        const finish = () => { URL.revokeObjectURL(url); if (currentAudio === audio) { currentAudio = null; doneSpeaking(); } };
-        audio.onended = finish; audio.onerror = finish;
-        currentAudio = audio;
-        startedSpeaking();
-        await audio.play();
-        return;
-      } catch (e) {
-        if (seq !== speakSeq) return;
-        currentAudio = null;
-      }
+    if (!voiceOn) { speakBrowser(text); return; }
+    const chunks = splitSentences(text);
+    const pending = [];
+    const want = (i) => { if (i < chunks.length && !pending[i]) pending[i] = fetchAudio(chunks[i]).catch(() => null); };
+    want(0); want(1);
+    audioActive = true;
+    let started = false;
+    for (let i = 0; i < chunks.length; i++) {
+      const blob = await pending[i];
+      if (seq !== speakSeq) return;
+      if (!blob) { audioActive = false; speakBrowser(chunks.slice(i).join(' ')); return; }
+      want(i + 2);
+      if (!started) { started = true; startedSpeaking(); }
+      await playBlob(blob);
+      if (seq !== speakSeq) return;
     }
-    speakBrowser(text);
+    audioActive = false;
+    doneSpeaking();
   }
 
   // ---------- UI ----------
