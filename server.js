@@ -6,6 +6,7 @@ import { timingSafeEqual } from 'node:crypto';
 import { Store } from './lib/store.js';
 import { chat, AgentError } from './lib/agent.js';
 import { takeDueReminders } from './lib/tools.js';
+import { mailConfigFromEnv, startMailWatcher } from './lib/mail.js';
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
 const PUBLIC_DIR = path.join(ROOT, 'public');
@@ -22,6 +23,12 @@ export function createServer(opts = {}) {
     userName: opts.userName ?? env.JARVIS_USER_NAME ?? 'Augustin',
     webhookUrl: opts.webhookUrl ?? env.N8N_WEBHOOK_URL ?? '',
     fetchFn: opts.fetchFn ?? fetch,
+    mail: opts.mail === undefined ? mailConfigFromEnv(env) : opts.mail,
+    voice: opts.voice === undefined
+      ? (env.ELEVENLABS_API_KEY && env.ELEVENLABS_VOICE_ID
+          ? { apiKey: env.ELEVENLABS_API_KEY, voiceId: env.ELEVENLABS_VOICE_ID, model: env.ELEVENLABS_MODEL || 'eleven_multilingual_v2' }
+          : null)
+      : opts.voice,
   };
   const store = opts.store ?? new Store(path.join(env.DATA_DIR || path.join(ROOT, 'data'), 'store.json'));
 
@@ -74,7 +81,7 @@ export function createServer(opts = {}) {
     try {
       const { pathname } = new URL(req.url, 'http://localhost');
 
-      if (pathname === '/api/health') return json(res, 200, { ok: true, tokenRequired: !!cfg.token, keyConfigured: !!cfg.apiKey });
+      if (pathname === '/api/health') return json(res, 200, { ok: true, tokenRequired: !!cfg.token, keyConfigured: !!cfg.apiKey, mailWatch: !!cfg.mail, voice: !!cfg.voice });
 
       if (pathname.startsWith('/api/')) {
         if (!authorized(req)) return json(res, 401, { error: 'Zugangs-Token fehlt oder ist falsch.' });
@@ -88,8 +95,23 @@ export function createServer(opts = {}) {
           const message = typeof body.message === 'string' ? body.message.trim() : '';
           if (!message || message.length > 4000) return json(res, 400, { error: 'Nachricht fehlt oder ist zu lang.' });
           const offsetMinutes = Number.isFinite(body.offsetMinutes) ? Math.max(-840, Math.min(840, body.offsetMinutes)) : 0;
-          const reply = await enqueue(() => chat({ store, message, offsetMinutes, apiKey: cfg.apiKey, model: cfg.model, userName: cfg.userName, webhookUrl: cfg.webhookUrl, fetchFn: cfg.fetchFn }));
+          const reply = await enqueue(() => chat({ store, message, offsetMinutes, apiKey: cfg.apiKey, model: cfg.model, userName: cfg.userName, webhookUrl: cfg.webhookUrl, mailEnabled: !!cfg.mail, fetchFn: cfg.fetchFn }));
           return json(res, 200, { reply, state: publicState() });
+        }
+        if (pathname === '/api/speak' && req.method === 'POST') {
+          if (!cfg.voice) return json(res, 501, { error: 'Keine ElevenLabs-Stimme konfiguriert.' });
+          let body;
+          try { body = JSON.parse(await readBody(req)); } catch (e) { if (e instanceof AgentError) throw e; return json(res, 400, { error: 'Ungültiges JSON.' }); }
+          const text = typeof body.text === 'string' ? body.text.trim() : '';
+          if (!text || text.length > 800) return json(res, 400, { error: 'Text fehlt oder ist zu lang.' });
+          const upstream = await cfg.fetchFn(
+            `https://api.elevenlabs.io/v1/text-to-speech/${encodeURIComponent(cfg.voice.voiceId)}?output_format=mp3_44100_64`,
+            { method: 'POST', headers: { 'Content-Type': 'application/json', 'xi-api-key': cfg.voice.apiKey },
+              body: JSON.stringify({ text, model_id: cfg.voice.model }) });
+          if (!upstream.ok) { console.warn('ElevenLabs HTTP ' + upstream.status); return json(res, 502, { error: 'Stimme nicht verfügbar (ElevenLabs ' + upstream.status + ').' }); }
+          const audio = Buffer.from(await upstream.arrayBuffer());
+          res.writeHead(200, { 'Content-Type': 'audio/mpeg', 'Content-Length': audio.length, 'Cache-Control': 'no-store' });
+          return res.end(audio);
         }
         return json(res, 404, { error: 'Unbekannte Route.' });
       }
@@ -110,11 +132,12 @@ export function createServer(opts = {}) {
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const host = process.env.HOST || '127.0.0.1';
   const port = Number(process.env.PORT) || 8000;
-  const { server, cfg } = createServer();
+  const { server, cfg, store } = createServer();
   if (!isLoopback(host) && !cfg.token) {
     console.error('Abbruch: Der Server ist von außen erreichbar (HOST=' + host + '), aber JARVIS_TOKEN ist nicht gesetzt.');
     process.exit(1);
   }
   if (!cfg.apiKey) console.warn('Warnung: ANTHROPIC_API_KEY ist nicht gesetzt – JARVIS kann nicht antworten.');
+  if (cfg.mail) { startMailWatcher({ store, config: cfg.mail }); console.log('Mail-Überwachung aktiv für ' + cfg.mail.imap.user); }
   server.listen(port, host, () => console.log(`JARVIS läuft auf http://${host}:${port}`));
 }
