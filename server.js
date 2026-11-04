@@ -1,143 +1,144 @@
+/**
+ * JARVIS – Server
+ * Node 20+, keine externen Abhängigkeiten außer imapflow (optional)
+ */
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { timingSafeEqual } from 'node:crypto';
-import { Store } from './lib/store.js';
-import { chat, AgentError } from './lib/agent.js';
-import { takeDueReminders } from './lib/tools.js';
-import { mailConfigFromEnv, startMailWatcher } from './lib/mail.js';
 
-const ROOT = path.dirname(fileURLToPath(import.meta.url));
-const PUBLIC_DIR = path.join(ROOT, 'public');
-const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml', '.ico': 'image/x-icon' };
+import { chat } from './lib/agent.js';
+import { speak } from './lib/voice.js';
+import { getState } from './lib/store.js';
 
-const isLoopback = (h) => ['127.0.0.1', '::1', 'localhost'].includes(h);
+const __dir = path.dirname(fileURLToPath(import.meta.url));
+const PORT = Number(process.env.PORT ?? 8000);
+const HOST = process.env.HOST ?? '127.0.0.1';
+const TOKEN = process.env.JARVIS_TOKEN ?? '';
+const PUBLIC = path.join(__dir, 'public');
 
-export function createServer(opts = {}) {
-  const env = process.env;
-  const cfg = {
-    apiKey: opts.apiKey ?? env.ANTHROPIC_API_KEY ?? '',
-    token: opts.token ?? env.JARVIS_TOKEN ?? '',
-    model: opts.model ?? env.JARVIS_MODEL ?? 'claude-sonnet-5-5',
-    userName: opts.userName ?? env.JARVIS_USER_NAME ?? 'Augustin',
-    webhookUrl: opts.webhookUrl ?? env.N8N_WEBHOOK_URL ?? '',
-    fetchFn: opts.fetchFn ?? fetch,
-    mail: opts.mail === undefined ? mailConfigFromEnv(env) : opts.mail,
-    voice: opts.voice === undefined
-      ? (env.ELEVENLABS_API_KEY && env.ELEVENLABS_VOICE_ID
-          ? { apiKey: env.ELEVENLABS_API_KEY, voiceId: env.ELEVENLABS_VOICE_ID, model: env.ELEVENLABS_MODEL || 'eleven_multilingual_v2' }
-          : null)
-      : opts.voice,
-  };
-  const store = opts.store ?? new Store(path.join(env.DATA_DIR || path.join(ROOT, 'data'), 'store.json'));
+// Safety: Token ist Pflicht, wenn der Server von außen erreichbar ist
+if (HOST !== '127.0.0.1' && HOST !== 'localhost' && !TOKEN) {
+  console.error('JARVIS_TOKEN muss gesetzt sein wenn HOST nicht localhost ist');
+  process.exit(1);
+}
 
-  const authorized = (req) => {
-    if (!cfg.token) return true;               // nur erlaubt, wenn der Server lokal bindet (siehe main)
-    const header = req.headers.authorization || '';
-    const given = Buffer.from(header.startsWith('Bearer ') ? header.slice(7) : '');
-    const want = Buffer.from(cfg.token);
-    return given.length === want.length && timingSafeEqual(given, want);
-  };
+const MIME = {
+  '.html': 'text/html; charset=utf-8',
+  '.js': 'application/javascript; charset=utf-8',
+  '.css': 'text/css; charset=utf-8',
+  '.ico': 'image/x-icon',
+  '.png': 'image/png',
+};
 
-  const json = (res, status, body) => {
-    res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
-    res.end(JSON.stringify(body));
-  };
+function auth(req) {
+  if (!TOKEN) return true;
+  const auth = req.headers['authorization'] ?? '';
+  const cookie = (req.headers['cookie'] ?? '')
+    .split(';')
+    .find(c => c.trim().startsWith('jarvis_token='))
+    ?.split('=')[1]?.trim();
+  return auth === `Bearer ${TOKEN}` || cookie === TOKEN;
+}
 
-  const readBody = (req, limit = 64 * 1024) => new Promise((resolve, reject) => {
-    let size = 0; const chunks = [];
-    req.on('data', (c) => { size += c.length; if (size > limit) { reject(new AgentError('Anfrage zu groß', 413)); req.destroy(); } else chunks.push(c); });
-    req.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')));
-    req.on('error', reject);
-  });
+function json(res, status, data) {
+  const body = JSON.stringify(data);
+  res.writeHead(status, { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) });
+  res.end(body);
+}
 
-  const publicState = () => {
-    const d = store.data;
-    return {
-      userName: cfg.userName,
-      goal: d.goal,
-      tasks: d.tasks.filter(t => !t.done).map(({ id, text, due }) => ({ id, text, due })),
-      reminders: d.reminders.filter(r => !r.fired).sort((a, b) => new Date(a.at) - new Date(b.at)).map(({ id, text, at }) => ({ id, text, at })),
-    };
-  };
+async function readBody(req) {
+  const chunks = [];
+  for await (const chunk of req) chunks.push(chunk);
+  return Buffer.concat(chunks).toString();
+}
 
-  // Chat-Anfragen nacheinander abarbeiten, damit der Speicher konsistent bleibt
-  let queue = Promise.resolve();
-  const enqueue = (fn) => { const run = queue.then(fn, fn); queue = run.catch(() => {}); return run; };
+const server = http.createServer(async (req, res) => {
+  const url = new URL(req.url, `http://${req.headers.host}`);
+  const pathname = url.pathname;
 
-  const serveStatic = (req, res, pathname) => {
-    const rel = pathname === '/' ? 'index.html' : decodeURIComponent(pathname).replace(/^\/+/, '');
-    const file = path.resolve(PUBLIC_DIR, rel);
-    if (file !== PUBLIC_DIR && !file.startsWith(PUBLIC_DIR + path.sep)) { res.writeHead(403); return res.end('Forbidden'); }
-    fs.readFile(file, (err, buf) => {
-      if (err) { res.writeHead(404); return res.end('Not found'); }
-      res.writeHead(200, { 'Content-Type': MIME[path.extname(file)] || 'application/octet-stream', 'Cache-Control': 'no-cache' });
-      res.end(buf);
-    });
-  };
-
-  const server = http.createServer(async (req, res) => {
-    try {
-      const { pathname } = new URL(req.url, 'http://localhost');
-
-      if (pathname === '/api/health') return json(res, 200, { ok: true, tokenRequired: !!cfg.token, keyConfigured: !!cfg.apiKey, mailWatch: !!cfg.mail, voice: !!cfg.voice });
-
-      if (pathname.startsWith('/api/')) {
-        if (!authorized(req)) return json(res, 401, { error: 'Zugangs-Token fehlt oder ist falsch.' });
-
-        if (pathname === '/api/state' && req.method === 'GET') return json(res, 200, publicState());
-        if (pathname === '/api/poll' && req.method === 'GET') return json(res, 200, { fired: takeDueReminders(store).map(({ id, text }) => ({ id, text })), state: publicState() });
-
-        if (pathname === '/api/chat' && req.method === 'POST') {
-          let body;
-          try { body = JSON.parse(await readBody(req)); } catch (e) { if (e instanceof AgentError) throw e; return json(res, 400, { error: 'Ungültiges JSON.' }); }
-          const message = typeof body.message === 'string' ? body.message.trim() : '';
-          if (!message || message.length > 4000) return json(res, 400, { error: 'Nachricht fehlt oder ist zu lang.' });
-          const offsetMinutes = Number.isFinite(body.offsetMinutes) ? Math.max(-840, Math.min(840, body.offsetMinutes)) : 0;
-          const reply = await enqueue(() => chat({ store, message, offsetMinutes, apiKey: cfg.apiKey, model: cfg.model, userName: cfg.userName, webhookUrl: cfg.webhookUrl, mailEnabled: !!cfg.mail, fetchFn: cfg.fetchFn }));
-          return json(res, 200, { reply, state: publicState() });
-        }
-        if (pathname === '/api/speak' && req.method === 'POST') {
-          if (!cfg.voice) return json(res, 501, { error: 'Keine ElevenLabs-Stimme konfiguriert.' });
-          let body;
-          try { body = JSON.parse(await readBody(req)); } catch (e) { if (e instanceof AgentError) throw e; return json(res, 400, { error: 'Ungültiges JSON.' }); }
-          const text = typeof body.text === 'string' ? body.text.trim() : '';
-          if (!text || text.length > 800) return json(res, 400, { error: 'Text fehlt oder ist zu lang.' });
-          const upstream = await cfg.fetchFn(
-            `https://api.elevenlabs.io/v1/text-to-speech/${encodeURIComponent(cfg.voice.voiceId)}?output_format=mp3_44100_64`,
-            { method: 'POST', headers: { 'Content-Type': 'application/json', 'xi-api-key': cfg.voice.apiKey },
-              body: JSON.stringify({ text, model_id: cfg.voice.model }) });
-          if (!upstream.ok) { console.warn('ElevenLabs HTTP ' + upstream.status); return json(res, 502, { error: 'Stimme nicht verfügbar (ElevenLabs ' + upstream.status + ').' }); }
-          const audio = Buffer.from(await upstream.arrayBuffer());
-          res.writeHead(200, { 'Content-Type': 'audio/mpeg', 'Content-Length': audio.length, 'Cache-Control': 'no-store' });
-          return res.end(audio);
-        }
-        return json(res, 404, { error: 'Unbekannte Route.' });
-      }
-
-      if (req.method !== 'GET' && req.method !== 'HEAD') { res.writeHead(405); return res.end(); }
-      serveStatic(req, res, pathname);
-    } catch (err) {
-      const status = err instanceof AgentError ? err.status : 500;
-      if (status >= 500) console.error(err);
-      if (!res.headersSent) json(res, status, { error: err instanceof AgentError ? err.message : 'Interner Fehler.' });
+  // --- Static files ---
+  if (req.method === 'GET' && !pathname.startsWith('/api/')) {
+    // Login page special-case
+    if (TOKEN && !auth(req) && pathname !== '/login') {
+      res.writeHead(302, { Location: '/login' });
+      return res.end();
     }
-  });
-
-  return { server, store, cfg };
-}
-
-// ---------- Start ----------
-if (process.argv[1] === fileURLToPath(import.meta.url)) {
-  const host = process.env.HOST || '127.0.0.1';
-  const port = Number(process.env.PORT) || 8000;
-  const { server, cfg, store } = createServer();
-  if (!isLoopback(host) && !cfg.token) {
-    console.error('Abbruch: Der Server ist von außen erreichbar (HOST=' + host + '), aber JARVIS_TOKEN ist nicht gesetzt.');
-    process.exit(1);
+    const target = pathname === '/' ? '/index.html' : pathname;
+    const file = path.join(PUBLIC, target);
+    if (!file.startsWith(PUBLIC)) return json(res, 400, { error: 'bad path' });
+    try {
+      const data = fs.readFileSync(file);
+      const ext = path.extname(file);
+      res.writeHead(200, { 'Content-Type': MIME[ext] ?? 'application/octet-stream' });
+      return res.end(data);
+    } catch {
+      res.writeHead(404); return res.end('Not found');
+    }
   }
-  if (!cfg.apiKey) console.warn('Warnung: ANTHROPIC_API_KEY ist nicht gesetzt – JARVIS kann nicht antworten.');
-  if (cfg.mail) { startMailWatcher({ store, config: cfg.mail }); console.log('Mail-Überwachung aktiv für ' + cfg.mail.imap.user); }
-  server.listen(port, host, () => console.log(`JARVIS läuft auf http://${host}:${port}`));
-}
+
+  // --- API ---
+  if (!auth(req)) return json(res, 401, { error: 'unauthorized' });
+
+  if (req.method === 'POST' && pathname === '/api/login') {
+    const body = await readBody(req);
+    let token;
+    try { token = JSON.parse(body).token; } catch { return json(res, 400, { error: 'bad json' }); }
+    if (token === TOKEN) {
+      res.writeHead(200, {
+        'Content-Type': 'application/json',
+        'Set-Cookie': `jarvis_token=${TOKEN}; Path=/; HttpOnly; SameSite=Strict`,
+      });
+      return res.end(JSON.stringify({ ok: true }));
+    }
+    return json(res, 403, { error: 'wrong token' });
+  }
+
+  if (req.method === 'GET' && pathname === '/api/health') {
+    return json(res, 200, { ok: true, ts: Date.now() });
+  }
+
+  if (req.method === 'GET' && pathname === '/api/state') {
+    return json(res, 200, getState());
+  }
+
+  if (req.method === 'POST' && pathname === '/api/chat') {
+    const body = await readBody(req);
+    let message;
+    try { message = JSON.parse(body).message; } catch { return json(res, 400, { error: 'bad json' }); }
+    if (!message?.trim()) return json(res, 400, { error: 'message required' });
+    try {
+      const reply = await chat(message.trim());
+      return json(res, 200, { reply });
+    } catch (err) {
+      console.error('chat error:', err);
+      return json(res, 500, { error: err.message });
+    }
+  }
+
+  if (req.method === 'POST' && pathname === '/api/speak') {
+    const body = await readBody(req);
+    let text;
+    try { text = JSON.parse(body).text; } catch { return json(res, 400, { error: 'bad json' }); }
+    if (!text?.trim()) return json(res, 400, { error: 'text required' });
+    try {
+      const audio = await speak(text.slice(0, 800));
+      if (!audio) return json(res, 204, {});
+      res.writeHead(200, { 'Content-Type': 'audio/mpeg', 'Content-Length': audio.length });
+      return res.end(audio);
+    } catch (err) {
+      console.error('speak error:', err);
+      return json(res, 500, { error: err.message });
+    }
+  }
+
+  json(res, 404, { error: 'not found' });
+});
+
+server.listen(PORT, HOST, () => {
+  console.log(`JARVIS läuft auf http://${HOST}:${PORT}`);
+  if (!process.env.ANTHROPIC_API_KEY) console.warn('⚠  ANTHROPIC_API_KEY fehlt');
+});
+
+process.on('uncaughtException', err => console.error('uncaught:', err));
+process.on('unhandledRejection', err => console.error('unhandled:', err));

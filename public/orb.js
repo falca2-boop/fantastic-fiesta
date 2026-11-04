@@ -1,123 +1,102 @@
-/* JARVIS Orb — reaktive futuristische Kugel, gerendert auf <canvas>.
-   Zustände: idle | listening | thinking | speaking.
-   audioLevel (0..1) kann von außen gesetzt werden (Mikrofon-Amplitude). */
-(function () {
-  const canvas = document.getElementById('orb');
-  const ctx = canvas.getContext('2d');
-  let W = 0, H = 0, DPR = Math.min(window.devicePixelRatio || 1, 2);
+/**
+ * JARVIS – Orb-Animation (Iron-Man-Stil)
+ * Exportiert setState(state) für app.js
+ */
+const canvas = document.getElementById('orb-canvas');
+const ctx = canvas.getContext('2d');
+const W = canvas.width, H = canvas.height, CX = W / 2, CY = H / 2, R = 60;
 
-  const state = {
-    mode: 'idle',
-    audioLevel: 0,     // externes Signal (Mikro)
-    energy: 0.15,      // geglättete Zielenergie
-    t: 0,
-  };
+const STATES = {
+  idle:      { base: '#0af', glow: 'rgba(0,170,255,0.3)', pulse: 0.3, rings: 2 },
+  listening: { base: '#0ff', glow: 'rgba(0,255,255,0.5)', pulse: 1.2, rings: 3 },
+  thinking:  { base: '#fa0', glow: 'rgba(255,160,0,0.5)',  pulse: 0.8, rings: 2 },
+  speaking:  { base: '#0f9', glow: 'rgba(0,255,140,0.5)',  pulse: 1.5, rings: 3 },
+  error:     { base: '#f05', glow: 'rgba(255,0,80,0.4)',   pulse: 0.4, rings: 1 },
+};
 
-  const modeEnergy = { idle: 0.15, listening: 0.55, thinking: 0.4, speaking: 0.75 };
-  const ACCENT = { r: 56, g: 217, b: 255 };
+let current = STATES.idle;
+let t = 0;
+let energy = 0; // 0–1, für Wellen-Amplitude
 
-  function resize() {
-    const rect = canvas.getBoundingClientRect();
-    W = rect.width; H = rect.height;
-    canvas.width = W * DPR; canvas.height = H * DPR;
-    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
-  }
-  window.addEventListener('resize', resize);
+export function setState(state, amp = 0) {
+  current = STATES[state] ?? STATES.idle;
+  energy = Math.min(1, Math.max(0, amp));
+}
 
-  // Ring-Partikel
-  const rings = [];
-  for (let i = 0; i < 3; i++) {
-    rings.push({ radius: 0.62 + i * 0.12, speed: (i % 2 ? -1 : 1) * (0.18 + i * 0.08), dots: 40 + i * 14, tilt: 0.32 + i * 0.06 });
-  }
+export function setEnergy(v) { energy = Math.min(1, Math.max(0, v)); }
 
-  function draw() {
-    state.t += 0.016;
-    // Zielenergie: Modus + Live-Audio
-    const target = modeEnergy[state.mode] + state.audioLevel * 0.5;
-    state.energy += (target - state.energy) * 0.08;
-    const e = state.energy;
+function hexToRgb(hex) {
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  return `${r},${g},${b}`;
+}
 
-    ctx.clearRect(0, 0, W, H);
-    const cx = W / 2, cy = H / 2;
-    const base = Math.min(W, H) * 0.30;
-    const col = (a) => `rgba(${ACCENT.r},${ACCENT.g},${ACCENT.b},${a})`;
+function draw() {
+  t += 0.016;
+  ctx.clearRect(0, 0, W, H);
 
-    // Äußerer Glow / Aura
-    const pulse = Math.sin(state.t * 2) * 0.5 + 0.5;
-    const auraR = base * (1.7 + e * 0.6 + pulse * 0.08 * e);
-    const aura = ctx.createRadialGradient(cx, cy, base * 0.4, cx, cy, auraR);
-    aura.addColorStop(0, col(0.22 + e * 0.25));
-    aura.addColorStop(0.4, col(0.08));
-    aura.addColorStop(1, col(0));
-    ctx.fillStyle = aura;
-    ctx.fillRect(0, 0, W, H);
+  const pulse = 1 + Math.sin(t * current.pulse * Math.PI * 2) * 0.04 + energy * 0.08;
+  const r = R * pulse;
 
-    // Rotierende Ringe aus Punkten
-    rings.forEach((ring, ri) => {
-      const rr = base * ring.radius * (1 + e * 0.12);
-      for (let i = 0; i < ring.dots; i++) {
-        const a = (i / ring.dots) * Math.PI * 2 + state.t * ring.speed;
-        const x = cx + Math.cos(a) * rr;
-        const y = cy + Math.sin(a) * rr * ring.tilt + Math.sin(a * 2 + state.t) * 2;
-        const depth = (Math.sin(a) + 1) / 2; // vorne heller
-        const size = (0.6 + depth * 1.8) * (1 + e * 0.5);
-        ctx.beginPath();
-        ctx.arc(x, y, size, 0, Math.PI * 2);
-        ctx.fillStyle = col(0.15 + depth * 0.55);
-        ctx.fill();
-      }
-    });
-
-    // Wellenförmiger Kern (mehrere verzerrte Kreise)
-    const layers = 5;
-    for (let L = layers; L >= 1; L--) {
-      const lr = base * (0.55 + L * 0.06);
-      ctx.beginPath();
-      const segs = 90;
-      for (let s = 0; s <= segs; s++) {
-        const a = (s / segs) * Math.PI * 2;
-        const noise =
-          Math.sin(a * 3 + state.t * 1.5 + L) * 0.05 +
-          Math.sin(a * 5 - state.t * 2 + L * 2) * 0.04 * (1 + e);
-        const r = lr * (1 + noise * (0.4 + e));
-        const x = cx + Math.cos(a) * r;
-        const y = cy + Math.sin(a) * r;
-        s === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
-      }
-      ctx.closePath();
-      ctx.strokeStyle = col(0.06 + (L / layers) * 0.14 * (1 + e));
-      ctx.lineWidth = 1.2;
-      ctx.stroke();
-    }
-
-    // Leuchtender Kern
-    const coreR = base * (0.5 + e * 0.14 + pulse * 0.03);
-    const core = ctx.createRadialGradient(cx, cy - coreR * 0.2, 0, cx, cy, coreR);
-    core.addColorStop(0, `rgba(230,250,255,${0.9})`);
-    core.addColorStop(0.25, col(0.85));
-    core.addColorStop(0.7, col(0.28));
-    core.addColorStop(1, col(0));
+  // Outer rings
+  for (let i = 0; i < current.rings; i++) {
+    const rr = r + 18 + i * 14 + Math.sin(t * 1.5 + i) * 3;
+    const alpha = (0.15 - i * 0.04) * (1 + energy * 0.5);
     ctx.beginPath();
-    ctx.arc(cx, cy, coreR, 0, Math.PI * 2);
-    ctx.fillStyle = core;
-    ctx.fill();
-
-    // Innere Highlight-Sichel
-    ctx.beginPath();
-    ctx.arc(cx - coreR * 0.22, cy - coreR * 0.28, coreR * 0.5, 0, Math.PI * 2);
-    ctx.fillStyle = 'rgba(255,255,255,0.10)';
-    ctx.fill();
-
-    requestAnimationFrame(draw);
+    ctx.arc(CX, CY, rr, 0, Math.PI * 2);
+    ctx.strokeStyle = `rgba(${hexToRgb(current.base)},${alpha.toFixed(2)})`;
+    ctx.lineWidth = 1;
+    ctx.stroke();
   }
 
-  resize();
+  // Glow
+  const grad = ctx.createRadialGradient(CX, CY, r * 0.3, CX, CY, r * 1.6);
+  grad.addColorStop(0, `rgba(${hexToRgb(current.base)},0.25)`);
+  grad.addColorStop(1, 'transparent');
+  ctx.beginPath();
+  ctx.arc(CX, CY, r * 1.6, 0, Math.PI * 2);
+  ctx.fillStyle = grad;
+  ctx.fill();
+
+  // Core
+  const core = ctx.createRadialGradient(CX - r * 0.25, CY - r * 0.25, 2, CX, CY, r);
+  core.addColorStop(0, '#fff');
+  core.addColorStop(0.3, current.base);
+  core.addColorStop(1, '#001a30');
+  ctx.beginPath();
+  ctx.arc(CX, CY, r, 0, Math.PI * 2);
+  ctx.fillStyle = core;
+  ctx.fill();
+
+  // Rim light
+  ctx.beginPath();
+  ctx.arc(CX, CY, r, 0, Math.PI * 2);
+  ctx.strokeStyle = current.base;
+  ctx.lineWidth = 1.5;
+  ctx.globalAlpha = 0.6;
+  ctx.stroke();
+  ctx.globalAlpha = 1;
+
+  // Arc decorations (rotating)
+  for (let i = 0; i < 4; i++) {
+    const angle = t * 0.4 + (i * Math.PI) / 2;
+    ctx.save();
+    ctx.translate(CX, CY);
+    ctx.rotate(angle);
+    ctx.beginPath();
+    ctx.arc(0, 0, r + 8, -0.3, 0.3);
+    ctx.strokeStyle = `rgba(${hexToRgb(current.base)},0.5)`;
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.restore();
+  }
+
   requestAnimationFrame(draw);
+}
 
-  // Öffentliche API
-  window.Orb = {
-    setMode(m) { if (modeEnergy[m] != null) state.mode = m; },
-    setAudioLevel(v) { state.audioLevel = Math.max(0, Math.min(1, v)); },
-    getMode() { return state.mode; },
-  };
-})();
+draw();
+
+// Make setState available globally for app.js
+window.orbSetState = setState;
+window.orbSetEnergy = setEnergy;

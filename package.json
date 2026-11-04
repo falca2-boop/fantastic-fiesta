@@ -1,7 +1,7 @@
 {
   "name": "jarvis",
-  "version": "1.0.0",
-  "description": "Persönlicher Sprachassistent mit Server-Backend (Claude, Aufgaben, Erinnerungen, Websuche)",
+  "version": "2.0.0",
+  "description": "Persönlicher Sprachassistent – Claude-Agent, Wake-Word, ElevenLabs-Stimme",
   "type": "module",
   "private": true,
   "engines": {
@@ -9,9 +9,7 @@
   },
   "scripts": {
     "start": "node server.js",
-    "test": "node --test test/jarvis.test.js test/mail.test.js"
+    "test": "node --test test/jarvis.test.js"
   },
-  "dependencies": {
-    "imapflow": "2.3.0"
-  }
+  "dependencies": {}
 }

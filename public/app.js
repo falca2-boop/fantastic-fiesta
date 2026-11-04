@@ -1,352 +1,416 @@
-/* JARVIS – Browser-Frontend. Alle KI-Logik, Werkzeuge und Daten liegen auf dem Server (/api/*). */
-(function () {
-  const $ = (id) => document.getElementById(id);
-  const micBtn = $('micBtn'), textInput = $('textInput'), dialog = $('dialog'), stateLabel = $('stateLabel');
-  const goalPanel = $('goalPanel'), goalText = $('goalText'), sidePanel = $('sidePanel');
-  const unsupported = $('unsupported'), orbCanvas = $('orb');
-  const apiOverlay = $('apiOverlay'), tokenInput = $('tokenInput'), tokenSaveBtn = $('tokenSaveBtn'), tokenError = $('tokenError');
+/**
+ * JARVIS – Frontend-Logik
+ * - Login / Token-Prüfung
+ * - Spracherkennung (Wake-Word „Hey Jarvis" + Push-to-Talk via Orb-Klick)
+ * - Chat mit Server
+ * - Sprachausgabe (ElevenLabs via Server, Fallback: Browser-TTS)
+ * - Waveform-Visualisierung
+ */
 
-  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-  const synth = window.speechSynthesis;
-  let recognition = null, listening = false, interimBubble = null, deVoice = null;
-  let TOKEN = '';
-  try { TOKEN = localStorage.getItem('jarvis_token') || ''; } catch (e) {}
+// ── Token / Login ────────────────────────────────────────────────────────────
 
-  // ---------- Server ----------
-  async function api(path, opts = {}) {
-    const res = await fetch(path, {
-      ...opts,
-      headers: { 'Content-Type': 'application/json', ...(TOKEN ? { Authorization: 'Bearer ' + TOKEN } : {}) },
-    });
-    if (res.status === 401) { const e = new Error('unauthorized'); e.code = 401; throw e; }
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) { const e = new Error(data.error || 'Fehler ' + res.status); e.code = res.status; throw e; }
-    return data;
-  }
+function getToken() { return localStorage.getItem('jarvis_token') ?? ''; }
+function setToken(t) { localStorage.setItem('jarvis_token', t); }
 
-  // ---------- Zugang ----------
-  function askToken(msg) {
-    tokenError.textContent = msg || '';
-    apiOverlay.style.display = 'flex';
-    tokenInput.focus();
-  }
-  tokenSaveBtn.addEventListener('click', async () => {
-    TOKEN = tokenInput.value.trim();
-    try {
-      await api('/api/state');
-      try { localStorage.setItem('jarvis_token', TOKEN); } catch (e) {}
-      apiOverlay.style.display = 'none';
-      await boot(true);
-    } catch (e) { askToken(e.code === 401 ? 'Token ist falsch.' : e.message); }
+function authHeader() {
+  const t = getToken();
+  return t ? { Authorization: `Bearer ${t}` } : {};
+}
+
+async function apiFetch(path, opts = {}) {
+  const res = await fetch(path, {
+    ...opts,
+    headers: { 'Content-Type': 'application/json', ...authHeader(), ...(opts.headers ?? {}) },
   });
-  tokenInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') tokenSaveBtn.click(); });
-
-  // ---------- Sprachausgabe ----------
-  function pickVoice() {
-    const voices = synth.getVoices();
-    deVoice = voices.find(v => /de(-|_)?/i.test(v.lang) && /google|microsoft/i.test(v.name))
-           || voices.find(v => /de(-|_)?/i.test(v.lang)) || voices[0] || null;
+  if (res.status === 401) {
+    showLogin();
+    throw new Error('unauthorized');
   }
-  if (synth) { pickVoice(); synth.onvoiceschanged = pickVoice; }
+  return res;
+}
 
-  let voiceOn = false, currentAudio = null, speakSeq = 0;
-  const isSpeaking = () => !!currentAudio || !!(synth && synth.speaking);
+const loginOverlay = document.getElementById('login-overlay');
+const tokenInput = document.getElementById('token-input');
+const loginBtn = document.getElementById('login-btn');
+const loginErr = document.getElementById('login-err');
 
-  function startedSpeaking() {
-    setState('speaking');
-    if (recognition && listening) { try { recognition.stop(); } catch (e) {} }
-  }
-  function doneSpeaking() {
-    setState(listening ? 'listening' : 'idle');
-    if (listening) restartRecognition();
-  }
-  function stopSpeaking() {
-    speakSeq++;
-    synth && synth.cancel();
-    if (currentAudio) { const a = currentAudio; currentAudio = null; a.pause(); }
-  }
+async function checkAuth() {
+  try {
+    const r = await fetch('/api/health', { headers: authHeader() });
+    if (r.status === 401) { showLogin(); return false; }
+    return true;
+  } catch { return false; }
+}
 
-  function speakBrowser(text) {
-    if (!synth) return;
-    const u = new SpeechSynthesisUtterance(text);
-    if (deVoice) u.voice = deVoice;
-    u.lang = 'de-DE'; u.rate = 1.02; u.pitch = 0.9;
-    u.onstart = startedSpeaking;
-    u.onend = doneSpeaking;
-    u.onerror = doneSpeaking;
-    synth.speak(u);
-  }
+function showLogin() { loginOverlay.classList.remove('hidden'); }
+function hideLogin() { loginOverlay.classList.add('hidden'); }
 
-  // Server-Stimme (ElevenLabs); bei jedem Fehler fällt JARVIS auf die Browser-Stimme zurück
-  async function speak(text) {
-    stopSpeaking();
-    const seq = speakSeq;
-    if (voiceOn) {
-      try {
-        const res = await fetch('/api/speak', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', ...(TOKEN ? { Authorization: 'Bearer ' + TOKEN } : {}) },
-          body: JSON.stringify({ text: text.slice(0, 800) }),
-        });
-        if (!res.ok) throw new Error('speak ' + res.status);
-        const blob = await res.blob();
-        if (seq !== speakSeq) return;              // inzwischen wurde etwas anderes angefordert
-        const url = URL.createObjectURL(blob);
-        const audio = new Audio(url);
-        const finish = () => { URL.revokeObjectURL(url); if (currentAudio === audio) { currentAudio = null; doneSpeaking(); } };
-        audio.onended = finish; audio.onerror = finish;
-        currentAudio = audio;
-        startedSpeaking();
-        await audio.play();
-        return;
-      } catch (e) {
-        if (seq !== speakSeq) return;
-        currentAudio = null;
+loginBtn.addEventListener('click', async () => {
+  loginErr.textContent = '';
+  const token = tokenInput.value.trim();
+  if (!token) return;
+  try {
+    const r = await fetch('/api/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token }),
+    });
+    if (r.ok) {
+      setToken(token);
+      hideLogin();
+      init();
+    } else {
+      loginErr.textContent = 'Falsches Token.';
+    }
+  } catch { loginErr.textContent = 'Verbindungsfehler.'; }
+});
+tokenInput.addEventListener('keydown', e => { if (e.key === 'Enter') loginBtn.click(); });
+
+// ── UI-Elemente ───────────────────────────────────────────────────────────────
+
+const statusEl    = document.getElementById('status');
+const replyPanel  = document.getElementById('reply-panel');
+const replyText   = document.getElementById('reply-text');
+const transcriptEl = document.getElementById('transcript-panel');
+const textInput   = document.getElementById('text-input');
+const sendBtn     = document.getElementById('send-btn');
+const clearBtn    = document.getElementById('clear-btn');
+const orbWrap     = document.getElementById('orb-wrap');
+const orbHint     = document.getElementById('orb-hint');
+const dotMic      = document.getElementById('dot-mic');
+const dotApi      = document.getElementById('dot-api');
+const dotVoice    = document.getElementById('dot-voice');
+
+// Status dots
+function setDot(el, state) { // 'active' | 'warn' | 'error' | ''
+  el.className = 'dot' + (state ? ' ' + state : '');
+}
+
+// ── State ─────────────────────────────────────────────────────────────────────
+
+let uiState = 'idle'; // idle | listening | thinking | speaking
+let isBusy = false;
+
+function setState(s) {
+  uiState = s;
+  statusEl.className = s === 'idle' ? '' : s;
+  const labels = { idle: 'BEREIT', listening: 'HÖRE ZU …', thinking: 'DENKE …', speaking: 'ANTWORTE …', error: 'FEHLER' };
+  statusEl.textContent = labels[s] ?? s.toUpperCase();
+  window.orbSetState?.(s);
+  replyPanel.classList.toggle('active', s === 'speaking');
+}
+
+// ── Transcript ────────────────────────────────────────────────────────────────
+
+function addMessage(role, text) {
+  const div = document.createElement('div');
+  div.className = `msg ${role}`;
+  div.innerHTML = `<div class="role">${role === 'user' ? 'DU' : 'JARVIS'}</div>${text}`;
+  transcriptEl.appendChild(div);
+  transcriptEl.scrollTop = transcriptEl.scrollHeight;
+  if (transcriptEl.children.length > 40)
+    transcriptEl.removeChild(transcriptEl.firstChild);
+}
+
+// ── Waveform ──────────────────────────────────────────────────────────────────
+
+const waveCanvas = document.getElementById('wave-canvas');
+const wctx = waveCanvas.getContext('2d');
+let analyser = null;
+let waveAnim = null;
+
+function drawWave() {
+  const W = waveCanvas.width, H = waveCanvas.height;
+  wctx.clearRect(0, 0, W, H);
+  if (!analyser) { waveAnim = requestAnimationFrame(drawWave); return; }
+  const data = new Uint8Array(analyser.frequencyBinCount);
+  analyser.getByteTimeDomainData(data);
+  wctx.beginPath();
+  wctx.strokeStyle = 'rgba(0,170,255,0.7)';
+  wctx.lineWidth = 1.5;
+  const step = W / data.length;
+  let energy = 0;
+  for (let i = 0; i < data.length; i++) {
+    const y = ((data[i] / 128) - 1) * (H / 2) + H / 2;
+    energy += Math.abs(data[i] - 128);
+    if (i === 0) wctx.moveTo(0, y);
+    else wctx.lineTo(i * step, y);
+  }
+  wctx.stroke();
+  window.orbSetEnergy?.(energy / data.length / 60);
+  waveAnim = requestAnimationFrame(drawWave);
+}
+requestAnimationFrame(drawWave);
+
+// ── Mikrofon ──────────────────────────────────────────────────────────────────
+
+let audioCtx = null;
+let micStream = null;
+
+async function initMic() {
+  try {
+    micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    audioCtx = new AudioContext();
+    analyser = audioCtx.createAnalyser();
+    analyser.fftSize = 256;
+    audioCtx.createMediaStreamSource(micStream).connect(analyser);
+    setDot(dotMic, 'active');
+    return true;
+  } catch (e) {
+    console.warn('Mikrofon:', e.message);
+    setDot(dotMic, 'error');
+    return false;
+  }
+}
+
+// ── Spracherkennung ───────────────────────────────────────────────────────────
+
+const SpeechRecognition = window.SpeechRecognition ?? window.webkitSpeechRecognition;
+let recognition = null;
+let wakeLocked = false; // verhindert Doppel-Auslösung
+
+function startWakeWordListener() {
+  if (!SpeechRecognition) { orbHint.textContent = 'Spracherkennung nicht verfügbar (Chrome/Edge)'; return; }
+
+  recognition = new SpeechRecognition();
+  recognition.lang = 'de-DE';
+  recognition.continuous = true;
+  recognition.interimResults = false;
+
+  recognition.onresult = e => {
+    if (isBusy) return;
+    const result = e.results[e.results.length - 1];
+    if (!result.isFinal) return;
+    const transcript = result[0].transcript.toLowerCase().trim();
+
+    const wakeWords = ['hey jarvis', 'jarvis', 'hei jarvis', 'jar vis'];
+    const hasWake = wakeWords.some(w => transcript.includes(w));
+
+    if (hasWake && !wakeLocked) {
+      wakeLocked = true;
+      setTimeout(() => { wakeLocked = false; }, 2000);
+      // Alles nach dem Wake-Word als Befehl nehmen, oder neu hören
+      let cmd = transcript;
+      for (const w of wakeWords) {
+        cmd = cmd.replace(w, '').trim();
+      }
+      if (cmd.length > 2) {
+        // Befehl direkt aus dem Wake-Word-Ergebnis
+        recognition.stop();
+        processVoiceCommand(cmd);
+      } else {
+        // Separat lauschen
+        recognition.stop();
+        listenForCommand();
       }
     }
-    speakBrowser(text);
-  }
+  };
 
-  // ---------- UI ----------
-  function setState(mode) {
-    window.Orb && window.Orb.setMode(mode);
-    const labels = { idle: 'Bereit', listening: 'Höre zu…', thinking: 'Verarbeite…', speaking: 'Spreche…' };
-    stateLabel.textContent = labels[mode] || '';
-  }
-  function addBubble(text, who, interim) {
-    const b = document.createElement('div');
-    b.className = 'bubble ' + who + (interim ? ' interim' : '');
-    b.textContent = text;
-    dialog.appendChild(b);
-    while (dialog.children.length > 10) dialog.removeChild(dialog.firstChild);
-    return b;
-  }
-  function jarvisSay(text) { addBubble(text, 'jarvis'); speak(text); }
+  recognition.onend = () => {
+    if (!isBusy) setTimeout(() => recognition?.start(), 300);
+  };
+  recognition.onerror = e => {
+    if (e.error !== 'no-speech' && e.error !== 'aborted')
+      console.warn('SR error:', e.error);
+  };
 
-  const fmtTime = (iso) => new Date(iso).toLocaleString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+  recognition.start();
+  orbHint.textContent = '„Hey Jarvis" oder klicken';
+}
 
-  function renderState(s) {
-    if (!s) return;
-    if (s.userName) USER_NAME = s.userName;
-    if (s.goal) {
-      goalText.textContent = '';
-      const label = document.createTextNode('Ziel: ');
-      const strong = document.createElement('strong');
-      strong.style.color = '#eafaff';
-      strong.textContent = s.goal.text.slice(0, 80);
-      goalText.append(label, strong);
-      if (s.goal.realisierbarkeit != null) {
-        const sp = document.createElement('span');
-        sp.style.cssText = 'font-size:11px;color:#6f8aa0;letter-spacing:2px';
-        sp.textContent = ` · ${s.goal.realisierbarkeit}% realisierbar`;
-        goalText.appendChild(sp);
-      }
-      goalPanel.classList.add('show');
-    }
-    sidePanel.textContent = '';
-    const section = (title, items) => {
-      if (!items.length) return;
-      const h = document.createElement('div'); h.className = 'lbl'; h.textContent = title; sidePanel.appendChild(h);
-      items.forEach(t => { const d = document.createElement('div'); d.className = 'item'; d.textContent = t; sidePanel.appendChild(d); });
-    };
-    section('Aufgaben', s.tasks.map(t => '▸ ' + t.text + (t.due ? ` (${t.due})` : '')));
-    section('Erinnerungen', s.reminders.map(r => '⏰ ' + fmtTime(r.at) + ' · ' + r.text));
-    sidePanel.classList.toggle('show', !!(s.tasks.length || s.reminders.length));
-  }
+function listenForCommand() {
+  if (!SpeechRecognition) return;
+  setState('listening');
+  orbHint.textContent = 'Spreche …';
 
-  // ---------- Gespräch ----------
-  async function respond(text) {
-    setState('thinking');
-    try {
-      const data = await api('/api/chat', { method: 'POST', body: JSON.stringify({ message: text, offsetMinutes: new Date().getTimezoneOffset() }) });
-      renderState(data.state);
-      jarvisSay(data.reply);
-    } catch (err) {
-      if (err.code === 401) { askToken('Bitte Zugangs-Token eingeben.'); setState('idle'); return; }
-      jarvisSay('Das hat nicht geklappt. ' + (err.message || '') );
+  const r = new SpeechRecognition();
+  r.lang = 'de-DE';
+  r.continuous = false;
+  r.interimResults = false;
+  r.maxAlternatives = 1;
+
+  let gotResult = false;
+
+  r.onresult = e => {
+    gotResult = true;
+    const cmd = e.results[0][0].transcript.trim();
+    processVoiceCommand(cmd);
+  };
+
+  r.onend = () => {
+    if (!gotResult) {
       setState('idle');
+      orbHint.textContent = '„Hey Jarvis" oder klicken';
+      setTimeout(() => recognition?.start(), 300);
     }
-  }
-  function handleInput(text) {
-    text = text.trim();
-    if (!text) return;
-    addBubble(text, 'user');
-    respond(text);
-  }
+  };
 
-  // ---------- Erinnerungen vom Server abholen ----------
-  async function poll() {
-    try {
-      const data = await api('/api/poll');
-      renderState(data.state);
-      data.fired.forEach(r => jarvisSay('Erinnerung: ' + r.text));
-      if (data.fired.length && window.Notification && Notification.permission === 'granted') {
-        data.fired.forEach(r => { try { new Notification('JARVIS', { body: r.text }); } catch (e) {} });
-      }
-    } catch (e) { /* offline oder Token fehlt – nächster Versuch folgt */ }
-  }
-  setInterval(() => { if (apiOverlay.style.display === 'none') poll(); }, 10000);
+  r.onerror = e => {
+    console.warn('listen error:', e.error);
+    setState('error');
+    setTimeout(() => { setState('idle'); recognition?.start(); }, 2000);
+  };
 
-  // ---------- Mikrofon-Pegel ----------
-  let audioCtx = null, analyser = null, micData = null, rafId = null;
-  async function startMicMeter() {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-      const src = audioCtx.createMediaStreamSource(stream);
-      analyser = audioCtx.createAnalyser();
-      analyser.fftSize = 512;
-      src.connect(analyser);
-      micData = new Uint8Array(analyser.frequencyBinCount);
-      const tick = () => {
-        analyser.getByteFrequencyData(micData);
-        let sum = 0;
-        for (let i = 0; i < micData.length; i++) sum += micData[i];
-        window.Orb && window.Orb.setAudioLevel((sum / micData.length) / 128);
-        rafId = requestAnimationFrame(tick);
-      };
-      tick();
-    } catch (e) {}
-  }
-  function stopMicMeter() {
-    if (rafId) cancelAnimationFrame(rafId);
-    window.Orb && window.Orb.setAudioLevel(0);
-  }
+  r.start();
+}
 
-  // ---------- Spracherkennung mit Wake-Word "Hey Jarvis" ----------
-  let USER_NAME = 'Augustin';
-  const WAKE_RE = /(?:dsch|tsch|sch|j|y)ar[vw][iy]s+/i;   // erkennt auch "Dscharvis", "Jarwis" …
-  let armedUntil = 0;           // bis wann JARVIS auf einen Befehl wartet
-  const ARM_MS = 10000;
+async function processVoiceCommand(text) {
+  if (!text) { setState('idle'); return; }
+  addMessage('user', text);
+  await sendMessage(text);
+  setTimeout(() => { startWakeWordListener(); }, 400);
+}
 
-  function restartRecognition() {
-    if (!recognition || !listening || isSpeaking()) return;
-    setTimeout(() => {
-      if (!listening || isSpeaking()) return;
-      try { recognition.start(); } catch (e) {}
-    }, 250);
+// ── Chat ──────────────────────────────────────────────────────────────────────
+
+async function sendMessage(text) {
+  if (isBusy) return;
+  isBusy = true;
+  setState('thinking');
+  setDot(dotApi, 'warn');
+  orbHint.textContent = '';
+
+  try {
+    const r = await apiFetch('/api/chat', {
+      method: 'POST',
+      body: JSON.stringify({ message: text }),
+    });
+    const data = await r.json();
+    setDot(dotApi, 'active');
+
+    if (!r.ok) throw new Error(data.error ?? r.status);
+
+    const reply = data.reply ?? '';
+    replyText.textContent = reply;
+    addMessage('jarvis', reply);
+    await speakReply(reply);
+
+  } catch (e) {
+    if (e.message !== 'unauthorized') {
+      setDot(dotApi, 'error');
+      setState('error');
+      replyText.textContent = 'Fehler: ' + e.message;
+      setTimeout(() => setState('idle'), 3000);
+    }
+  } finally {
+    isBusy = false;
+    orbHint.textContent = '„Hey Jarvis" oder klicken';
   }
+}
 
-  function onFinalSpeech(raw) {
-    const text = raw.trim();
-    if (!text) return;
-    const m = text.match(WAKE_RE);
-    if (m) {
-      // alles nach dem Wake-Word ist der Befehl
-      const cmd = text.slice(m.index + m[0].length).replace(/^[\s,.:!?-]+/, '');
-      if (cmd.length > 2) { armedUntil = 0; handleInput(cmd); }
-      else { armedUntil = Date.now() + ARM_MS; jarvisSay(`Ja, ${USER_NAME}?`); }
+// ── Sprachausgabe ─────────────────────────────────────────────────────────────
+
+let currentAudio = null;
+
+async function speakReply(text) {
+  if (!text) return;
+  setState('speaking');
+
+  // Versuche zuerst ElevenLabs via Server
+  try {
+    const r = await apiFetch('/api/speak', {
+      method: 'POST',
+      body: JSON.stringify({ text }),
+    });
+
+    if (r.status === 204) {
+      // Kein ElevenLabs → Browser-TTS
+      await browserSpeak(text);
       return;
     }
-    if (Date.now() < armedUntil) { armedUntil = 0; handleInput(text); }
-    // sonst: Gespräch im Raum ignorieren
-  }
 
-  function initRecognition() {
-    if (!SR) { unsupported.style.display = 'flex'; return; }
-    recognition = new SR();
-    recognition.lang = 'de-DE';
-    recognition.interimResults = true;
-    recognition.continuous = true;
-    recognition.onresult = (ev) => {
-      let interim = '', final = '';
-      for (let i = ev.resultIndex; i < ev.results.length; i++) {
-        const r = ev.results[i];
-        if (r.isFinal) final += r[0].transcript;
-        else interim += r[0].transcript;
-      }
-      if (interim && (Date.now() < armedUntil || WAKE_RE.test(interim))) {
-        if (!interimBubble) interimBubble = addBubble(interim, 'user', true);
-        else interimBubble.textContent = interim;
-      }
-      if (final) {
-        if (interimBubble) { interimBubble.remove(); interimBubble = null; }
-        onFinalSpeech(final);
-      }
-    };
-    recognition.onend = () => {
-      if (interimBubble) { interimBubble.remove(); interimBubble = null; }
-      if (listening) { restartRecognition(); return; }
-      micBtn.classList.remove('active');
-      stopMicMeter();
-      if (window.Orb.getMode() !== 'speaking') setState('idle');
-    };
-    recognition.onerror = (e) => {
-      if (e.error === 'not-allowed' || e.error === 'service-not-allowed') {
-        listening = false; micBtn.classList.remove('active'); stopMicMeter(); setState('idle');
-        addBubble('Mikrofon-Zugriff wurde blockiert. Bitte im Browser erlauben.', 'jarvis');
-      }
-      // andere Fehler (no-speech, aborted): onend startet neu
-    };
-  }
+    if (!r.ok) throw new Error('speak ' + r.status);
 
-  function startListening() {
-    if (!recognition || listening) return;
-    listening = true;
-    micBtn.classList.add('active');
-    setState('listening');
-    startMicMeter();
-    try { recognition.start(); } catch (e) {}
-  }
-  function stopListening() {
-    listening = false;
-    armedUntil = 0;
-    try { recognition.stop(); } catch (e) {}
-    micBtn.classList.remove('active');
-    stopMicMeter();
+    const blob = await r.blob();
+    const url = URL.createObjectURL(blob);
+    setDot(dotVoice, 'active');
+
+    await new Promise((resolve, reject) => {
+      currentAudio = new Audio(url);
+      currentAudio.onended = resolve;
+      currentAudio.onerror = reject;
+      currentAudio.play().catch(reject);
+    });
+
+    URL.revokeObjectURL(url);
+    setDot(dotVoice, 'active');
+  } catch (e) {
+    console.warn('ElevenLabs:', e.message, '→ Browser-TTS');
+    setDot(dotVoice, 'warn');
+    await browserSpeak(text);
+  } finally {
     setState('idle');
   }
+}
 
-  function toggleListen() {
-    if (apiOverlay.style.display !== 'none') return;
-    if (!recognition) { textInput.focus(); return; }
-    if (listening) {
-      // Klick während Dauer-Hören: sofort Befehl annehmen, zweiter Klick beendet das Hören
-      if (Date.now() < armedUntil) { stopListening(); return; }
-      stopSpeaking();
-      armedUntil = Date.now() + ARM_MS;
-      setState('listening');
-      restartRecognition();
-      return;
-    }
-    stopSpeaking();
-    armedUntil = Date.now() + ARM_MS;
-    startListening();
-  }
-
-  micBtn.addEventListener('click', toggleListen);
-  orbCanvas.addEventListener('click', toggleListen);
-  textInput.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') { handleInput(textInput.value); textInput.value = ''; }
+function browserSpeak(text) {
+  return new Promise(resolve => {
+    if (!window.speechSynthesis) { resolve(); return; }
+    window.speechSynthesis.cancel();
+    const utt = new SpeechSynthesisUtterance(text);
+    utt.lang = 'de-DE';
+    utt.rate = 1.0;
+    utt.pitch = 0.9;
+    // Präferiere eine tiefe männliche Stimme
+    const voices = window.speechSynthesis.getVoices();
+    const pref = voices.find(v => v.lang.startsWith('de') && /male|männlich|man/i.test(v.name));
+    const de = voices.find(v => v.lang.startsWith('de'));
+    if (pref) utt.voice = pref;
+    else if (de) utt.voice = de;
+    utt.onend = resolve;
+    utt.onerror = resolve;
+    window.speechSynthesis.speak(utt);
+    setDot(dotVoice, 'warn'); // warn = Browser-TTS (kein ElevenLabs)
   });
+}
 
-  initRecognition();
+// ── Orb-Klick (Push-to-Talk) ──────────────────────────────────────────────────
+
+orbWrap.addEventListener('click', () => {
+  if (isBusy) return;
+  recognition?.stop();
+  listenForCommand();
+});
+
+// ── Text-Eingabe ───────────────────────────────────────────────────────────────
+
+async function handleTextSend() {
+  const text = textInput.value.trim();
+  if (!text || isBusy) return;
+  textInput.value = '';
+  addMessage('user', text);
+  await sendMessage(text);
+}
+
+sendBtn.addEventListener('click', handleTextSend);
+textInput.addEventListener('keydown', e => { if (e.key === 'Enter') handleTextSend(); });
+
+clearBtn.addEventListener('click', () => {
+  transcriptEl.innerHTML = '';
+  replyText.textContent = '—';
+});
+
+// ── Initialisierung ───────────────────────────────────────────────────────────
+
+async function init() {
   setState('idle');
+  await initMic();
+  await checkVoice();
+  startWakeWordListener();
+}
 
-  // ---------- Start ----------
-  let greeted = false;
-  function greetOnce(ev) {
-    if (greeted) return; greeted = true;
-    try { if (window.Notification && Notification.permission === 'default') Notification.requestPermission(); } catch (e) {}
-    // Klick auf Mikro/Orb startet das Hören selbst – dann keine Begrüßung
-    if (ev && ev.target && (ev.target === micBtn || micBtn.contains(ev.target) || ev.target === orbCanvas)) return;
-    startListening();
-    jarvisSay(`Systeme online, ${USER_NAME}. Sag Hey Jarvis, wenn du mich brauchst.`);
-  }
+async function checkVoice() {
+  // Kurzer Test ob /api/speak ElevenLabs hat (204 = nein, 200 = ja)
+  try {
+    const r = await apiFetch('/api/speak', {
+      method: 'POST',
+      body: JSON.stringify({ text: ' ' }),
+    });
+    setDot(dotVoice, r.status === 204 ? 'warn' : 'active');
+  } catch { setDot(dotVoice, 'warn'); }
+}
 
-  async function boot(afterToken) {
-    let health;
-    try { health = await api('/api/health'); } catch (e) { addBubble('Server nicht erreichbar.', 'jarvis'); return; }
-    voiceOn = !!health.voice;
-    if (!health.keyConfigured) addBubble('Auf dem Server fehlt ANTHROPIC_API_KEY. Ohne ihn kann ich nicht antworten.', 'jarvis');
-    try {
-      renderState(await api('/api/state'));
-      apiOverlay.style.display = 'none';
-    } catch (e) {
-      if (e.code === 401) { askToken(TOKEN ? 'Token ist falsch.' : ''); return; }
-    }
-    if (afterToken) { greeted = false; greetOnce(); }
-    else window.addEventListener('pointerdown', greetOnce, { once: true });
-  }
-  boot(false);
+(async () => {
+  const ok = await checkAuth();
+  if (ok) await init();
 })();
