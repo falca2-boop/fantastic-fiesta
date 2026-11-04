@@ -4,21 +4,21 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>JARVIS</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Share+Tech+Mono&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Share+Tech+Mono&display=swap" rel="stylesheet" />
   <style>
     :root {
-      --bg: #030810;
-      --bg2: #060f1e;
-      --accent: #0af;
-      --accent2: #07f;
-      --glow: rgba(0, 170, 255, 0.35);
-      --text: #c8e8ff;
-      --text-dim: #4a7a9b;
-      --panel: rgba(0, 30, 60, 0.7);
-      --border: rgba(0, 170, 255, 0.2);
-      --danger: #f05;
-      --warn: #fa0;
+      --bg:      #06080f;
+      --bg2:     #0d1018;
+      --gold:    #c8912a;
+      --gold2:   #e8b84b;
+      --goldg:   rgba(200,145,42,0.4);
+      --dim:     rgba(200,145,42,0.18);
+      --text:    #e8d8b0;
+      --text-dim:#7a6a40;
+      --panel:   rgba(10,8,4,0.75);
+      --border:  rgba(200,145,42,0.22);
+      --danger:  #c03030;
+      --cyan:    #38b8c8;
     }
 
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -27,284 +27,364 @@
       background: var(--bg);
       color: var(--text);
       font-family: 'Share Tech Mono', monospace;
-      min-height: 100vh;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
+      height: 100vh;
       overflow: hidden;
+      display: grid;
+      grid-template-rows: 44px 1fr 44px;
+      grid-template-columns: 220px 1fr 220px;
+      grid-template-areas:
+        "header header header"
+        "left   center right"
+        "footer footer footer";
     }
 
     /* ── HEADER ── */
     header {
-      width: 100%;
-      padding: 12px 24px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
+      grid-area: header;
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0 20px;
       border-bottom: 1px solid var(--border);
-      background: var(--panel);
-      backdrop-filter: blur(8px);
+      background: rgba(6,8,15,0.9);
+      backdrop-filter: blur(6px);
     }
     .logo {
       font-family: 'Orbitron', sans-serif;
-      font-size: 1.3rem;
-      letter-spacing: 6px;
-      color: var(--accent);
-      text-shadow: 0 0 12px var(--glow);
+      font-size: 1rem; letter-spacing: 8px;
+      color: var(--gold2);
+      text-shadow: 0 0 16px var(--goldg);
     }
-    .status-bar {
-      display: flex;
-      gap: 16px;
-      font-size: 0.65rem;
-      color: var(--text-dim);
-    }
-    .status-bar span { display: flex; align-items: center; gap: 4px; }
-    .dot {
-      width: 7px; height: 7px;
-      border-radius: 50%;
-      background: var(--text-dim);
-      transition: background .4s, box-shadow .4s;
-    }
-    .dot.active { background: var(--accent); box-shadow: 0 0 8px var(--accent); }
-    .dot.error  { background: var(--danger); box-shadow: 0 0 8px var(--danger); }
-    .dot.warn   { background: var(--warn);   box-shadow: 0 0 8px var(--warn); }
+    .hdr-info { font-size: 0.6rem; color: var(--text-dim); letter-spacing: 2px; }
+    .dots { display: flex; gap: 10px; }
+    .dot { display: flex; align-items: center; gap: 5px; font-size: 0.6rem; color: var(--text-dim); }
+    .dot-led { width: 6px; height: 6px; border-radius: 50%; background: var(--text-dim); transition: background .4s, box-shadow .4s; }
+    .dot-led.on   { background: var(--gold2); box-shadow: 0 0 8px var(--gold2); }
+    .dot-led.warn { background: #e08030; box-shadow: 0 0 8px #e08030; }
+    .dot-led.err  { background: var(--danger); box-shadow: 0 0 8px var(--danger); }
 
-    /* ── MAIN ── */
-    main {
-      flex: 1;
-      width: 100%;
-      max-width: 860px;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      padding: 24px 16px 0;
-      gap: 24px;
+    /* ── LEFT PANEL ── */
+    .panel-left {
+      grid-area: left;
+      padding: 16px 10px 16px 16px;
+      border-right: 1px solid var(--border);
+      display: flex; flex-direction: column; gap: 12px;
+      overflow: hidden;
     }
 
-    /* ── ORB ── */
-    #orb-wrap {
+    /* ── RIGHT PANEL ── */
+    .panel-right {
+      grid-area: right;
+      padding: 16px 16px 16px 10px;
+      border-left: 1px solid var(--border);
+      display: flex; flex-direction: column; gap: 12px;
+      overflow: hidden;
+    }
+
+    /* ── CENTER ── */
+    .center {
+      grid-area: center;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: space-between;
+      padding: 16px 0 10px;
       position: relative;
-      width: 180px; height: 180px;
-      cursor: pointer;
-      flex-shrink: 0;
-    }
-    #orb-canvas { display: block; }
-    #orb-hint {
-      position: absolute;
-      bottom: -20px;
-      left: 50%;
-      transform: translateX(-50%);
-      font-size: 0.6rem;
-      color: var(--text-dim);
-      white-space: nowrap;
-      transition: opacity .3s;
     }
 
-    /* ── WAVEFORM ── */
-    #wave-canvas {
-      width: 100%;
-      max-width: 400px;
-      height: 40px;
-    }
-
-    /* ── STATUS TEXT ── */
-    #status {
-      font-size: 0.7rem;
-      color: var(--text-dim);
-      letter-spacing: 2px;
-      text-transform: uppercase;
-      min-height: 1.2em;
-      transition: color .3s;
-    }
-    #status.listening  { color: var(--accent); }
-    #status.thinking   { color: var(--warn); }
-    #status.speaking   { color: #0f9; }
-    #status.error      { color: var(--danger); }
-
-    /* ── REPLY PANEL ── */
-    #reply-panel {
-      width: 100%;
-      background: var(--panel);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 16px 20px;
-      min-height: 80px;
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-      transition: border-color .3s, box-shadow .3s;
-    }
-    #reply-panel.active {
-      border-color: var(--accent);
-      box-shadow: 0 0 16px var(--glow);
-    }
-    #reply-label {
-      font-size: 0.6rem;
-      color: var(--text-dim);
-      letter-spacing: 3px;
-      text-transform: uppercase;
-    }
-    #reply-text {
-      font-size: 0.95rem;
-      line-height: 1.6;
-      color: var(--text);
-      min-height: 1.5em;
-    }
-
-    /* ── TRANSCRIPT ── */
-    #transcript-panel {
-      width: 100%;
-      max-height: 160px;
-      overflow-y: auto;
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-    }
-    #transcript-panel::-webkit-scrollbar { width: 4px; }
-    #transcript-panel::-webkit-scrollbar-track { background: transparent; }
-    #transcript-panel::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
-
-    .msg {
-      padding: 8px 12px;
-      border-radius: 6px;
-      font-size: 0.8rem;
-      line-height: 1.5;
-      border-left: 3px solid var(--border);
-    }
-    .msg.user    { border-left-color: var(--accent2); background: rgba(0, 100, 220, 0.1); }
-    .msg.jarvis  { border-left-color: var(--accent);  background: rgba(0, 170, 255, 0.07); }
-    .msg .role   { font-size: 0.6rem; color: var(--text-dim); letter-spacing: 2px; margin-bottom: 3px; }
-
-    /* ── TEXT INPUT ── */
-    #input-row {
-      width: 100%;
-      display: flex;
-      gap: 8px;
-      padding-bottom: 20px;
+    /* ── FOOTER ── */
+    footer {
+      grid-area: footer;
+      display: flex; align-items: center; gap: 8px;
+      padding: 0 16px;
+      border-top: 1px solid var(--border);
+      background: rgba(6,8,15,0.9);
     }
     #text-input {
       flex: 1;
-      background: var(--panel);
-      border: 1px solid var(--border);
-      border-radius: 6px;
-      padding: 10px 14px;
-      color: var(--text);
-      font-family: inherit;
-      font-size: 0.85rem;
-      outline: none;
-      transition: border-color .2s;
-    }
-    #text-input:focus { border-color: var(--accent); }
-    #text-input::placeholder { color: var(--text-dim); }
-
-    button {
       background: transparent;
-      border: 1px solid var(--accent);
-      color: var(--accent);
-      border-radius: 6px;
-      padding: 10px 18px;
-      font-family: 'Share Tech Mono', monospace;
-      font-size: 0.8rem;
-      cursor: pointer;
-      letter-spacing: 1px;
+      border: none;
+      border-left: 2px solid var(--gold);
+      padding: 4px 12px;
+      color: var(--text);
+      font-family: inherit; font-size: 0.8rem;
+      outline: none;
+    }
+    #text-input::placeholder { color: var(--text-dim); }
+    .footer-btn {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--gold);
+      border-radius: 3px;
+      padding: 4px 12px;
+      font-family: inherit; font-size: 0.7rem;
+      cursor: pointer; letter-spacing: 1px;
       transition: background .2s, box-shadow .2s;
     }
-    button:hover { background: rgba(0, 170, 255, 0.12); box-shadow: 0 0 10px var(--glow); }
-    button:disabled { opacity: 0.35; cursor: default; box-shadow: none; }
+    .footer-btn:hover { background: var(--dim); box-shadow: 0 0 8px var(--goldg); }
 
-    /* ── LOGIN OVERLAY ── */
-    #login-overlay {
+    /* ── DATA CARD ── */
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 8px 10px;
+      position: relative;
+      overflow: hidden;
+    }
+    .card::before {
+      content: '';
+      position: absolute; top: 0; left: 0; right: 0;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, var(--gold), transparent);
+      opacity: 0.5;
+    }
+    .card-label {
+      font-size: 0.55rem; color: var(--text-dim);
+      letter-spacing: 3px; text-transform: uppercase;
+      margin-bottom: 4px;
+    }
+    .card-value {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 1.1rem; color: var(--gold2);
+      text-shadow: 0 0 10px var(--goldg);
+    }
+    .card-sub { font-size: 0.6rem; color: var(--text-dim); margin-top: 2px; }
+
+    /* ── MINI BARS ── */
+    .mini-bars { display: flex; align-items: flex-end; gap: 2px; height: 28px; }
+    .bar {
+      flex: 1; background: var(--gold);
+      border-radius: 1px;
+      opacity: 0.7;
+      transition: height .3s;
+      min-height: 2px;
+    }
+
+    /* ── GAUGE ── */
+    .gauge-wrap { display: flex; align-items: center; gap: 8px; }
+    .gauge-arc { flex-shrink: 0; }
+    .gauge-info { font-size: 0.65rem; color: var(--text-dim); }
+    .gauge-pct  { font-family: 'Orbitron', sans-serif; font-size: 1rem; color: var(--gold2); }
+
+    /* ── WAVEFORM BARS (right panel) ── */
+    .wave-bars { display: flex; align-items: flex-end; gap: 2px; height: 50px; }
+    .wave-bar {
+      width: 4px; border-radius: 2px 2px 0 0;
+      background: linear-gradient(to top, var(--gold), var(--gold2));
+      opacity: 0.75;
+      transition: height .08s;
+    }
+
+    /* ── TRANSCRIPT ── */
+    .transcript-card {
+      flex: 1; overflow-y: auto;
+      display: flex; flex-direction: column; gap: 4px;
+    }
+    .transcript-card::-webkit-scrollbar { width: 3px; }
+    .transcript-card::-webkit-scrollbar-thumb { background: var(--border); }
+    .msg { font-size: 0.65rem; line-height: 1.5; padding: 4px 6px; border-left: 2px solid var(--border); }
+    .msg.user   { border-left-color: var(--cyan); color: #a8d8e8; }
+    .msg.jarvis { border-left-color: var(--gold); color: var(--text); }
+    .msg .role  { font-size: 0.5rem; color: var(--text-dim); letter-spacing: 2px; }
+
+    /* ── ORB AREA ── */
+    #orb-wrap {
+      cursor: pointer;
+      position: relative;
+      flex-shrink: 0;
+    }
+    #orb-hint {
+      text-align: center;
+      font-size: 0.6rem; color: var(--text-dim);
+      letter-spacing: 2px; margin-top: 4px;
+    }
+
+    /* ── STATUS ── */
+    #status {
+      font-size: 0.65rem; letter-spacing: 3px;
+      color: var(--text-dim); text-transform: uppercase;
+      transition: color .3s;
+    }
+    #status.listening { color: var(--gold2); }
+    #status.thinking  { color: #e08030; }
+    #status.speaking  { color: #60d890; }
+    #status.error     { color: var(--danger); }
+
+    /* ── REPLY ── */
+    #reply-box {
+      width: 100%; max-width: 400px;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 10px 14px;
+      font-size: 0.8rem; line-height: 1.6;
+      min-height: 52px;
+      transition: border-color .3s, box-shadow .3s;
+    }
+    #reply-box.active {
+      border-color: var(--gold);
+      box-shadow: 0 0 20px var(--goldg);
+    }
+
+    /* ── WAVE CANVAS ── */
+    #wave-canvas {
+      width: 100%; max-width: 320px; height: 32px;
+    }
+
+    /* ── HUD CORNERS ── */
+    .hud-corner {
+      position: fixed; width: 40px; height: 40px;
+      pointer-events: none;
+      opacity: 0.5;
+    }
+    .hud-tl { top: 46px; left: 0;  border-top: 1px solid var(--gold); border-left: 1px solid var(--gold); }
+    .hud-tr { top: 46px; right: 0; border-top: 1px solid var(--gold); border-right: 1px solid var(--gold); }
+    .hud-bl { bottom: 46px; left: 0;  border-bottom: 1px solid var(--gold); border-left: 1px solid var(--gold); }
+    .hud-br { bottom: 46px; right: 0; border-bottom: 1px solid var(--gold); border-right: 1px solid var(--gold); }
+
+    /* ── HEX GRID BG ── */
+    body::before {
+      content: '';
       position: fixed; inset: 0;
-      background: rgba(3, 8, 16, 0.96);
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      gap: 20px;
-      z-index: 100;
+      background-image:
+        repeating-linear-gradient(0deg, transparent, transparent 39px, rgba(200,145,42,0.03) 40px),
+        repeating-linear-gradient(90deg, transparent, transparent 39px, rgba(200,145,42,0.03) 40px);
+      pointer-events: none; z-index: 0;
+    }
+    header, .panel-left, .panel-right, .center, footer { position: relative; z-index: 1; }
+
+    /* ── LOGIN ── */
+    #login-overlay {
+      position: fixed; inset: 0; z-index: 200;
+      background: rgba(6,8,15,0.97);
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center; gap: 18px;
     }
     #login-overlay.hidden { display: none; }
     #login-overlay h1 {
       font-family: 'Orbitron', sans-serif;
-      font-size: 2rem;
-      letter-spacing: 10px;
-      color: var(--accent);
-      text-shadow: 0 0 20px var(--glow);
+      font-size: 2rem; letter-spacing: 10px;
+      color: var(--gold2); text-shadow: 0 0 24px var(--goldg);
     }
-    #login-overlay p { font-size: 0.75rem; color: var(--text-dim); }
+    #login-overlay p { font-size: 0.7rem; color: var(--text-dim); letter-spacing: 2px; }
     #token-input {
-      background: var(--panel);
-      border: 1px solid var(--border);
-      border-radius: 6px;
-      padding: 12px 18px;
-      color: var(--text);
-      font-family: inherit;
-      font-size: 0.9rem;
-      width: 300px;
-      outline: none;
-      text-align: center;
-      letter-spacing: 2px;
+      background: var(--panel); border: 1px solid var(--border);
+      border-radius: 4px; padding: 10px 18px;
+      color: var(--text); font-family: inherit; font-size: 0.85rem;
+      width: 280px; outline: none; text-align: center; letter-spacing: 2px;
     }
-    #token-input:focus { border-color: var(--accent); }
-    #login-err { color: var(--danger); font-size: 0.75rem; min-height: 1em; }
-
-    /* ── HUD corner decorations ── */
-    .hud-tl, .hud-br {
-      position: fixed;
-      width: 80px; height: 80px;
-      pointer-events: none;
-    }
-    .hud-tl { top: 60px; left: 10px; border-top: 1px solid var(--border); border-left: 1px solid var(--border); }
-    .hud-br { bottom: 10px; right: 10px; border-bottom: 1px solid var(--border); border-right: 1px solid var(--border); }
+    #token-input:focus { border-color: var(--gold); }
+    #login-err { color: var(--danger); font-size: 0.7rem; min-height: 1em; }
   </style>
 </head>
 <body>
 
-<!-- Login Overlay -->
+<!-- HUD Corners -->
+<div class="hud-corner hud-tl"></div>
+<div class="hud-corner hud-tr"></div>
+<div class="hud-corner hud-bl"></div>
+<div class="hud-corner hud-br"></div>
+
+<!-- Login -->
 <div id="login-overlay" class="hidden">
   <h1>J.A.R.V.I.S</h1>
   <p>ZUGANGS-TOKEN ERFORDERLICH</p>
-  <input id="token-input" type="password" placeholder="Token eingeben …" autocomplete="off" />
-  <button id="login-btn">AUTHENTIFIZIEREN</button>
+  <input id="token-input" type="password" placeholder="Token …" autocomplete="off" />
+  <button class="footer-btn" id="login-btn">AUTHENTIFIZIEREN</button>
   <p id="login-err"></p>
 </div>
 
-<!-- HUD decorations -->
-<div class="hud-tl"></div>
-<div class="hud-br"></div>
-
+<!-- Header -->
 <header>
   <div class="logo">J.A.R.V.I.S</div>
-  <div class="status-bar">
-    <span><div class="dot" id="dot-mic"></div> MIC</span>
-    <span><div class="dot" id="dot-api"></div> API</span>
-    <span><div class="dot" id="dot-voice"></div> VOICE</span>
+  <div class="hdr-info" id="clock">--:--:--</div>
+  <div class="dots">
+    <div class="dot"><div class="dot-led" id="dot-mic"></div>MIC</div>
+    <div class="dot"><div class="dot-led" id="dot-api"></div>API</div>
+    <div class="dot"><div class="dot-led" id="dot-voice"></div>VOICE</div>
   </div>
 </header>
 
-<main>
-  <div id="orb-wrap">
-    <canvas id="orb-canvas" width="180" height="180"></canvas>
-    <div id="orb-hint">klick oder „Hey Jarvis"</div>
+<!-- Left Panel -->
+<div class="panel-left">
+  <div class="card">
+    <div class="card-label">System Status</div>
+    <div class="card-value" id="stat-state">IDLE</div>
+    <div class="card-sub">Neural core active</div>
   </div>
 
-  <canvas id="wave-canvas" width="400" height="40"></canvas>
+  <div class="card">
+    <div class="card-label">Aufgaben</div>
+    <div class="card-value" id="stat-tasks">0</div>
+    <div class="card-sub">offen</div>
+  </div>
 
+  <div class="card">
+    <div class="card-label">Frequenz</div>
+    <div class="mini-bars" id="freq-bars"></div>
+  </div>
+
+  <div class="card">
+    <div class="card-label">Uptime</div>
+    <div class="card-value" id="stat-uptime">00:00</div>
+    <div class="card-sub">hh:mm</div>
+  </div>
+
+  <div class="card" style="flex:1">
+    <div class="card-label">Gauge</div>
+    <div class="gauge-wrap">
+      <svg class="gauge-arc" width="60" height="60" viewBox="0 0 60 60">
+        <circle cx="30" cy="30" r="22" fill="none" stroke="rgba(200,145,42,0.15)" stroke-width="6"/>
+        <circle id="gauge-circle" cx="30" cy="30" r="22" fill="none"
+          stroke="#c8912a" stroke-width="6"
+          stroke-dasharray="138" stroke-dashoffset="138"
+          stroke-linecap="round"
+          transform="rotate(-90 30 30)"
+          style="transition: stroke-dashoffset 1s"/>
+      </svg>
+      <div class="gauge-info">
+        <div class="gauge-pct" id="gauge-pct">0%</div>
+        <div>Aktivität</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Center -->
+<div class="center">
   <div id="status">BEREIT</div>
 
-  <div id="reply-panel">
-    <div id="reply-label">LETZTE ANTWORT</div>
-    <div id="reply-text">—</div>
+  <div id="orb-wrap">
+    <canvas id="orb-canvas" width="220" height="220"></canvas>
+    <div id="orb-hint">„HEY JARVIS" · KLICK</div>
   </div>
 
-  <div id="transcript-panel"></div>
+  <canvas id="wave-canvas" width="320" height="32"></canvas>
 
-  <div id="input-row">
-    <input id="text-input" type="text" placeholder="Nachricht eingeben …" />
-    <button id="send-btn">SENDEN</button>
-    <button id="clear-btn" title="Verlauf löschen">CLR</button>
+  <div id="reply-box">—</div>
+</div>
+
+<!-- Right Panel -->
+<div class="panel-right">
+  <div class="card">
+    <div class="card-label">Waveform</div>
+    <div class="wave-bars" id="wave-bars"></div>
   </div>
-</main>
+
+  <div class="card" style="flex:1; overflow:hidden; display:flex; flex-direction:column">
+    <div class="card-label">Verlauf</div>
+    <div class="transcript-card" id="transcript"></div>
+  </div>
+
+  <div class="card">
+    <div class="card-label">Letzte Anfrage</div>
+    <div class="card-sub" id="last-query" style="color:var(--text); font-size:0.65rem; line-height:1.4">—</div>
+  </div>
+</div>
+
+<!-- Footer -->
+<footer>
+  <input id="text-input" type="text" placeholder="Nachricht eingeben …" />
+  <button class="footer-btn" id="send-btn">SEND</button>
+  <button class="footer-btn" id="clear-btn">CLR</button>
+</footer>
 
 <script type="module" src="/orb.js"></script>
 <script type="module" src="/app.js"></script>
