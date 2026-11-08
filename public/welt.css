@@ -74,3 +74,7 @@ body.welt { overflow: hidden; display: flex; flex-direction: column; }
 .w-credit[hidden] { display: none; }
 .w-3d-row { flex-wrap: wrap; max-width: 250px; }
 @media (max-width: 1180px) { .w-search { display: none; } }
+
+.w-zoom { position: absolute; right: 14px; bottom: 44px; padding: 4px 10px; background: rgba(2, 10, 14, 0.78); border: 1px solid var(--border); border-radius: 8px; font-size: 0.72rem; color: var(--text-2); }
+.w-street { margin: 8px 0 2px; background: rgba(var(--accent-rgb), 0.15); border: 1px solid var(--border-strong); border-radius: 8px; padding: 6px 12px; font-size: 0.82rem; }
+.w-street:hover { background: rgba(var(--accent-rgb), 0.28); }

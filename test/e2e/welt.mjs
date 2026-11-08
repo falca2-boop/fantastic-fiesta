@@ -94,6 +94,18 @@ try {
   check('Klick auf die Kugel: schaltet auf Städte & Dörfer und zoomt hinein', (await page.evaluate(() => window.__welt.getSkin())) === 'karte' && (await page.evaluate(() => window.__welt.globe.pointOfView().altitude)) < 0.2);
   check('Klick auf die Kugel: Ortsname und Region werden angezeigt', (await page.locator('#wInfo h3').textContent()) === 'Graz' && (await page.locator('#wInfo .sub').first().textContent()).includes('Steiermark, Österreich'));
   check('Nah herangezoomt: Kontinentflächen sind ausgeblendet', (await page.evaluate(() => window.__welt.globe.polygonsData().length)) === 0);
+  check('Zoom bis auf Straßen und Häuser möglich (Mindestabstand und Kamera-Nahebene)', (await page.evaluate(() => window.__welt.globe.controls().minDistance)) < 100.02 && (await page.evaluate(() => window.__welt.globe.camera().near)) <= 0.005);
+  await page.click('#wInfo .w-street');
+  await page.waitForFunction(() => window.__welt.globe.pointOfView().altitude < 0.001 && document.getElementById('wZoom').textContent.includes('Straßen'), null, { timeout: 25000 }).catch(() => {});
+  check('Knopf „Auf Straßen und Häuser zoomen“ geht auf Straßenebene', (await page.evaluate(() => window.__welt.globe.pointOfView().altitude)) < 0.001 && (await page.locator('#wZoom').textContent()).includes('Straßen & Häuser'), (await page.locator('#wZoom').textContent()) + ' alt=' + (await page.evaluate(() => window.__welt.globe.pointOfView().altitude)));
+  check('OSM-Kacheln gehen bis Stufe 19', (await page.evaluate(() => window.__welt.globe.globeTileEngineMaxLevel())) === 19);
+  const a1 = await page.evaluate(() => window.__welt.globe.pointOfView().altitude);
+  await page.evaluate(() => window.__welt.inspectPlace(47.0707, 15.4395, { altitude: 0.12 }));
+  await page.waitForFunction(() => window.__welt.globe.pointOfView().altitude > 0.1, null, { timeout: 25000 }).catch(() => {});
+  await page.evaluate(() => window.__welt.inspectPlace(47.0707, 15.4395));
+  await page.waitForFunction(() => window.__welt.globe.pointOfView().altitude < 0.05, null, { timeout: 25000 }).catch(() => {});
+  const a2 = await page.evaluate(() => window.__welt.globe.pointOfView().altitude);
+  check('Weitere Klicks auf der Karte zoomen tiefer hinein', a2 < 0.05 && a2 > 0.03 && a1 < 0.001, a1 + ' / ' + a2);
   await page.evaluate(() => window.__welt.inspectPlace(0, 0)); await page.waitForTimeout(500);
   check('Offenes Meer: freundlicher Hinweis statt Fehler', /Kein Ort/.test(await page.locator('#wInfo h3').textContent()));
   await page.fill('#wSearchQ', 'Graz'); await page.press('#wSearchQ', 'Enter'); await page.waitForTimeout(800);

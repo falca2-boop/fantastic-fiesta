@@ -111,10 +111,12 @@
   const SKINS = { satellit: 'vendor/earth-blue-marble.jpg', nacht: 'vendor/earth-night.jpg', dunkel: 'vendor/earth-dark.jpg', karte: 'vendor/earth-blue-marble.jpg', hd: 'vendor/earth-blue-marble.jpg' };
   // Kachel-Karten laden beim Heranzoomen immer schärfere Bilder (Echtzeit-Streaming aus dem Netz)
   const TILES = {
-    karte: { url: (x, y, l) => 'https://tile.openstreetmap.org/' + l + '/' + x + '/' + y + '.png', max: 18, credit: '© OpenStreetMap-Mitwirkende (Städte, Dörfer, Straßen)' },
-    hd: { url: (x, y, l) => 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/' + l + '/' + y + '/' + x, max: 17, credit: 'Bilder: Esri, Maxar, Earthstar Geographics' },
+    karte: { url: (x, y, l) => 'https://tile.openstreetmap.org/' + l + '/' + x + '/' + y + '.png', max: 19, credit: '© OpenStreetMap-Mitwirkende (Städte, Dörfer, Straßen, Häuser)' },
+    hd: { url: (x, y, l) => 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/' + l + '/' + y + '/' + x, max: 19, credit: 'Bilder: Esri, Maxar, Earthstar Geographics' },
   };
   let skin = 'satellit', altitudeNow = 2.4;
+  const MIN_ALT = 0.00012;   // ca. 750 m über dem Boden: einzelne Straßen und Häuser
+  const zoomName = (a) => (a > 1.2 ? 'Welt' : a > 0.3 ? 'Kontinent' : a > 0.05 ? 'Land / Region' : a > 0.008 ? 'Stadt' : a > 0.001 ? 'Stadtviertel' : 'Straßen & Häuser');
   const DETAIL_ALT = 0.35;   // darunter werden Kontinentflächen ausgeblendet, damit Städte und Dörfer sichtbar sind
   const pointAlt = (p) => (p.kind === 'cam' ? 0.02 * depth : 0.015 + Math.min(0.22, Math.log10(p.count + 1) * 0.07) * depth);
   const polyAlt = (f) => (f.properties.continent === hoverCont || f.properties.continent === selectedCont ? 0.028 : 0.006) * depth;
@@ -174,6 +176,12 @@
     globe.polygonsData(show ? countries : []);
     globe.labelsData(show ? Object.entries(CONTINENTS).map(([name, c]) => ({ name, lat: c.label[0], lng: c.label[1], color: 'rgba(' + c.color + ',0.95)' })) : []);
   }
+  /** Zoomstufe merken, Anzeige und Kontinentflächen nachführen (auch nach Kamerafahrten, die kein Zoom-Ereignis am Ende senden). */
+  function syncZoom(alt) {
+    const was = altitudeNow > DETAIL_ALT; altitudeNow = alt;
+    $('wZoom').textContent = 'Zoom: ' + zoomName(alt);
+    if (was !== (alt > DETAIL_ALT)) refreshPolygons();
+  }
   function setSkin(name) {
     if (!globe || !SKINS[name]) return;
     skin = name;
@@ -189,11 +197,14 @@
   let placeToken = 0;
   async function inspectPlace(lat, lng, opts) {
     const o = opts || {};
+    const wasSkin = skin;
     if (!TILES[skin]) setSkin('karte');
     if (globe) {
       const c = globe.controls(); c.autoRotate = false; $('tSpin').checked = false;
       c.enableDamping = false;                                  // Schwung der Drehung stoppen, sonst landet der Flug neben dem Ziel
-      globe.pointOfView({ lat, lng, altitude: o.altitude || 0.12 }, 1600);
+      // Erster Klick: Überblick (ca. 750 km). Weitere Klicks auf der Karte zoomen jeweils um das Dreifache tiefer, bis Straßen und Häuser sichtbar sind.
+      const target = o.altitude || (TILES[wasSkin] && altitudeNow < 0.5 ? Math.max(MIN_ALT, altitudeNow / 3) : 0.12);
+      globe.pointOfView({ lat, lng, altitude: target }, 1600);
       setTimeout(() => { c.enableDamping = true; }, 1900);
     }
     const box = $('wInfo'); box.textContent = ''; box.hidden = false;
@@ -211,7 +222,9 @@
       h.textContent = o.title || name;
       const area = [a.state || a.region, a.country].filter(Boolean).join(', ');
       sub.textContent = (area ? area + ' · ' : '') + lat.toFixed(4) + '°, ' + lng.toFixed(4) + '°';
-      box.appendChild(el('div', 'sub', 'Tipp: Mit dem Mausrad weiter hineinzoomen, bis einzelne Straßen und Häuser sichtbar sind.'));
+      const street = el('button', 'w-street', 'Auf Straßen und Häuser zoomen'); street.type = 'button';
+      street.onclick = () => { globe.pointOfView({ lat, lng, altitude: 0.0004 }, 2200); };
+      box.append(street, el('div', 'sub', 'Tipp: Klick auf die Karte zoomt weiter hinein, mit dem Mausrad geht es bis auf einzelne Häuser.'));
     } catch (e) { if (token === placeToken) h.textContent = o.title || 'Ort (Name gerade nicht abrufbar)'; }
   }
   async function searchPlace(q) {
@@ -289,7 +302,7 @@
         .onPolygonClick((f, ev, c) => { if (c && Number.isFinite(c.lat)) inspectPlace(c.lat, c.lng); else selectContinent(f.properties.continent); })
         .onGlobeClick(({ lat, lng }) => inspectPlace(lat, lng))
         .onLabelClick((l) => selectContinent(l.name))
-        .onZoom((pov) => { const was = altitudeNow > DETAIL_ALT; altitudeNow = pov.altitude; if (was !== (altitudeNow > DETAIL_ALT)) refreshPolygons(); })
+        .onZoom((pov) => syncZoom(pov.altitude))
         .labelLat('lat').labelLng('lng').labelText('name').labelColor('color').labelSize(1.5).labelAltitude(0.03).labelDotRadius(0).labelResolution(2)
         .ringsData([]).ringColor(() => (t) => 'rgba(255,92,92,' + (1 - t) + ')').ringMaxRadius(3).ringPropagationSpeed(1.5).ringRepeatPeriod(1400)
         .ringLat('lat').ringLng('lng');
@@ -298,7 +311,8 @@
       const name = dbg ? String(gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL)) : '';
       const soft = /swiftshader|llvmpipe|software|softpipe/i.test(name);
       globe.renderer().setPixelRatio(soft ? 1 : Math.min(window.devicePixelRatio || 1, 1.75));
-      const c = globe.controls(); c.autoRotate = true; c.autoRotateSpeed = soft ? 0.25 : 0.45; c.enableDamping = true; c.minDistance = 100.4;
+      const c = globe.controls(); c.autoRotate = true; c.autoRotateSpeed = soft ? 0.25 : 0.45; c.enableDamping = true; c.minDistance = 100 * (1 + MIN_ALT);
+      const cam = globe.camera(); cam.near = 0.002; cam.updateProjectionMatrix();   // sonst wird der Boden beim Heranzoomen abgeschnitten
       const fit = () => globe.width(host.clientWidth).height(host.clientHeight);
       new ResizeObserver(fit).observe(host); fit();
       $('tSpin').addEventListener('change', () => { c.autoRotate = $('tSpin').checked; });
@@ -315,8 +329,8 @@
       for (const b of document.querySelectorAll('.w-3d-row button')) b.addEventListener('click', () => {
         setSkin(b.dataset.skin);
       });
-      setTimeout(applySun, 300); setInterval(applySun, 60000); $('tSun').addEventListener('change', applySun);
-      window.__welt = { globe, soft, setSkin, inspectPlace, applySun, sunPosition, getSkin: () => skin, apply3d, getDepth: () => depth, showInfo: (p) => showInfo(p), selectContinent: (n) => selectContinent(n) };
+      setInterval(() => syncZoom(globe.pointOfView().altitude), 400); setTimeout(applySun, 300); setInterval(applySun, 60000); $('tSun').addEventListener('change', applySun);
+      window.__welt = { globe, soft, MIN_ALT, zoomName, setSkin, inspectPlace, applySun, sunPosition, getSkin: () => skin, apply3d, getDepth: () => depth, showInfo: (p) => showInfo(p), selectContinent: (n) => selectContinent(n) };
     } catch (err) {
       globe = null; console.error('[Welt] Globus konnte nicht starten', err);
       $('wFallback').hidden = false; $('wFallback').textContent = 'Die 3D-Weltkugel braucht WebGL und startet hier nicht. Livestream und Schlagzeilen funktionieren trotzdem.';
