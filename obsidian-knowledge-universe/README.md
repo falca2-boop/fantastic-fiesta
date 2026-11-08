@@ -23,6 +23,10 @@ cd obsidian-knowledge-universe
 Zum Ausprobieren in einem leeren Vault: `./demo-notes.sh "/pfad/zu/deinem/Vault"` legt 75 verlinkte Demo-Notizen
 im Ordner `Knowledge-Universe-Demo` an (zum Entfernen den Ordner löschen).
 
+**Variante A2: alles automatisch** (Linux/Chromebook): `./activate.sh "/pfad/zu/deinem/Vault"` installiert das Plugin, schaltet es im
+Vault ein, schließt Obsidian, sorgt dafür, dass beim Start nur dieser Vault öffnet, und startet Obsidian neu.
+Danach genügt Strg + P → „Knowledge Universe öffnen".
+
 **Variante B: von Hand**
 
 1. Ordner `DEIN_VAULT/.obsidian/plugins/knowledge-universe/` anlegen.
