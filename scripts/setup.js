@@ -30,16 +30,24 @@ if (fs.existsSync(ENV_FILE)) {
 
 const v = {};
 
-console.log('1) Anthropic API Key (Pflicht). Erstellen unter https://console.anthropic.com → API Keys.');
-while (!v.ANTHROPIC_API_KEY) {
+console.log('1) Welche KI soll Jarvis nutzen?');
+console.log('   1 = Google Gemini (Key aus https://aistudio.google.com/apikey, hat einen kostenlosen Tarif)');
+console.log('   2 = Anthropic Claude (Key aus https://console.anthropic.com, braucht Guthaben)');
+const choice = (await ask('   Auswahl', '1')) === '2' ? 'anthropic' : 'gemini';
+const keyName = choice === 'gemini' ? 'GEMINI_API_KEY' : 'ANTHROPIC_API_KEY';
+const prefix = choice === 'gemini' ? 'AIza' : 'sk-ant-';
+if (choice === 'gemini') v.JARVIS_PROVIDER = 'gemini';
+while (!v[keyName]) {
   if (closed && !queue.length) { console.log('\nEingabe beendet, ohne Key. Abbruch.'); process.exit(1); }
-  const key = await ask('   Key (beginnt mit sk-ant-)');
-  if (key.startsWith('sk-ant-')) v.ANTHROPIC_API_KEY = key;
-  else console.log('   Das sieht nicht wie ein Anthropic-Key aus. Nochmal.');
+  const key = await ask(`   Key (beginnt mit ${prefix})`);
+  if (key.startsWith(prefix)) v[keyName] = key;
+  else console.log('   Das sieht nicht wie ein ' + (choice === 'gemini' ? 'Google' : 'Anthropic') + '-Key aus. Nochmal.');
 }
 try {
-  const res = await fetch('https://api.anthropic.com/v1/models', { headers: { 'x-api-key': v.ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01' } });
-  console.log(res.ok ? '   Key funktioniert.' : `   Warnung: Anthropic meldet HTTP ${res.status}. Prüfe Key und Guthaben.`);
+  const res = choice === 'gemini'
+    ? await fetch('https://generativelanguage.googleapis.com/v1beta/models', { headers: { 'x-goog-api-key': v[keyName] } })
+    : await fetch('https://api.anthropic.com/v1/models', { headers: { 'x-api-key': v[keyName], 'anthropic-version': '2023-06-01' } });
+  console.log(res.ok ? '   Key funktioniert.' : `   Warnung: HTTP ${res.status}. Prüfe den Key${choice === 'anthropic' ? ' und das Guthaben' : ''}.`);
 } catch { console.log('   Konnte den Key gerade nicht prüfen (kein Internet?). Ich speichere ihn trotzdem.'); }
 
 v.JARVIS_USER_NAME = await ask('2) Wie soll Jarvis dich nennen?', 'Augustin');

@@ -4,7 +4,8 @@ Persönlicher Sprachassistent mit eigenem Server. Du sagst **„Hey Jarvis"**, e
 erledigt Dinge für dich (Anrede: Augustin, einstellbar).
 
 - **Websuche** (live), **Aufgaben**, **Notizen**, **Erinnerungen** (er spricht sie zur Zeit aus), **Gedächtnis** über dich, **Tagesplan**
-- **Server-Backend (Node, keine Abhängigkeiten):** Der Anthropic API Key liegt nur auf dem Server, nie im Browser.
+- **KI-Anbieter:** Claude (Anthropic) oder Google Gemini (AI Studio, kostenloser Tarif möglich). Gewählt wird über `JARVIS_PROVIDER` oder automatisch nach dem gesetzten Key.
+- **Server-Backend (Node, keine Abhängigkeiten):** Der API Key liegt nur auf dem Server, nie im Browser.
   Daten liegen in `data/store.json` und sind auf jedem Gerät dieselben.
 - **E-Mail / Kalender / Notion** über einen optionalen n8n-Webhook (`N8N_WEBHOOK_URL`). Der Workflow muss die
   Aktionen (`send_email`, `create_event` …) selbst ausführen. JARVIS fragt vor dem Senden nach.
@@ -90,6 +91,7 @@ npm test
 | `lib/store.js` | JSON-Speicher |
 | `lib/env.js` | Liest `.env` beim Start (ohne Zusatzpaket, auch unter Windows) |
 | `scripts/setup.js` | Einrichtungsassistent (`npm run setup`) |
+| `lib/gemini.js` | Gemini-Anbindung (Werkzeug-Umwandlung, Websuche über Google) |
 | `lib/vault.js` | Obsidian-Anbindung (Notizen, Gedächtnis als Markdown) |
 | `lib/mail.js` | IMAP-Überwachung, Filter, Anruf (Twilio) und Push (ntfy) |
 | `public/` | Oberfläche: Orb, Spracherkennung („Hey Jarvis"), Sprachausgabe |

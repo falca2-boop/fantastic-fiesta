@@ -143,3 +143,53 @@ test('.env-Parser: Kommentare, Anführungszeichen, keine Überschreibung gesetzt
   assert.deepEqual(env, { A: 'shell', B: 'file' });
   assert.equal(loadEnvFile(f + 'x', {}), false);
 });
+
+test('Gemini: Werkzeugaufruf, Websuche als Funktion, JSON-Argumente, Verlauf', async () => {
+  const s = new Store(null);
+  const calls = [];
+  const fakeFetch = async (url, init) => {
+    const body = JSON.parse(init.body);
+    calls.push({ url, headers: init.headers, body });
+    let data;
+    if (body.tools?.[0]?.googleSearch) data = { candidates: [{ content: { parts: [{ text: 'Es sind 20 Grad.' }] } }] };
+    else if (calls.filter(c => c.body.systemInstruction).length === 1)
+      data = { candidates: [{ content: { role: 'model', parts: [
+        { functionCall: { name: 'add_task', args: { text: 'Milch' } }, thoughtSignature: 'sig' },
+        { functionCall: { name: 'web_search', args: { query: 'Wetter Köln' } } },
+        { functionCall: { name: 'external_action', args: { action: 'send_email', details: '{"to":"a@b.de"}' } } },
+      ] } }] };
+    else data = { candidates: [{ content: { role: 'model', parts: [{ text: 'Gedanke', thought: true }, { text: 'Augustin, erledigt.' }] } }] };
+    return { ok: true, status: 200, json: async () => data };
+  };
+  const webhookCalls = [];
+  const hookFetch = async (url, init) => url.includes('googleapis') ? fakeFetch(url, init) : (webhookCalls.push(JSON.parse(init.body)), { ok: true, text: async () => 'gesendet' });
+  const reply = await chat({ store: s, message: 'Mach das', apiKey: 'gk', model: 'gemini-test', provider: 'gemini', userName: 'Augustin', webhookUrl: 'http://n8n/hook', fetchFn: hookFetch, now: NOW });
+  assert.equal(reply, 'Augustin, erledigt.');
+  assert.equal(s.data.tasks[0].text, 'Milch');
+  assert.deepEqual(webhookCalls[0], { action: 'send_email', details: { to: 'a@b.de' } });
+  const first = calls[0];
+  assert.match(first.url, /models\/gemini-test:generateContent$/);
+  assert.equal(first.headers['x-goog-api-key'], 'gk');
+  const decls = first.body.tools[0].functionDeclarations;
+  assert.ok(decls.some(d => d.name === 'web_search' && d.parameters.required[0] === 'query'));
+  assert.equal(decls.find(d => d.name === 'list_tasks').parameters, undefined);
+  assert.equal(decls.find(d => d.name === 'external_action').parameters.properties.details.type, 'STRING');
+  assert.equal(decls.find(d => d.name === 'set_goal').parameters.properties.schritte.items.type, 'STRING');
+  const last = calls.at(-1).body.contents;
+  assert.equal(last.at(-2).parts[0].thoughtSignature, 'sig');
+  assert.equal(last.at(-1).parts.length, 3);
+  assert.match(last.at(-1).parts[1].functionResponse.response.result, /20 Grad/);
+  assert.deepEqual(s.data.history.map(h => h.content), ['Mach das', 'Augustin, erledigt.']);
+});
+
+test('Gemini: Fehler 429 wird verständlich gemeldet, Server wählt Gemini anhand des Keys', async () => {
+  await assert.rejects(chat({ store: new Store(null), message: 'x', apiKey: 'k', model: 'm', provider: 'gemini', userName: 'A', fetchFn: async () => ({ ok: false, status: 429 }) }), /Limit/);
+  const saved = { ...process.env };
+  try {
+    delete process.env.ANTHROPIC_API_KEY; delete process.env.JARVIS_PROVIDER; process.env.GEMINI_API_KEY = 'AIza-test';
+    await withServer({}, async (base) => {
+      const h = await (await fetch(base + '/api/health')).json();
+      assert.equal(h.provider, 'gemini'); assert.equal(h.keyConfigured, true);
+    });
+  } finally { for (const k of ['ANTHROPIC_API_KEY', 'JARVIS_PROVIDER', 'GEMINI_API_KEY']) { if (saved[k] === undefined) delete process.env[k]; else process.env[k] = saved[k]; } }
+});

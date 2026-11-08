@@ -6,6 +6,7 @@ import { timingSafeEqual } from 'node:crypto';
 import { Store } from './lib/store.js';
 import { chat, AgentError } from './lib/agent.js';
 import { takeDueReminders } from './lib/tools.js';
+import { DEFAULT_GEMINI_MODEL } from './lib/gemini.js';
 import { loadEnvFile } from './lib/env.js';
 import { vaultDirFromEnv } from './lib/vault.js';
 import { mailConfigFromEnv, startMailWatcher } from './lib/mail.js';
@@ -18,10 +19,12 @@ const isLoopback = (h) => ['127.0.0.1', '::1', 'localhost'].includes(h);
 
 export function createServer(opts = {}) {
   const env = process.env;
+  const provider = opts.provider ?? env.JARVIS_PROVIDER ?? (!env.ANTHROPIC_API_KEY && (env.GEMINI_API_KEY || env.GOOGLE_API_KEY) ? 'gemini' : 'anthropic');
   const cfg = {
-    apiKey: opts.apiKey ?? env.ANTHROPIC_API_KEY ?? '',
+    provider,
+    apiKey: opts.apiKey ?? (provider === 'gemini' ? (env.GEMINI_API_KEY || env.GOOGLE_API_KEY || '') : (env.ANTHROPIC_API_KEY ?? '')),
     token: opts.token ?? env.JARVIS_TOKEN ?? '',
-    model: opts.model ?? env.JARVIS_MODEL ?? 'claude-sonnet-5-5',
+    model: opts.model ?? (provider === 'gemini' ? (env.GEMINI_MODEL || DEFAULT_GEMINI_MODEL) : (env.JARVIS_MODEL ?? 'claude-sonnet-5-5')),
     userName: opts.userName ?? env.JARVIS_USER_NAME ?? 'Augustin',
     webhookUrl: opts.webhookUrl ?? env.N8N_WEBHOOK_URL ?? '',
     fetchFn: opts.fetchFn ?? fetch,
@@ -83,7 +86,7 @@ export function createServer(opts = {}) {
     try {
       const { pathname } = new URL(req.url, 'http://localhost');
 
-      if (pathname === '/api/health') return json(res, 200, { ok: true, tokenRequired: !!cfg.token, keyConfigured: !!cfg.apiKey, mailWatch: !!cfg.mail, voice: !!cfg.voice, obsidian: !!store.vaultDir });
+      if (pathname === '/api/health') return json(res, 200, { ok: true, tokenRequired: !!cfg.token, keyConfigured: !!cfg.apiKey, provider: cfg.provider, mailWatch: !!cfg.mail, voice: !!cfg.voice, obsidian: !!store.vaultDir });
 
       if (pathname.startsWith('/api/')) {
         if (!authorized(req)) return json(res, 401, { error: 'Zugangs-Token fehlt oder ist falsch.' });
@@ -97,7 +100,7 @@ export function createServer(opts = {}) {
           const message = typeof body.message === 'string' ? body.message.trim() : '';
           if (!message || message.length > 4000) return json(res, 400, { error: 'Nachricht fehlt oder ist zu lang.' });
           const offsetMinutes = Number.isFinite(body.offsetMinutes) ? Math.max(-840, Math.min(840, body.offsetMinutes)) : 0;
-          const reply = await enqueue(() => chat({ store, message, offsetMinutes, apiKey: cfg.apiKey, model: cfg.model, userName: cfg.userName, webhookUrl: cfg.webhookUrl, mailEnabled: !!cfg.mail, fetchFn: cfg.fetchFn }));
+          const reply = await enqueue(() => chat({ store, message, offsetMinutes, apiKey: cfg.apiKey, model: cfg.model, provider: cfg.provider, userName: cfg.userName, webhookUrl: cfg.webhookUrl, mailEnabled: !!cfg.mail, fetchFn: cfg.fetchFn }));
           return json(res, 200, { reply, state: publicState() });
         }
         if (pathname === '/api/speak' && req.method === 'POST') {
@@ -140,7 +143,8 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     console.error('Abbruch: Der Server ist von außen erreichbar (HOST=' + host + '), aber JARVIS_TOKEN ist nicht gesetzt.');
     process.exit(1);
   }
-  if (!cfg.apiKey) console.warn('Warnung: ANTHROPIC_API_KEY ist nicht gesetzt – JARVIS kann nicht antworten.');
+  if (!cfg.apiKey) console.warn('Warnung: Kein API-Key gesetzt (' + (cfg.provider === 'gemini' ? 'GEMINI_API_KEY' : 'ANTHROPIC_API_KEY') + ') – JARVIS kann nicht antworten.');
+  console.log('KI-Anbieter: ' + cfg.provider + ' (' + cfg.model + ')');
   if (store.vaultDir) console.log('Obsidian-Vault: ' + store.vaultDir);
   if (cfg.mail) { startMailWatcher({ store, config: cfg.mail }); console.log('Mail-Überwachung aktiv für ' + cfg.mail.imap.user); }
   server.listen(port, host, () => console.log(`JARVIS läuft auf http://${host}:${port}`));
