@@ -9,7 +9,7 @@
   },
   "scripts": {
     "start": "node server.js",
-    "test": "node --test test/jarvis.test.js test/mail.test.js",
+    "test": "node --test test/jarvis.test.js test/mail.test.js test/clap.test.js",
     "setup": "node scripts/setup.js"
   },
   "dependencies": {

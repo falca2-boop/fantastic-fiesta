@@ -249,3 +249,11 @@ test('Server: ElevenLabs-Fehler nennen den Grund (402 = Tarif, 404 = Stimme nich
     assert.match((await (await fetch(base + '/api/speak', { method: 'POST', body: '{"text":"Hallo"}' })).json()).error, /Meine Stimmen/);
   });
 });
+
+test('Server: /api/health meldet, ob die Oberfläche offen ist (letzte Abfrage vor < 90 s)', async () => {
+  await withServer({}, async (base) => {
+    assert.equal((await (await fetch(base + '/api/health')).json()).uiActive, false);
+    await fetch(base + '/api/poll');
+    assert.equal((await (await fetch(base + '/api/health')).json()).uiActive, true);
+  });
+});

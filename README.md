@@ -70,6 +70,17 @@ Das Mikrofon funktioniert auf `localhost` und über `https://`.
 
 `bash scripts/install-launcher.sh` legt ein **Jarvis**-Symbol im Startmenü an (Linux-Apps). Ein Klick startet Jarvis, falls er nicht läuft, und öffnet ihn im Browser (Port 8001). Der Key und alle Einstellungen kommen aus der `.env`. Im Terminal gehen auch `jarvis-start` und `jarvis-stop`.
 
+## Zweimal klatschen öffnet Jarvis (Linux/Chromebook)
+
+`bash scripts/install-clap.sh` richtet einen Hintergrunddienst ein, der auf zwei kurze Klatscher hört und dann Jarvis startet und öffnet, **falls die Jarvis-Seite nicht schon offen ist** (der Server merkt sich die letzte Abfrage der Oberfläche).
+
+- **Datenschutz:** Das Audio wird nur im Arbeitsspeicher auf Lautstärke geprüft. Nichts wird gespeichert oder gesendet. ChromeOS zeigt, solange das Mikrofon genutzt wird, ein Mikrofon-Symbol.
+- **Voraussetzung:** ChromeOS → Einstellungen → Entwickler → Linux → Mikrofon erlauben (danach Linux neu starten). Das Programm hört nur, solange Linux läuft.
+- **Erkennung:** Zwei kurze, scharfe Knalle im Abstand von 0,18 bis 0,9 Sekunden. Sprache, Musik, einzelne Geräusche und Applaus (drei und mehr) lösen nichts aus; nach einem Treffer gibt es 4 Sekunden Pause.
+- **Testen:** `node scripts/clap-listener.js --test` zeigt live einen Pegel und meldet Doppelklatscher, ohne Jarvis zu starten.
+- **Empfindlichkeit:** `CLAP_SENSITIVITY` (1 bis 10, Standard 6) in `~/.config/systemd/user/jarvis-clap.service`, danach `systemctl --user daemon-reload && systemctl --user restart jarvis-clap`.
+- **Ausschalten:** `systemctl --user disable --now jarvis-clap`.
+
 ## Im Netz betreiben (z. B. Render, Railway, Fly.io)
 
 Der Server braucht einen dauerhaft laufenden Node-Prozess, deshalb reicht Vercel/GitHub Pages nicht.

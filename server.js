@@ -73,6 +73,10 @@ export function createServer(opts = {}) {
     };
   };
 
+  // Ist die Oberfläche offen? (sie fragt alle 10 s /api/poll ab; Hintergrund-Tabs werden von Chrome gedrosselt, daher großzügig)
+  let lastUi = 0;
+  const uiActive = () => Date.now() - lastUi < 90_000;
+
   // Chat-Anfragen nacheinander abarbeiten, damit der Speicher konsistent bleibt
   let queue = Promise.resolve();
   const enqueue = (fn) => { const run = queue.then(fn, fn); queue = run.catch(() => {}); return run; };
@@ -92,11 +96,12 @@ export function createServer(opts = {}) {
     try {
       const { pathname } = new URL(req.url, 'http://localhost');
 
-      if (pathname === '/api/health') return json(res, 200, { ok: true, tokenRequired: !!cfg.token, keyConfigured: !!cfg.apiKey, provider: cfg.provider, mailWatch: !!cfg.mail, voice: !!cfg.voice, obsidian: !!store.vaultDir });
+      if (pathname === '/api/health') return json(res, 200, { ok: true, tokenRequired: !!cfg.token, keyConfigured: !!cfg.apiKey, provider: cfg.provider, uiActive: uiActive(), mailWatch: !!cfg.mail, voice: !!cfg.voice, obsidian: !!store.vaultDir });
 
       if (pathname.startsWith('/api/')) {
         if (!authorized(req)) return json(res, 401, { error: 'Zugangs-Token fehlt oder ist falsch.' });
 
+        if ((pathname === '/api/state' || pathname === '/api/poll') && req.method === 'GET') lastUi = Date.now();
         if (pathname === '/api/state' && req.method === 'GET') return json(res, 200, publicState());
         if (pathname === '/api/poll' && req.method === 'GET') return json(res, 200, { fired: takeDueReminders(store).map(({ id, text }) => ({ id, text })), state: publicState() });
 
