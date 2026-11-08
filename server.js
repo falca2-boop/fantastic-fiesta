@@ -57,6 +57,7 @@ export function createServer(opts = {}) {
     return {
       userName: cfg.userName,
       goal: d.goal,
+      stats: { done: d.tasks.filter(t => t.done).length, total: d.tasks.length },
       tasks: d.tasks.filter(t => !t.done).map(({ id, text, due }) => ({ id, text, due })),
       reminders: d.reminders.filter(r => !r.fired).sort((a, b) => new Date(a.at) - new Date(b.at)).map(({ id, text, at }) => ({ id, text, at })),
     };

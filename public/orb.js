@@ -14,7 +14,7 @@
   };
 
   const modeEnergy = { idle: 0.15, listening: 0.55, thinking: 0.4, speaking: 0.75 };
-  const ACCENT = { r: 56, g: 217, b: 255 };
+  const ACCENT = { r: 110, g: 165, b: 255 };
 
   function resize() {
     const rect = canvas.getBoundingClientRect();
@@ -39,7 +39,7 @@
 
     ctx.clearRect(0, 0, W, H);
     const cx = W / 2, cy = H / 2;
-    const base = Math.min(W, H) * 0.30;
+    const base = Math.min(W, H) * 0.26;
     const col = (a) => `rgba(${ACCENT.r},${ACCENT.g},${ACCENT.b},${a})`;
 
     // Äußerer Glow / Aura
@@ -51,6 +51,31 @@
     aura.addColorStop(1, col(0));
     ctx.fillStyle = aura;
     ctx.fillRect(0, 0, W, H);
+
+    // Tick-Ring (Skala) mit wanderndem Bogen
+    const tr = base * 1.6;
+    for (let i = 0; i < 120; i++) {
+      const a = (i / 120) * Math.PI * 2;
+      const major = i % 10 === 0;
+      const len = major ? 10 : 4;
+      ctx.beginPath();
+      ctx.moveTo(cx + Math.cos(a) * tr, cy + Math.sin(a) * tr);
+      ctx.lineTo(cx + Math.cos(a) * (tr + len), cy + Math.sin(a) * (tr + len));
+      ctx.strokeStyle = `rgba(200,220,255,${major ? 0.5 : 0.18})`;
+      ctx.lineWidth = major ? 1.4 : 1;
+      ctx.stroke();
+    }
+    const arcA = state.t * (0.25 + e * 0.5);
+    ctx.beginPath();
+    ctx.arc(cx, cy, tr - 10, arcA, arcA + 1.1);
+    ctx.strokeStyle = `rgba(210,230,255,${0.45 + e * 0.4})`;
+    ctx.lineWidth = 2;
+    ctx.lineCap = 'round';
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(cx, cy, tr - 10, arcA + Math.PI, arcA + Math.PI + 0.5);
+    ctx.strokeStyle = 'rgba(210,230,255,0.25)';
+    ctx.stroke();
 
     // Rotierende Ringe aus Punkten
     rings.forEach((ring, ri) => {
