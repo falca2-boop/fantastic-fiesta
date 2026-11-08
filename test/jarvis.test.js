@@ -236,3 +236,16 @@ test('Obsidian: OBSIDIAN_SUBFOLDER legt den Unterordner fest, unsichere Werte we
     assert.ok(!fs.existsSync(path.join(vault, '..', 'ausserhalb')));
   } finally { if (saved === undefined) delete process.env.OBSIDIAN_SUBFOLDER; else process.env.OBSIDIAN_SUBFOLDER = saved; }
 });
+
+test('Server: ElevenLabs-Fehler nennen den Grund (402 = Tarif, 404 = Stimme nicht gefunden)', async () => {
+  const mk = (status, body) => async () => ({ ok: false, status, text: async () => JSON.stringify(body) });
+  await withServer({ voice: { apiKey: 'k', voiceId: 'v', model: 'm' }, fetchFn: mk(402, { detail: { status: 'paid_plan_required', message: 'Free users cannot use library voices via the API.' } }) }, async (base) => {
+    const r = await fetch(base + '/api/speak', { method: 'POST', body: '{"text":"Hallo"}' });
+    assert.equal(r.status, 502);
+    const e = (await r.json()).error;
+    assert.match(e, /402/); assert.match(e, /bezahlten/); 
+  });
+  await withServer({ voice: { apiKey: 'k', voiceId: 'v', model: 'm' }, fetchFn: mk(404, { detail: { message: 'voice_not_found' } }) }, async (base) => {
+    assert.match((await (await fetch(base + '/api/speak', { method: 'POST', body: '{"text":"Hallo"}' })).json()).error, /Meine Stimmen/);
+  });
+});

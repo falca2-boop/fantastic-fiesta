@@ -52,7 +52,7 @@
   }
   if (synth) { pickVoice(); synth.onvoiceschanged = pickVoice; }
 
-  let voiceOn = false, currentAudio = null, speakSeq = 0;
+  let voiceOn = false, voiceWarned = false, currentAudio = null, speakSeq = 0;
   const isSpeaking = () => !!currentAudio || !!(synth && synth.speaking);
 
   function startedSpeaking() {
@@ -91,7 +91,11 @@
           headers: { 'Content-Type': 'application/json', ...(TOKEN ? { Authorization: 'Bearer ' + TOKEN } : {}) },
           body: JSON.stringify({ text: text.slice(0, 800) }),
         });
-        if (!res.ok) throw new Error('speak ' + res.status);
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          if (!voiceWarned) { voiceWarned = true; banner.textContent = (err.error || 'Die ElevenLabs-Stimme ist nicht verfügbar.') + ' Ich spreche mit der Browser-Stimme weiter.'; banner.classList.add('show'); }
+          throw new Error('speak ' + res.status);
+        }
         const blob = await res.blob();
         if (seq !== speakSeq) return;              // inzwischen wurde etwas anderes angefordert
         const url = URL.createObjectURL(blob);

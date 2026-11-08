@@ -128,7 +128,13 @@ export function createServer(opts = {}) {
             `https://api.elevenlabs.io/v1/text-to-speech/${encodeURIComponent(cfg.voice.voiceId)}?output_format=mp3_44100_64`,
             { method: 'POST', headers: { 'Content-Type': 'application/json', 'xi-api-key': cfg.voice.apiKey },
               body: JSON.stringify({ text, model_id: cfg.voice.model }) });
-          if (!upstream.ok) { console.warn('ElevenLabs HTTP ' + upstream.status); return json(res, 502, { error: 'Stimme nicht verfügbar (ElevenLabs ' + upstream.status + ').' }); }
+          if (!upstream.ok) {
+            let detail = '';
+            try { const j = JSON.parse(await upstream.text()); detail = String(j.detail?.message || j.detail || '').slice(0, 200); } catch {}
+            const hint = { 401: 'Der ElevenLabs-Key ist ungültig.', 402: 'Diese Stimme braucht einen bezahlten ElevenLabs-Tarif (Bibliotheksstimmen gehen per API nicht im kostenlosen Tarif).', 404: 'Stimme nicht gefunden: ID falsch oder nicht unter „Meine Stimmen“.', 429: 'ElevenLabs-Limit erreicht.' }[upstream.status] || '';
+            console.warn('ElevenLabs HTTP ' + upstream.status + (detail ? ': ' + detail : ''));
+            return json(res, 502, { error: 'Stimme nicht verfügbar (ElevenLabs ' + upstream.status + '). ' + (hint || detail) });
+          }
           const audio = Buffer.from(await upstream.arrayBuffer());
           res.writeHead(200, { 'Content-Type': 'audio/mpeg', 'Content-Length': audio.length, 'Cache-Control': 'no-store' });
           return res.end(audio);
