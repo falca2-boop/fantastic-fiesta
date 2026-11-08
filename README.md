@@ -99,3 +99,7 @@ npm test
 
 Einschränkungen: Spracherkennung und -ausgabe nutzen die Browser-Funktionen (Chrome/Edge); Erinnerungen werden
 gesprochen, solange ein Tab offen ist, sonst beim nächsten Öffnen nachgeholt. Der Speicher ist für **einen** Nutzer ausgelegt.
+
+## Obsidian-Plugin: Knowledge Universe
+
+Im Ordner [`obsidian-knowledge-universe/`](obsidian-knowledge-universe/README.md) liegt ein eigenständiges Obsidian-Plugin, das den Vault als 3D-Partikel-Universum darstellt (Three.js). Installation und Bedienung stehen dort.
