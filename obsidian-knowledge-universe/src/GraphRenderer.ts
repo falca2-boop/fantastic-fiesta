@@ -359,12 +359,14 @@ export class GraphRenderer {
   }
 
   zoomBy(factor: number) {
+    this.autoFrame = false;
     const d = this.camera.position.distanceTo(this.controls.target);
     this.flyTo(this.controls.target.clone(), d * factor, 350);
   }
 
   focusNode(i: number) {
     if (!this.data || i < 0 || i >= this.data.nodes.length) return;
+    this.autoFrame = false;                      // der Nutzer navigiert selbst: nicht wieder auf die Übersicht zurückspringen
     this.flyTo(this.nodePosition(i), Math.max(this.layout.radius * 0.3, 40), 1100);
   }
 

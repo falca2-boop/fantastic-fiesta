@@ -56,7 +56,7 @@ try {
 
   // Klick auf Knoten öffnet Notiz; Doppelklick zeigt Details ohne zusätzliches Öffnen
   const pos = await page.evaluate(() => { const r = view.renderer, cam = r.camera, N = view.data.nodes; const v = new cam.position.constructor();
-    for (let i = 0; i < N.length; i++) { if (N[i].kind !== 'note' || N[i].weight < 0.25) continue; r.nodePosition(i, v); const p = v.clone().project(cam); const x = (p.x*.5+.5)*innerWidth, y = (1-(p.y*.5+.5))*innerHeight; if (p.z < 1 && x > 200 && x < 1100 && y > 100 && y < 700) return { x, y, i, title: N[i].title }; } return null; });
+    for (let i = 0; i < N.length; i++) { if (N[i].kind !== 'note' || N[i].weight < 0.25) continue; r.nodePosition(i, v); const p = v.clone().project(cam); const x = (p.x*.5+.5)*innerWidth, y = (1-(p.y*.5+.5))*innerHeight; if (p.z < 1 && x > 200 && x < 900 && y > 100 && y < 700) return { x, y, i, title: N[i].title }; } return null; });
   check('Knoten für Klicktest gefunden', !!pos, JSON.stringify(pos));
   if (pos) {
     await page.evaluate(() => { window.opened.length = 0; });
