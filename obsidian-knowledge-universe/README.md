@@ -20,6 +20,9 @@ cd obsidian-knowledge-universe
 ./install.sh "/pfad/zu/deinem/Vault"
 ```
 
+Zum Ausprobieren in einem leeren Vault: `./demo-notes.sh "/pfad/zu/deinem/Vault"` legt 75 verlinkte Demo-Notizen
+im Ordner `Knowledge-Universe-Demo` an (zum Entfernen den Ordner löschen).
+
 **Variante B: von Hand**
 
 1. Ordner `DEIN_VAULT/.obsidian/plugins/knowledge-universe/` anlegen.

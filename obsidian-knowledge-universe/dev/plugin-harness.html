@@ -1,5 +1,11 @@
 <!doctype html>
 <html lang="de"><head><meta charset="utf-8"><title>Knowledge Universe – Plugin-Test</title>
 <link rel="stylesheet" href="../styles.css">
-<style>html,body{margin:0;height:100%;background:#030305}#root{position:fixed;inset:0}</style></head>
+<style>html,body{margin:0;height:100%;background:#fff;color:#222;font-family:sans-serif}#root{position:fixed;inset:0}
+/* Nachbildung der Standardstile des hellen Obsidian-Designs, die Plugin-Elemente überschreiben können */
+button:not(.clickable-icon){background:#fff;color:#222;border:1px solid #d8d8d8;border-radius:6px;box-shadow:0 1px 2px rgba(0,0,0,.2);height:32px;padding:4px 12px;font-size:14px}
+button:not(.clickable-icon):hover{background:#f0f0f0}
+input[type=text]{background:#fff;border:1px solid #d8d8d8;border-radius:6px;height:32px;padding:4px 8px;color:#222;box-shadow:inset 0 0 0 1px #ddd}
+select{background:#fff;color:#222;border:1px solid #d8d8d8;border-radius:6px;height:32px}
+</style></head>
 <body><div id="root"></div><script src="out/plugin-harness.js"></script></body></html>
