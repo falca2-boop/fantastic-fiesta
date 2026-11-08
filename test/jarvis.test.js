@@ -365,3 +365,9 @@ test('Eingebaute Agenten: alle Werkzeuge erlaubt und ausschließlich lesend', ()
   const brief = listAgents(s).find((a) => a.name === 'briefschreiber');
   assert.ok(!brief.tools.includes('external_action') && !brief.tools.includes('add_note') && /sendest nichts/.test(brief.role));
 });
+
+test('Persönlichkeit: Jarvis ist Freund auf Du-Basis und antwortet immer', async () => {
+  const { systemPrompt } = await import('../lib/agent.js');
+  const p = systemPrompt(new Store(null), { userName: 'Augustin', address: 'Boss', now: Date.now(), offsetMinutes: 0 });
+  assert.match(p, /guter Freund/); assert.match(p, /„du“/); assert.match(p, /IMMER/); assert.match(p, /ehrlich/); assert.match(p, /eine KI/);
+});

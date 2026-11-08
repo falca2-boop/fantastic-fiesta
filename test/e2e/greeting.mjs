@@ -47,6 +47,8 @@ try {
   check('Sprache ohne "Jarvis" wird ignoriert', !(await userCount()).includes('Das Wetter ist schön'));
   await say('Hey Jarvis'); await page.waitForTimeout(400);
   check('"Hey Jarvis" zeigt "Ja? Sag deinen Befehl"', (await page.locator('#heard.wake').textContent()).includes('Befehl'));
+  const ACKS = ['Ja, ich bin da.', 'Klar, ich höre dir zu.', 'Schieß los, ich bin ganz Ohr.', 'Immer. Was gibt es?', 'Ja? Sag an.', 'Hey, ich bin da. Was brauchst du?'];
+  check('Auf „Hey Jarvis“ antwortet Jarvis sofort mit einem freundlichen Satz', (await page.evaluate(() => window.__spoken)).some((t) => ACKS.includes(t)), JSON.stringify(await page.evaluate(() => window.__spoken.slice(-2))));
   check('Nach "Hey Jarvis" steht der Status auf "Höre zu"', (await page.locator('#stateText').textContent()).includes('Höre zu'));
   await say('Was steht heute an'); await page.waitForTimeout(600);
   check('Der Befehl nach "Hey Jarvis" wird angenommen', (await userCount()).includes('Was steht heute an'));

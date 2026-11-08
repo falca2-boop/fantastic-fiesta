@@ -169,3 +169,8 @@ Bibliotheken liegen unter `public/vendor/` (globe.gl, three.js, NASA-Texturen; M
 Im Kasten **System** zeigt Jarvis den echten Verbrauch: heute und im laufenden Monat in Token und geschätzten US-Dollar, dazu die Websuchen und die teuersten Verwendungen (Gespräch, einzelne Agenten, Morgenbriefing). Die Zahlen stammen aus den Antworten der Anthropic-API (`usage`), die Preise aus der Anthropic-Preisliste (`lib/usage.js`, Sonnet 5.5: 2 $ Eingabe / 10 $ Ausgabe pro Million Token, Websuche 10 $ pro 1.000). Es ist eine Schätzung, maßgeblich ist die Rechnung in der Anthropic Console. Gezählt wird ab dem Update; frühere Nutzung fehlt. Mit Gemini wird nichts gezählt.
 
 Optionales **Tageslimit**: `JARVIS_DAILY_LIMIT_USD=2` in der `.env`. Ist es erreicht, ruft Jarvis bis morgen die KI nicht mehr auf (auch Agenten und Morgenbriefing nicht). Das ersetzt nicht das Ausgabenlimit in der Console, ergänzt es aber.
+
+
+## Jarvis als Freund
+
+Jarvis spricht dich mit „du“ an, warm, locker und mit Humor, fragt nach deinem Tag, nutzt das, was er über dich weiß, und sagt auch Unbequemes freundlich und ehrlich. Er ist eine KI und sagt das, wenn du fragst. Auf Zuruf antwortet er **immer**: „Hey Jarvis“ beantwortet er sofort mit einem freundlichen Satz („Ja, ich bin da.“, „Schieß los …“) und hört dann zu; auch kurze Zurufe wie „Danke“ oder „Bist du da?“ bekommen eine Antwort; klappt etwas nicht, sagt er das ebenfalls laut. Der Ton steht in `systemPrompt` (`lib/agent.js`).

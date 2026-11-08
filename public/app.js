@@ -326,6 +326,7 @@
       if (err.code === 401) { askToken('Bitte Zugangs-Token eingeben.'); setState('idle'); return; }
       const m = addBubble('Das hat nicht geklappt. ' + (err.message || ''), 'jarvis');
       dialog.lastChild.classList.add('error');
+      speak('Hm, das hat gerade nicht geklappt. Versuch es gleich noch einmal.');
       setState('idle');
     }
   }
@@ -399,6 +400,14 @@
   }
   // kurzer Ton als Bestätigung des Wake-Words (kein Sprechen, damit das Zuhören nicht unterbrochen wird)
   let actx = null;
+  // Auf Zuruf („Hey Jarvis“) antwortet Jarvis immer sofort, wie ein Freund; ist der Ton gesperrt, gibt es wenigstens den Signalton.
+  const ACKS = ['Ja, ich bin da.', 'Klar, ich höre dir zu.', 'Schieß los, ich bin ganz Ohr.', 'Immer. Was gibt es?', 'Ja? Sag an.', 'Hey, ich bin da. Was brauchst du?'];
+  let lastAck = -1;
+  function acknowledge() {
+    let i; do { i = Math.floor(Math.random() * ACKS.length); } while (i === lastAck && ACKS.length > 1);
+    lastAck = i;
+    speak(ACKS[i]).then((ok) => { if (!ok) chime(); });
+  }
   function chime() {
     try {
       actx = actx || new (window.AudioContext || window.webkitAudioContext)();
@@ -433,7 +442,7 @@
       // alles nach dem Wake-Word ist der Befehl
       const cmd = text.slice(m.end).replace(/^[\s,.:!?-]+/, '');
       if (cmd.length > 2) { armedUntil = 0; handleInput(cmd); }
-      else { armedUntil = Date.now() + ARM_MS; if (!wakeCued) chime(); showHeard('Ja? Sag deinen Befehl …', 'wake'); setState('listening'); }
+      else { armedUntil = Date.now() + ARM_MS; armAfterSpeech = true; showHeard('Ja? Sag deinen Befehl …', 'wake'); setState('listening'); acknowledge(); }
       wakeCued = false;
       return;
     }
@@ -457,7 +466,7 @@
       if (interim) {
         showHeard('Ich höre: ' + interim);
         // Wake-Word schon im Zwischenergebnis: sofort bestätigen und auf den Befehl vorbereiten
-        if (window.findWake(interim) && !wakeCued && Date.now() >= armedUntil) { wakeCued = true; armedUntil = Date.now() + ARM_MS; chime(); showHeard('Ja? Sag deinen Befehl …', 'wake'); }
+        if (window.findWake(interim) && !wakeCued && Date.now() >= armedUntil) { wakeCued = true; armedUntil = Date.now() + ARM_MS; showHeard('Ja? Sag deinen Befehl …', 'wake'); }
         if (Date.now() < armedUntil || window.findWake(interim)) {
           if (!interimBubble) interimBubble = addBubble(interim, 'user', true);
           else interimBubble.textContent = interim;
