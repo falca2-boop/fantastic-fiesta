@@ -65,6 +65,8 @@ export class UniverseUI {
   private pauseBtn!: HTMLButtonElement;
   private tooltip!: HTMLElement; private details!: HTMLElement;
   private empty!: HTMLElement;
+  private loading!: HTMLElement;
+  private hint!: HTMLElement;
   private resultIdx: number[] = [];
   private active = -1;
   private panel: Panel = null;
@@ -82,6 +84,8 @@ export class UniverseUI {
     this.tooltip = el('div', 'ku-tooltip'); this.tooltip.hidden = true; this.root.appendChild(this.tooltip);
     this.details = el('aside', 'ku-details'); this.details.hidden = true; this.root.appendChild(this.details);
     this.empty = el('div', 'ku-empty', 'Keine Notizen gefunden.'); this.empty.hidden = true; this.root.appendChild(this.empty);
+    this.loading = el('div', 'ku-empty', 'Universum wird aufgebaut …'); this.root.appendChild(this.loading);
+    this.hint = el('div', 'ku-hint'); this.hint.hidden = true; this.root.appendChild(this.hint);
   }
 
   // ------------------------------------------------------------------------------------- Aufbau
@@ -158,8 +162,25 @@ export class UniverseUI {
 
   // -------------------------------------------------------------------------------------- Daten
 
+  /** Dezenter Hinweis unten links (z. B. vereinfachte Darstellung). */
+  showHint(text: string, ms = 14000) {
+    this.hint.replaceChildren(el('span', undefined, text));
+    const x = iconButton('close', 'Schließen', () => { this.hint.hidden = true; });
+    this.hint.appendChild(x);
+    this.hint.hidden = false;
+    window.setTimeout(() => { this.hint.hidden = true; }, ms);
+  }
+
+  /** Fehler sichtbar machen, statt leer zu bleiben. */
+  showError(text: string) {
+    this.loading.hidden = false;
+    this.loading.classList.add('ku-error-text');
+    this.loading.textContent = text;
+  }
+
   setGraph(data: GraphData) {
     this.data = data;
+    this.loading.hidden = true;
     this.empty.hidden = data.noteCount > 0;
     this.buildFilterPanel();
     this.applyFilter();
@@ -198,7 +219,7 @@ export class UniverseUI {
     const row = el('label', 'ku-row');
     row.appendChild(el('span', undefined, 'Qualität'));
     const sel = el('select');
-    for (const [v, t] of [['auto', 'Automatisch'], ['low', 'Niedrig'], ['medium', 'Mittel'], ['high', 'Hoch']]) {
+    for (const [v, t] of [['auto', 'Automatisch'], ['minimal', 'Minimal'], ['low', 'Niedrig'], ['medium', 'Mittel'], ['high', 'Hoch']]) {
       const o = el('option', undefined, t); o.value = v; if (v === s.quality) o.selected = true; sel.appendChild(o);
     }
     sel.addEventListener('change', () => { s.quality = sel.value as UniverseSettings['quality']; this.actions.settingsChanged({ quality: s.quality }, true); });

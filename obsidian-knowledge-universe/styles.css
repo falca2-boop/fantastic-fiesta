@@ -96,6 +96,11 @@
 
 .ku-empty, .ku-error { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); max-width: 360px; text-align: center; font-size: 13px; color: rgba(236, 238, 242, 0.6); line-height: 1.6; }
 
+.ku-hint { position: absolute; left: 18px; bottom: 74px; max-width: min(420px, calc(100% - 36px)); display: flex; align-items: center; gap: 8px; padding: 8px 8px 8px 14px; border-radius: 12px;
+  background: rgba(30, 22, 8, 0.85); border: 1px solid rgba(255, 170, 0, 0.4); color: #ffe2b0; font-size: 12px; line-height: 1.45; backdrop-filter: blur(12px); }
+.ku-hint .ku-btn { width: 26px; height: 26px; flex: none; }
+.ku-error-text { color: #ffb3b3; max-width: 520px; user-select: text; }
+
 @media (max-width: 640px) {
   .ku-search { width: 150px; } .ku-search:focus-within { width: 190px; }
   .ku-details { left: 12px; right: 12px; width: auto; bottom: 70px; }

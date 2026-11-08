@@ -37,7 +37,7 @@ export interface GraphData {
   tags: { tag: string; count: number }[];
 }
 
-export type Quality = 'auto' | 'low' | 'medium' | 'high';
+export type Quality = 'auto' | 'minimal' | 'low' | 'medium' | 'high';
 export type OpenMode = 'split' | 'tab' | 'window';
 
 export interface UniverseSettings {

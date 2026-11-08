@@ -12,8 +12,8 @@ export class UniverseSettingTab extends PluginSettingTab {
     const save = async (rebuild: boolean) => { await this.plugin.saveSettings(rebuild); };
 
     new Setting(containerEl).setName('Qualität')
-      .setDesc('Anzahl der Partikel: niedrig ≈ 3.000, mittel ≈ 6.000, hoch ≈ 10.000. „Automatisch“ wählt nach Rechner und senkt die Auflösung bei Rucklern.')
-      .addDropdown((d) => d.addOptions({ auto: 'Automatisch', low: 'Niedrig', medium: 'Mittel', high: 'Hoch' })
+      .setDesc('Partikel: minimal ≈ 1.500 bei halber Auflösung und ohne Bloom, niedrig ≈ 3.000, mittel ≈ 6.500, hoch ≈ 10.000. „Automatisch“ erkennt Rechner ohne Grafikbeschleunigung und wählt dann „Minimal“.')
+      .addDropdown((d) => d.addOptions({ auto: 'Automatisch', minimal: 'Minimal (ohne Grafikbeschleunigung)', low: 'Niedrig', medium: 'Mittel', high: 'Hoch' })
         .setValue(s.quality).onChange(async (v) => { s.quality = v as Quality; await save(true); }));
 
     new Setting(containerEl).setName('Leuchten (Bloom)').setDesc('Stärke des Leucht-Effekts.')

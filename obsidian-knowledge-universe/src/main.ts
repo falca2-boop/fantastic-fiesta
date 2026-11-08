@@ -1,4 +1,4 @@
-import { Plugin, WorkspaceLeaf } from 'obsidian';
+import { Notice, Plugin, WorkspaceLeaf } from 'obsidian';
 import { UniverseSettingTab } from './settings';
 import { DEFAULT_SETTINGS, UniverseSettings } from './types';
 import { UniverseView, VIEW_TYPE_UNIVERSE } from './GraphView';
@@ -15,6 +15,11 @@ export default class KnowledgeUniversePlugin extends Plugin {
   }
 
   async activateView() {
+    try { await this.openUniverse(); }
+    catch (err) { console.error('[Knowledge Universe] Öffnen fehlgeschlagen', err); new Notice('Knowledge Universe konnte nicht geöffnet werden: ' + (err instanceof Error ? err.message : String(err))); }
+  }
+
+  private async openUniverse() {
     const { workspace } = this.app;
     let leaf: WorkspaceLeaf | undefined = workspace.getLeavesOfType(VIEW_TYPE_UNIVERSE)[0];
     if (!leaf) {

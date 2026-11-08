@@ -41,36 +41,47 @@ export class UniverseView extends ItemView {
       });
     } catch (err) {
       console.error('[Knowledge Universe] WebGL konnte nicht gestartet werden', err);
-      root.createDiv({ cls: 'ku-error', text: 'WebGL ist in dieser Umgebung nicht verfügbar. Die 3D-Ansicht kann nicht gestartet werden.' });
+      const why = err instanceof Error ? err.message : String(err);
+      root.createDiv({ cls: 'ku-error', text: 'WebGL 2 ist in dieser Umgebung nicht verfügbar, die 3D-Ansicht kann nicht starten. (' + why.slice(0, 160) + ')' });
       return;
     }
 
-    this.ui = new UniverseUI(root, this.plugin.settings, {
-      zoom: (f) => this.renderer?.zoomBy(f),
-      reset: () => this.renderer?.resetView(),
-      togglePause: () => { const r = this.renderer; if (!r) return false; r.setPaused(!r.isPaused); return r.isPaused; },
-      fullscreen: () => {
-        if (document.fullscreenElement) void document.exitFullscreen();
-        else void root.requestFullscreen?.().catch(() => new Notice('Vollbild wird hier nicht unterstützt.'));
-      },
-      search: (q) => this.search(q),
-      highlight: (idx) => this.renderer?.setSearchHighlight(idx),
-      focusNode: (i) => { this.renderer?.focusNode(i); this.renderer?.setSelected(i); },
-      openNode: (i) => void this.openNode(i),
-      setHidden: (mask) => this.renderer?.setHiddenMask(mask),
-      settingsChanged: (patch, rebuild) => { Object.assign(this.plugin.settings, patch); void this.plugin.saveSettings(rebuild); },
-    });
+    try {
+      this.ui = new UniverseUI(root, this.plugin.settings, {
+        zoom: (f) => this.renderer?.zoomBy(f),
+        reset: () => this.renderer?.resetView(),
+        togglePause: () => { const r = this.renderer; if (!r) return false; r.setPaused(!r.isPaused); return r.isPaused; },
+        fullscreen: () => {
+          if (document.fullscreenElement) void document.exitFullscreen();
+          else void root.requestFullscreen?.().catch(() => new Notice('Vollbild wird hier nicht unterstützt.'));
+        },
+        search: (q) => this.search(q),
+        highlight: (idx) => this.renderer?.setSearchHighlight(idx),
+        focusNode: (i) => { this.renderer?.focusNode(i); this.renderer?.setSelected(i); },
+        openNode: (i) => void this.openNode(i),
+        setHidden: (mask) => this.renderer?.setHiddenMask(mask),
+        settingsChanged: (patch, rebuild) => { Object.assign(this.plugin.settings, patch); void this.plugin.saveSettings(rebuild); },
+      });
 
-    // Der Vault ändert sich: Graph nach kurzer Ruhephase aktualisieren
-    const isMd = (f: unknown) => f instanceof TFile && f.extension === 'md';
-    this.registerEvent(this.app.metadataCache.on('resolved', () => this.refresh()));
-    this.registerEvent(this.app.metadataCache.on('changed', () => this.refresh()));
-    this.registerEvent(this.app.metadataCache.on('deleted', () => this.refresh()));
-    this.registerEvent(this.app.vault.on('create', (f) => { if (isMd(f)) this.refresh(); }));
-    this.registerEvent(this.app.vault.on('delete', (f) => { if (isMd(f)) this.refresh(); }));
-    this.registerEvent(this.app.vault.on('rename', (f) => { if (isMd(f)) this.refresh(); }));
+      // Der Vault ändert sich: Graph nach kurzer Ruhephase aktualisieren
+      const isMd = (f: unknown) => f instanceof TFile && f.extension === 'md';
+      this.registerEvent(this.app.metadataCache.on('resolved', () => this.refresh()));
+      this.registerEvent(this.app.metadataCache.on('changed', () => this.refresh()));
+      this.registerEvent(this.app.metadataCache.on('deleted', () => this.refresh()));
+      this.registerEvent(this.app.vault.on('create', (f) => { if (isMd(f)) this.refresh(); }));
+      this.registerEvent(this.app.vault.on('delete', (f) => { if (isMd(f)) this.refresh(); }));
+      this.registerEvent(this.app.vault.on('rename', (f) => { if (isMd(f)) this.refresh(); }));
 
-    this.reload(true);
+      if (this.renderer.simplified) this.ui.showHint(this.renderer.softwareMode
+        ? 'Keine Grafikbeschleunigung erkannt: vereinfachte Darstellung (halbe Auflösung, weniger Partikel). Bei Bedarf unter Einstellungen → Qualität ändern.'
+        : 'Vereinfachte Darstellung (Qualität „Minimal“).');
+      this.reload(true);
+    } catch (err) {
+      console.error('[Knowledge Universe] Start fehlgeschlagen', err);
+      const msg = err instanceof Error ? err.message : String(err);
+      this.ui?.showError('Start fehlgeschlagen: ' + msg);
+      if (!this.ui) root.createDiv({ cls: 'ku-error', text: 'Start fehlgeschlagen: ' + msg });
+    }
   }
 
   async onClose() {

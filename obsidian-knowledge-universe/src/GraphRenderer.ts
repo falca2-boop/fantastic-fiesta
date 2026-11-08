@@ -21,13 +21,39 @@ export type RenderSettings = Pick<UniverseSettings, 'quality' | 'bloom' | 'rotat
 
 const BG = 0x030305;
 const BUDGETS: Record<Exclude<Quality, 'auto'>, { particles: number; lines: number }> = {
+  minimal: { particles: 1500, lines: 0 },
   low: { particles: 3000, lines: 4500 },
   medium: { particles: 6500, lines: 9000 },
   high: { particles: 10000, lines: 16000 },
 };
 
+let softwareGL: boolean | null = null;
+
+/** Erkennt WebGL ohne Grafikbeschleunigung (Software-Rendering auf dem Prozessor), z. B. bei Linux-Apps auf Chromebooks. */
+export function isSoftwareGL(): boolean {
+  if (softwareGL !== null) return softwareGL;
+  softwareGL = false;
+  try {
+    const c = document.createElement('canvas');
+    const strict = c.getContext('webgl2', { failIfMajorPerformanceCaveat: true });
+    if (!strict) {
+      const c2 = document.createElement('canvas');
+      const gl2 = c2.getContext('webgl2');
+      softwareGL = !!gl2;                                  // WebGL2 gibt es, aber nur mit Leistungseinbußen
+      gl2?.getExtension('WEBGL_lose_context')?.loseContext();
+    } else {
+      const ext = strict.getExtension('WEBGL_debug_renderer_info');
+      const name = String(ext ? strict.getParameter(ext.UNMASKED_RENDERER_WEBGL) : strict.getParameter(strict.RENDERER));
+      softwareGL = /swiftshader|llvmpipe|softpipe|software|basic render/i.test(name);
+      strict.getExtension('WEBGL_lose_context')?.loseContext();
+    }
+  } catch { softwareGL = false; }
+  return softwareGL;
+}
+
 export function resolveQuality(q: Quality): Exclude<Quality, 'auto'> {
   if (q !== 'auto') return q;
+  if (isSoftwareGL()) return 'minimal';
   const cores = navigator.hardwareConcurrency || 4;
   const small = Math.min(window.innerWidth, window.innerHeight) < 600;
   if (small || cores <= 4) return 'low';
@@ -78,6 +104,8 @@ export class GraphRenderer {
   private perfSlowFrames = 0;
   private perfLevel = 0;
   private bloomForcedOff = false;
+  private frameInterval = 0;          // Mindestabstand zwischen gerenderten Bildern (ms), 0 = unbegrenzt
+  private lastRender = 0;
   private resizeObs: ResizeObserver;
   private intersectObs?: IntersectionObserver;
 
@@ -99,8 +127,9 @@ export class GraphRenderer {
     this.renderer.setClearColor(0x000000, 1);
     this.scene.background = new THREE.Color(BG);
     this.basePixelRatio = Math.min(window.devicePixelRatio || 1, 2);
-    this.pixelRatio = this.basePixelRatio;
+    this.pixelRatio = this.desiredPixelRatio();
     this.renderer.setPixelRatio(this.pixelRatio);
+    this.updateFrameCap();
 
     this.camera = new THREE.PerspectiveCamera(55, 1, 1, 8000);
     this.camera.position.set(0, 40, 260);
@@ -222,7 +251,7 @@ export class GraphRenderer {
     const scale = this.perfLevel >= 2 ? 0.6 : 1;
     this.built = buildGeometry(this.data, {
       budget: Math.round(q.particles * scale), ambientBudget: Math.round(q.lines * scale),
-      ambient: this.settings.ambientLines && this.perfLevel < 3, restLength: this.layout.restLength,
+      ambient: this.settings.ambientLines && this.perfLevel < 3 && q.lines > 0, restLength: this.layout.restLength,
     });
     const add = (o: THREE.Object3D) => { o.frustumCulled = false; this.scene.add(o); this.objects.push(o); };
     add(new THREE.Points(this.built.dust, this.pointsMat));
@@ -236,10 +265,18 @@ export class GraphRenderer {
 
   /** Ändert Einstellungen. Gibt true zurück, wenn die Geometrie neu aufgebaut werden musste. */
   applySettings(s: RenderSettings): boolean {
-    const rebuild = !!this.data && (s.quality !== this.settings.quality || s.ambientLines !== this.settings.ambientLines);
+    const qualityChanged = s.quality !== this.settings.quality;
+    const rebuild = !!this.data && (qualityChanged || s.ambientLines !== this.settings.ambientLines);
     this.settings = s;
+    if (qualityChanged) {
+      this.perfLevel = 0; this.bloomForcedOff = false;
+      this.pixelRatio = this.desiredPixelRatio();
+      this.updateFrameCap();
+      this.resize();
+    }
+    const minimal = resolveQuality(s.quality) === 'minimal';
     this.bloom.strength = s.bloom;
-    this.bloom.enabled = s.bloom > 0.01 && !this.bloomForcedOff;
+    this.bloom.enabled = s.bloom > 0.01 && !this.bloomForcedOff && !minimal;
     this.uniforms.uPulse.value = s.pulses ? 1 : 0;
     this.controls.autoRotate = !this.paused && s.rotationSpeed > 0;
     this.controls.autoRotateSpeed = s.rotationSpeed * 1.2;
@@ -420,6 +457,19 @@ export class GraphRenderer {
     this.updateScale();
   }
   private applyPixelRatio() { this.renderer.setPixelRatio(this.pixelRatio); }
+
+  /** Auflösung nach Qualität: ohne Grafikbeschleunigung deutlich niedriger. */
+  private desiredPixelRatio(): number {
+    const q = resolveQuality(this.settings.quality);
+    if (q === 'minimal') return Math.min(this.basePixelRatio, 0.5);
+    if (isSoftwareGL()) return Math.min(this.basePixelRatio, 0.75);
+    return this.basePixelRatio;
+  }
+  private updateFrameCap() { this.frameInterval = resolveQuality(this.settings.quality) === 'minimal' ? 1000 / 24 : 0; }
+
+  /** true, wenn die Darstellung vereinfacht läuft (keine Grafikbeschleunigung oder Qualität „Minimal“). */
+  get simplified(): boolean { return resolveQuality(this.settings.quality) === 'minimal'; }
+  get softwareMode(): boolean { return isSoftwareGL(); }
   private updateScale() {
     const h = this.renderer.domElement.height;
     this.uniforms.uScale.value = h / (2 * Math.tan((this.camera.fov * Math.PI) / 360));
@@ -430,6 +480,7 @@ export class GraphRenderer {
     if (this.disposed) return;
     this.raf = requestAnimationFrame(this.loop);
     const now = performance.now();
+    if (this.frameInterval && now - this.lastT < this.frameInterval) return;
     const dt = Math.min(0.05, (now - this.lastT) / 1000);
     const raw = now - this.lastT;
     this.lastT = now;
@@ -471,13 +522,15 @@ export class GraphRenderer {
 
   /** Senkt bei Rucklern schrittweise Auflösung, dann Partikelzahl und Bloom. */
   private monitorPerformance(frameMs: number) {
-    if (this.settings.quality !== 'auto' || frameMs > 250) return;
+    if (frameMs > 250) return;
+    if (this.settings.quality !== 'auto' && !(this.simplified && this.pixelRatio > 0.3)) return;
     this.perfEma += (frameMs - this.perfEma) * 0.05;
     if (this.perfEma > 34) this.perfSlowFrames++; else this.perfSlowFrames = Math.max(0, this.perfSlowFrames - 1);
     if (this.perfSlowFrames < 90 || this.perfLevel >= 3) return;
     this.perfSlowFrames = 0;
     this.perfLevel++;
-    if (this.perfLevel === 1) { this.pixelRatio = Math.max(0.75, this.basePixelRatio * 0.7); this.resize(); }
+    if (this.simplified) { this.pixelRatio = Math.max(0.3, this.pixelRatio * 0.75); this.perfLevel = Math.min(this.perfLevel, 1); this.resize(); }
+    else if (this.perfLevel === 1) { this.pixelRatio = Math.max(0.75, this.basePixelRatio * 0.7); this.resize(); }
     else if (this.perfLevel === 2) { this.rebuildGeometry(); }
     else { this.bloomForcedOff = true; this.bloom.enabled = false; this.rebuildGeometry(); }
     this.perfEma = 16;

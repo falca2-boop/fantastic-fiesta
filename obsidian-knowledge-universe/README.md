@@ -93,7 +93,9 @@ Farben: Electric Orange, Neon Pink, Magenta, Cyan, Violett, Gold (`PALETTE` in `
 
 ## Hinweise und Grenzen
 
-- Benötigt WebGL 2. Ohne Grafikbeschleunigung zeigt die Ansicht eine Meldung.
+- Benötigt WebGL 2. Fehlt es ganz, zeigt die Ansicht eine Meldung mit dem Grund.
+- **Ohne Grafikbeschleunigung** (z. B. Obsidian als Linux-App auf einem Chromebook, WebGL läuft dann auf dem Prozessor) erkennt das Plugin das und startet im Modus „Minimal“: halbe Auflösung, ca. 1.500 Partikel, kein Bloom, 24 Bilder pro Sekunde. Ein Hinweis unten links erklärt das. Unter *Einstellungen → Qualität* lässt sich das ändern.
+- Fehler beim Start erscheinen als Text in der Ansicht und in der Entwicklerkonsole (Strg + Umschalt + I).
 - Sehr große Vaults (mehrere Tausend Notizen): die Simulation formt das Universum live über einige Sekunden. Qualität „Niedrig“ hilft auf schwächeren Rechnern.
 - Nicht aufgelöste Links (auf Notizen, die es noch nicht gibt) werden nicht dargestellt.
 - Dateien außer Markdown (Bilder, PDFs) sind keine Knoten.
