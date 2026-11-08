@@ -141,7 +141,7 @@
     if (window.Orb && window.Orb.burst && !interim) window.Orb.burst(who === 'user' ? 5 : 9);
     while (dialog.children.length > 60) dialog.removeChild(dialog.firstChild);
     dialog.scrollTop = dialog.scrollHeight;
-    return { remove: () => m.remove(), set textContent(t) { m.querySelector('.bubble').textContent = t; } };
+    return { node: m.querySelector('.bubble'), remove: () => m.remove(), set textContent(t) { m.querySelector('.bubble').textContent = t; } };
   }
   let typingEl = null;
   function showTyping(on) {
@@ -170,7 +170,29 @@
     saveSpoken(seen);
     return out.join(' ').trim();
   }
-  function jarvisSay(text) { addBubble(text, 'jarvis'); const t = freshSpeech(text); if (t) speak(t); }
+  // Analyse-Modus: Text vor <<SPRICH>> erscheint formatiert im Chat, nur der Teil danach wird gesprochen.
+  const stripMd = (s) => s.replace(/^#+\s*/gm, '').replace(/\*\*/g, '').replace(/^\s*[-*]\s+/gm, '').trim();
+  function renderRich(node, text) {
+    node.textContent = ''; node.classList.add('rich');
+    let list = null;
+    const inline = (parent, t) => t.split(/(\*\*[^*]+\*\*)/).forEach((part) => {
+      if (/^\*\*[^*]+\*\*$/.test(part)) parent.appendChild(el('strong', '', part.slice(2, -2))); else if (part) parent.appendChild(document.createTextNode(part));
+    });
+    for (const raw of text.split('\n')) {
+      const line = raw.trimEnd();
+      const h = line.match(/^#{1,4}\s+(.*)/), li = line.match(/^\s*[-*]\s+(.*)/);
+      if (li) { if (!list) { list = el('ul'); node.appendChild(list); } const i = el('li'); inline(i, li[1]); list.appendChild(i); continue; }
+      list = null;
+      if (h) node.appendChild(el('h4', '', h[1])); else if (line.trim()) { const p = el('p'); inline(p, line); node.appendChild(p); }
+    }
+  }
+  function jarvisSay(text) {
+    const [shown, spokenPart] = String(text).split('<<SPRICH>>');
+    const bubble = addBubble(shown.trim(), 'jarvis');
+    if (/^#{1,4}\s|^\s*[-*]\s/m.test(shown) && bubble.node) renderRich(bubble.node, shown.trim());
+    const t = freshSpeech(stripMd(spokenPart ? spokenPart.trim() : shown));
+    if (t) speak(t);
+  }
 
   const fmtTime = (iso) => new Date(iso).toLocaleString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
   function relTime(iso) {

@@ -51,6 +51,15 @@ try {
   await page.waitForTimeout(1500);
   await say('Hej Dscharwis Plane meinen Tag'); await page.waitForTimeout(600);
   check('Variante "Dscharwis" + Befehl im selben Satz', (await userCount()).includes('Plane meinen Tag'));
+  // Analyse-Modus: formatierter Chat-Text, gesprochen wird nur der Teil nach <<SPRICH>>
+  await page.route('**/api/chat', (route) => route.fulfill({ json: { reply: '## Kernaussage\nDas ist **wichtig**.\n## Nächste Schritte\n- Erstens testen\n- Zweitens starten\n<<SPRICH>>\nMeine Empfehlung: Erst testen, dann starten.', state: { tasks: [], reminders: [], notes: [], goal: null } } }));
+  await page.waitForTimeout(1500);
+  await say('Hey Jarvis analysiere meine Strategie'); await page.waitForTimeout(1200);
+  check('Analyse: Überschriften und Liste werden formatiert', (await page.locator('.bubble.rich h4').count()) === 2 && (await page.locator('.bubble.rich li').count()) === 2);
+  check('Analyse: Fettdruck wird dargestellt', (await page.locator('.bubble.rich strong').textContent()) === 'wichtig');
+  check('Analyse: Marker steht nicht im Chat', !(await page.locator('.msg.jarvis').last().textContent()).includes('SPRICH'));
+  const sp = await page.evaluate(() => window.__spoken);
+  check('Analyse: gesprochen wird nur die Kurzfassung', sp[sp.length - 1] === 'Meine Empfehlung: Erst testen, dann starten.', JSON.stringify(sp.slice(-1)));
   check('Keine Seitenfehler (Fall 1)', errs.length === 0, errs.join('|'));
   await ctx.close();
 
