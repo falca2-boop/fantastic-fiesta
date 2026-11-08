@@ -93,3 +93,26 @@ test('Listener: erkennt Doppelklatscher in einem Aufnahmestrom und startet Jarvi
   assert.equal(await launch({ ok: true, uiActive: true }), false);    // schon offen: nichts passiert
   fs.rmSync(dir, { recursive: true, force: true });
 });
+
+test('Listener: "Hey Jarvis" vom Wake-Word-Programm startet Jarvis, außer die Seite ist offen', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'wake-'));
+  const pcm = path.join(dir, 'a.pcm');
+  fs.writeFileSync(pcm, Buffer.from(synth(2500, []).buffer));       // nur Rauschen: der Treffer kommt allein vom Wake-Word-Programm
+  const listener = fileURLToPath(new URL('../scripts/clap-listener.js', import.meta.url));
+  // Attrappe des Wake-Word-Programms: meldet WAKE, sobald Audio ankommt
+  const fakeWorker = `${process.execPath} -e "console.log('READY');process.stdin.once('data',()=>console.log('WAKE 0.97'));process.stdin.resume()"`;
+  const run1 = async (uiActive, trigger) => {
+    const marker = path.join(dir, 'm' + Math.random());
+    const http = await import('node:http');
+    const srv = http.createServer((_q, res) => { res.setHeader('content-type', 'application/json'); res.end(JSON.stringify({ ok: true, uiActive })); });
+    await new Promise((r) => srv.listen(0, '127.0.0.1', r));
+    const env = { ...process.env, JARVIS_TRIGGER: trigger, WAKE_WORKER_CMD: fakeWorker, CLAP_RECORDER_CMD: `cat ${pcm}; sleep 2`, JARVIS_LAUNCH_CMD: `touch ${marker}`, JARVIS_PORT: String(srv.address().port), CLAP_ONCE: '1' };
+    await new Promise((resolve) => { const p = spawn(process.execPath, [listener], { env, stdio: 'ignore' }); p.on('exit', resolve); setTimeout(() => p.kill(), 8000); });
+    srv.close();
+    return fs.existsSync(marker);
+  };
+  assert.equal(await run1(false, 'wake'), true);     // Jarvis nicht offen: wird gestartet
+  assert.equal(await run1(true, 'wake'), false);     // schon offen: nichts
+  assert.equal(await run1(false, 'clap'), false);    // Auslöser "clap": Wake-Word wird ignoriert
+  fs.rmSync(dir, { recursive: true, force: true });
+});

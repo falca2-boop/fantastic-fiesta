@@ -1,9 +1,12 @@
 #!/usr/bin/env bash
-# Richtet "zweimal klatschen öffnet Jarvis" als Hintergrunddienst ein (systemd, startet beim Anmelden automatisch).
-# Einmal ausführen:  bash scripts/install-clap.sh      Entfernen:  systemctl --user disable --now jarvis-clap
+# Richtet "Hey Jarvis" und/oder "zweimal klatschen" als Hintergrunddienst ein, der Jarvis öffnet (systemd, startet beim Anmelden automatisch).
+# Einmal ausführen:  bash scripts/install-clap.sh
+# Nur eins davon:    JARVIS_TRIGGER=wake bash scripts/install-clap.sh   (oder clap; Standard: both)
+# Entfernen:         systemctl --user disable --now jarvis-clap
 set -euo pipefail
 
 DIR="$(cd "$(dirname "$0")/.." && pwd)"
+TRIGGER="${JARVIS_TRIGGER:-both}"
 NODE="$(command -v node || true)"
 [ -n "$NODE" ] || { echo "Node.js nicht gefunden." >&2; exit 1; }
 
@@ -14,6 +17,9 @@ if ! command -v parecord >/dev/null 2>&1 && ! command -v arecord >/dev/null 2>&1
     sudo -n apt-get install -y pulseaudio-utils || { echo; echo "Bitte einmal von Hand ausführen und danach dieses Skript noch einmal:  sudo apt install -y pulseaudio-utils"; exit 1; }
   fi
 fi
+
+# 1b) "Hey Jarvis": Erkenner installieren
+case "$TRIGGER" in wake|both) bash "$DIR/scripts/install-wake.sh" ;; esac
 
 # 2) Das Jarvis-Symbol / jarvis-start muss existieren
 [ -x "$HOME/.local/bin/jarvis-start" ] || bash "$DIR/scripts/install-launcher.sh"
@@ -31,6 +37,7 @@ Restart=always
 RestartSec=5
 Environment=PATH=/usr/local/bin:/usr/bin:/bin:%h/.local/bin
 Environment=JARVIS_PORT=8001
+Environment=JARVIS_TRIGGER=$TRIGGER
 
 [Install]
 WantedBy=default.target
@@ -44,6 +51,7 @@ else
   echo "  nohup $NODE $DIR/scripts/clap-listener.js >/dev/null 2>&1 &"
 fi
 echo
+echo "Auslöser: $TRIGGER   (wake = Hey Jarvis, clap = zweimal klatschen, both = beides)"
 echo "Mikrofon testen (zeigt live einen Pegel, startet Jarvis nicht):  node $DIR/scripts/clap-listener.js --test"
 echo "Wichtig: ChromeOS-Einstellungen → Entwickler → Linux → Mikrofon erlauben (danach Linux neu starten)."
 echo "Zu empfindlich oder zu unempfindlich? Umgebungsvariable CLAP_SENSITIVITY (1 bis 10, Standard 6) in der Datei $UNITDIR/jarvis-clap.service ändern."
