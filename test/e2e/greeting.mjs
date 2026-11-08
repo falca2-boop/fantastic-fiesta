@@ -13,7 +13,7 @@ const b = await chromium.launch();
 const out = [];
 const check = (n, ok, x = '') => out.push((ok ? 'OK   ' : 'FAIL ') + n + (x ? '  ' + x : ''));
 const mocks = (blocked) => `
-  window.__spoken = []; window.__recs = []; window.__blocked = ${blocked};
+  window.__spoken = []; window.__recs = []; window.__blocked = ${blocked}; window.JARVIS_FOLLOW_MS = 1500;
   class SR { constructor() { window.__recs.push(this); this.starts = 0; } start() { this.starts++; this.running = true; this.onstart && this.onstart(); } stop() { this.running = false; setTimeout(() => this.onend && this.onend(), 0); } abort() { this.stop(); } }
   window.SpeechRecognition = window.webkitSpeechRecognition = SR;
   class U { constructor(t) { this.text = t; } }
@@ -36,15 +36,26 @@ try {
   await page.evaluate(() => { const r = window.__recs[0]; const res = [[{ transcript: 'Wie spät ist es' }]]; res[0].isFinal = true; r.onresult({ resultIndex: 0, results: res }); });
   await page.waitForTimeout(800);
   check('Der erste Befehl wird ohne "Hey Jarvis" angenommen', (await page.locator('.msg.user .bubble').allTextContents()).includes('Wie spät ist es'));
+  const sayNow = (t) => page.evaluate((t) => { const r = window.__recs[0]; const res = [[{ transcript: t }]]; res[0].isFinal = true; r.onresult({ resultIndex: 0, results: res }); }, t);
+  await sayNow('Und morgen?'); await page.waitForTimeout(500);
+  check('Nach einer Antwort geht das Gespräch weiter: Folgefrage ohne „Hey Jarvis“ wird angenommen', (await page.locator('.msg.user .bubble').allTextContents()).includes('Und morgen?'));
+  check('Nach der Antwort zeigt Jarvis „Ich höre weiter zu“', /weiter zu/.test(await page.locator('#heard').textContent()));
   await page.waitForTimeout(500);
-  check('Kostenanzeige im Kasten System zeigt den echten Verbrauch (≈ 0,01 $, 5.100 Token)', /Heute.*≈ 0,01 \$ · 5\.100 Token/.test((await page.locator('#usageBox').textContent()).replace(/\s+/g, ' ')), (await page.locator('#usageBox').textContent()).replace(/\s+/g, ' '));
+  check('Kostenanzeige im Kasten System zeigt den echten Verbrauch (zwei Antworten: ≈ 0,02 $, 10.200 Token)', /Heute.*≈ 0,02 \$ · 10\.200 Token/.test((await page.locator('#usageBox').textContent()).replace(/\s+/g, ' ')), (await page.locator('#usageBox').textContent()).replace(/\s+/g, ' '));
   check('Es wird nur einmal begrüßt', (await page.evaluate(() => window.__spoken.filter((t) => t === 'Hey Boss.').length)) === 1);
   // Wake-Word: ohne "Jarvis" ignorieren, nur "Hey Jarvis" -> zuhören, danach Befehl; Variante mit Befehl im selben Satz
   const say = (t) => page.evaluate((t) => { const r = window.__recs[0]; const res = [[{ transcript: t }]]; res[0].isFinal = true; r.onresult({ resultIndex: 0, results: res }); }, t);
-  await page.waitForTimeout(500);
+  await page.waitForTimeout(300);
+  await page.waitForTimeout(2800);
   const userCount = async () => (await page.locator('.msg.user .bubble').allTextContents());
   await say('Das Wetter ist schön'); await page.waitForTimeout(400);
   check('Sprache ohne "Jarvis" wird ignoriert', !(await userCount()).includes('Das Wetter ist schön'));
+  // „Hey Jarvis“ nur als Zwischenergebnis (Chrome liefert das Endergebnis oft spät): Jarvis antwortet trotzdem von selbst
+  const nBefore = (await page.evaluate(() => window.__spoken)).length;
+  await page.evaluate(() => { const r = window.__recs[0]; r.onresult({ resultIndex: 0, results: [Object.assign([{ transcript: 'Hey Jarvis' }], { isFinal: false })] }); });
+  await page.waitForTimeout(1500);
+  check('„Hey Jarvis“ wird schon nach dem Zwischenergebnis beantwortet', (await page.evaluate(() => window.__spoken)).length > nBefore);
+  await page.waitForTimeout(600);
   await say('Hey Jarvis'); await page.waitForTimeout(400);
   check('"Hey Jarvis" zeigt "Ja? Sag deinen Befehl"', (await page.locator('#heard.wake').textContent()).includes('Befehl'));
   const ACKS = ['Ja, ich bin da.', 'Klar, ich höre dir zu.', 'Schieß los, ich bin ganz Ohr.', 'Immer. Was gibt es?', 'Ja? Sag an.', 'Hey, ich bin da. Was brauchst du?'];
@@ -64,6 +75,10 @@ try {
   check('Analyse: Marker steht nicht im Chat', !(await page.locator('.msg.jarvis').last().textContent()).includes('SPRICH'));
   const sp = await page.evaluate(() => window.__spoken);
   check('Analyse: gesprochen wird nur die Kurzfassung', sp[sp.length - 1] === 'Meine Empfehlung: Erst testen, dann starten.', JSON.stringify(sp.slice(-1)));
+  await page.reload(); await page.waitForTimeout(1500);
+  check('Chatverlauf bleibt nach dem Neuladen erhalten', (await page.locator('.chat-sep').count()) === 2 && (await page.locator('.msg.user .bubble').allTextContents()).includes('Wie spät ist es') && (await page.locator('.msg.user .bubble').allTextContents()).includes('Plane meinen Tag'));
+  check('Wiederhergestellte Analyse bleibt formatiert', (await page.locator('.bubble.rich h4').count()) >= 1);
+  check('Begrüßung wird nicht als Verlauf gespeichert (nur die neue)', (await page.locator('.msg.jarvis .bubble', { hasText: /^Hey Boss\.$/ }).count()) === 1);
   check('Keine Seitenfehler (Fall 1)', errs.length === 0, errs.join('|'));
   await ctx.close();
 

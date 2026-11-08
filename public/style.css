@@ -322,3 +322,5 @@ canvas#orb { width: 100%; height: 100%; display: block; cursor: pointer; }
 .usage .urow span:last-child { color: var(--text); text-align: right; white-space: normal; }
 .usage .urow.bad span:last-child { color: var(--danger); }
 .usage .urow.warn span:last-child { color: var(--warn); }
+
+.chat-sep { text-align: center; color: var(--muted); font-size: 0.72rem; letter-spacing: 0.14em; text-transform: uppercase; padding: 8px 0; }

@@ -59,10 +59,12 @@
     setState('speaking');
     if (recognition && listening) { try { recognition.stop(); } catch (e) {} }
   }
+  const followMs = () => window.JARVIS_FOLLOW_MS || 15000;   // so lange gilt nach einer Antwort jede Äußerung als Folgefrage
+  function keepListening() { armedUntil = Date.now() + followMs(); showHeard('Ich höre weiter zu – sag einfach etwas, oder „Hey Jarvis“.', 'wake'); }
   let armAfterSpeech = false;     // nach der Begrüßung sofort einen Befehl ohne "Hey Jarvis" annehmen
   function doneSpeaking() {
     setState(listening ? 'listening' : 'idle');
-    if (armAfterSpeech && listening) { armAfterSpeech = false; armedUntil = Date.now() + ARM_MS; }
+    if (armAfterSpeech && listening) { armAfterSpeech = false; keepListening(); }
     if (listening) restartRecognition();
   }
   function stopSpeaking() {
@@ -132,13 +134,21 @@
   }
 
   const hhmm = (d) => d.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
-  function addBubble(text, who, interim) {
+  // Chatverlauf bleibt über Neuladen erhalten (im Browser gespeichert, die letzten 60 Nachrichten)
+  const CHAT_KEY = 'jarvis.chat';
+  const loadChat = () => { try { return JSON.parse(localStorage.getItem(CHAT_KEY) || '[]'); } catch (e) { return []; } };
+  const saveChat = (item) => { try { const l = loadChat(); l.push(item); localStorage.setItem(CHAT_KEY, JSON.stringify(l.slice(-60))); } catch (e) {} };
+  const stampText = (ts) => { const d = new Date(ts); return d.toDateString() === new Date().toDateString() ? hhmm(d) : d.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' }) + ' ' + hhmm(d); };
+  /** opts: { save: false } für Begrüßung und Hinweise, { ts } beim Wiederherstellen */
+  function addBubble(text, who, interim, opts) {
+    const o = opts || {};
+    const ts = o.ts || Date.now();
     const m = el('div', 'msg ' + who + (interim ? ' interim' : ''));
     const meta = el('div', 'meta');
-    meta.append(el('span', '', who === 'user' ? 'Du' : 'Jarvis'), el('span', '', hhmm(new Date())));
+    meta.append(el('span', '', who === 'user' ? 'Du' : 'Jarvis'), el('span', '', stampText(ts)));
     m.append(meta, el('div', 'bubble', text));
     dialog.appendChild(m);
-    if (window.Orb && window.Orb.burst && !interim) window.Orb.burst(who === 'user' ? 5 : 9);
+    if (!interim && !o.restore) { if (window.Orb && window.Orb.burst) window.Orb.burst(who === 'user' ? 5 : 9); if (o.save !== false) saveChat({ who, text, ts }); }
     while (dialog.children.length > 60) dialog.removeChild(dialog.firstChild);
     dialog.scrollTop = dialog.scrollHeight;
     return { node: m.querySelector('.bubble'), remove: () => m.remove(), set textContent(t) { m.querySelector('.bubble').textContent = t; } };
@@ -186,12 +196,26 @@
       if (h) node.appendChild(el('h4', '', h[1])); else if (line.trim()) { const p = el('p'); inline(p, line); node.appendChild(p); }
     }
   }
+  const looksRich = (t) => /^#{1,4}\s|^\s*[-*]\s/m.test(t);
+  function restoreChat() {
+    const list = loadChat();
+    if (!list.length) return;
+    dialog.appendChild(el('div', 'chat-sep', 'Früheres Gespräch'));
+    for (const it of list) {
+      const b = addBubble(it.text, it.who, false, { restore: true, ts: it.ts });
+      if (it.who === 'jarvis' && looksRich(it.text) && b.node) renderRich(b.node, it.text);
+    }
+    dialog.appendChild(el('div', 'chat-sep', 'Jetzt'));
+    dialog.scrollTop = dialog.scrollHeight;
+  }
   function jarvisSay(text) {
     const [shown, spokenPart] = String(text).split('<<SPRICH>>');
     const bubble = addBubble(shown.trim(), 'jarvis');
-    if (/^#{1,4}\s|^\s*[-*]\s/m.test(shown) && bubble.node) renderRich(bubble.node, shown.trim());
-    const t = freshSpeech(stripMd(spokenPart ? spokenPart.trim() : shown));
-    if (t) speak(t);
+    if (looksRich(shown) && bubble.node) renderRich(bubble.node, shown.trim());
+    let t = freshSpeech(stripMd(spokenPart ? spokenPart.trim() : shown));
+    if (!t) t = 'Das hatte ich dir gerade schon gesagt.';        // alles schon gesprochen: trotzdem antworten, nur kurz
+    armAfterSpeech = true;                                        // Gespräch geht weiter: Folgefrage ohne „Hey Jarvis“ möglich
+    speak(t).then((ok) => { if (!ok) keepListening(); });
   }
 
   const fmtTime = (iso) => new Date(iso).toLocaleString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
@@ -326,7 +350,7 @@
       if (err.code === 401) { askToken('Bitte Zugangs-Token eingeben.'); setState('idle'); return; }
       const m = addBubble('Das hat nicht geklappt. ' + (err.message || ''), 'jarvis');
       dialog.lastChild.classList.add('error');
-      speak('Hm, das hat gerade nicht geklappt. Versuch es gleich noch einmal.');
+      armAfterSpeech = true; speak('Hm, das hat gerade nicht geklappt. Versuch es gleich noch einmal.');
       setState('idle');
     }
   }
@@ -421,6 +445,7 @@
       });
     } catch (e) { /* ohne Ton: es gibt die visuelle Bestätigung */ }
   }
+  let wakeAckTimer = 0, wakeAcked = false;   // „Hey Jarvis“ schon aus dem Zwischenergebnis beantwortet
   let wakeCued = false;          // Wake-Word schon aus dem Zwischenergebnis bestätigt
   let armedUntil = 0;           // bis wann JARVIS auf einen Befehl wartet
   const ARM_MS = 10000;
@@ -441,8 +466,9 @@
     if (m) {
       // alles nach dem Wake-Word ist der Befehl
       const cmd = text.slice(m.end).replace(/^[\s,.:!?-]+/, '');
-      if (cmd.length > 2) { armedUntil = 0; handleInput(cmd); }
-      else { armedUntil = Date.now() + ARM_MS; armAfterSpeech = true; showHeard('Ja? Sag deinen Befehl …', 'wake'); setState('listening'); acknowledge(); }
+      if (cmd.length > 2) { armedUntil = 0; clearTimeout(wakeAckTimer); wakeAcked = false; handleInput(cmd); }
+      else { armedUntil = Date.now() + ARM_MS; armAfterSpeech = true; showHeard('Ja? Sag deinen Befehl …', 'wake'); setState('listening'); if (!wakeAcked) acknowledge(); }
+      clearTimeout(wakeAckTimer); wakeAcked = false;
       wakeCued = false;
       return;
     }
@@ -466,7 +492,13 @@
       if (interim) {
         showHeard('Ich höre: ' + interim);
         // Wake-Word schon im Zwischenergebnis: sofort bestätigen und auf den Befehl vorbereiten
-        if (window.findWake(interim) && !wakeCued && Date.now() >= armedUntil) { wakeCued = true; armedUntil = Date.now() + ARM_MS; showHeard('Ja? Sag deinen Befehl …', 'wake'); }
+        const wm = window.findWake(interim);
+        if (wm && !wakeCued && Date.now() >= armedUntil) { wakeCued = true; armedUntil = Date.now() + ARM_MS; showHeard('Ja? Sag deinen Befehl …', 'wake'); }
+        // Nur „Hey Jarvis“ gesagt und dann Pause: sofort antworten, ohne auf das späte Endergebnis von Chrome zu warten
+        clearTimeout(wakeAckTimer);
+        if (wm && !interim.slice(wm.end).replace(/[\s,.:!?-]+/g, '')) {
+          wakeAckTimer = setTimeout(() => { wakeAcked = true; armedUntil = Date.now() + ARM_MS; armAfterSpeech = true; acknowledge(); }, 800);
+        }
         if (Date.now() < armedUntil || window.findWake(interim)) {
           if (!interimBubble) interimBubble = addBubble(interim, 'user', true);
           else interimBubble.textContent = interim;
@@ -546,14 +578,15 @@
   const greetText = () => `${ADDRESS}.`;
 
   async function openGreeting() {
+    restoreChat();
     armAfterSpeech = true;
     armedUntil = Date.now() + ARM_MS + 3000;
     if (recognition && !listening) startListening();
-    addBubble(greetText(), 'jarvis');
+    addBubble(greetText(), 'jarvis', false, { save: false });
     const spoke = await speak(greetText());
     if (!spoke) {
       pendingGreet = true;
-      addBubble('Chrome erlaubt mir ohne Klick noch keinen Ton. Klick einmal irgendwo. Dauerhaft: Schloss-Symbol in der Adresszeile → Website-Einstellungen → Ton → Zulassen.', 'jarvis');
+      addBubble('Chrome erlaubt mir ohne Klick noch keinen Ton. Klick einmal irgendwo. Dauerhaft: Schloss-Symbol in der Adresszeile → Website-Einstellungen → Ton → Zulassen.', 'jarvis', false, { save: false });
     }
   }
 
