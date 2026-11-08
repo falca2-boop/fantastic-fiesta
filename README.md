@@ -50,6 +50,7 @@ Mit `OBSIDIAN_VAULT_DIR=/pfad/zu/deinem/Vault` speichert JARVIS Notizen und Ged�
 
 Bestehende Fakten werden beim ersten Start in die Datei übernommen; alte Notizen aus `store.json` bleiben dort liegen.
 Aufgaben und Erinnerungen bleiben in `data/store.json`. Jarvis muss auf demselben Rechner laufen wie der Vault (oder der Vault dorthin synchronisiert werden).
+Mit `OBSIDIAN_SUBFOLDER=00-INBOX/Jarvis` legst du einen anderen Unterordner statt `Jarvis` fest (nur relative Pfade).
 Ohne die Variable ändert sich nichts.
 
 ## Starten (lokal)

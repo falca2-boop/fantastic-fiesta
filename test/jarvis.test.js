@@ -218,3 +218,21 @@ test('Anrede: JARVIS_ADDRESS überschreibt den Namen im Systemprompt und im Zust
     assert.equal(st.userName, 'Boss'); assert.equal(st.address, 'Hey Boss');
   });
 });
+
+test('Obsidian: OBSIDIAN_SUBFOLDER legt den Unterordner fest, unsichere Werte werden ignoriert', async () => {
+  const fs = await import('node:fs'), os = await import('node:os'), path = await import('node:path');
+  const saved = process.env.OBSIDIAN_SUBFOLDER;
+  try {
+    const vault = fs.mkdtempSync(path.join(os.tmpdir(), 'vault-'));
+    const s = new Store(null, { vaultDir: vault });
+    process.env.OBSIDIAN_SUBFOLDER = '00-INBOX/Jarvis';
+    await runTool(s, 'add_note', { text: 'Hallo' }, { now: NOW });
+    await runTool(s, 'remember', { fact: 'Fakt' });
+    assert.ok(fs.existsSync(path.join(vault, '00-INBOX', 'Jarvis', 'Notizen', '2026-10-09 Hallo.md')));
+    assert.ok(fs.existsSync(path.join(vault, '00-INBOX', 'Jarvis', 'Gedächtnis.md')));
+    process.env.OBSIDIAN_SUBFOLDER = '../ausserhalb';
+    await runTool(s, 'add_note', { text: 'Sicher' }, { now: NOW });
+    assert.ok(fs.existsSync(path.join(vault, 'Jarvis', 'Notizen', '2026-10-09 Sicher.md')));
+    assert.ok(!fs.existsSync(path.join(vault, '..', 'ausserhalb')));
+  } finally { if (saved === undefined) delete process.env.OBSIDIAN_SUBFOLDER; else process.env.OBSIDIAN_SUBFOLDER = saved; }
+});
