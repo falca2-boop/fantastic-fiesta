@@ -116,3 +116,44 @@ test('Listener: "Hey Jarvis" vom Wake-Word-Programm startet Jarvis, außer die S
   assert.equal(await run1(false, 'clap'), false);    // Auslöser "clap": Wake-Word wird ignoriert
   fs.rmSync(dir, { recursive: true, force: true });
 });
+
+// ---------------------------------------------------------------- Hintergrundgeräusche
+function stationary(kind, n, rms, seed) {
+  const r = rng(seed), out = new Float64Array(n);
+  const g = () => { let s = 0; for (let i = 0; i < 6; i++) s += r(); return (s - 3) * 1.41; };
+  if (kind === 'white') for (let i = 0; i < n; i++) out[i] = g();
+  else if (kind === 'rumble') { let y = 0; for (let i = 0; i < n; i++) { y += 0.01 * (g() - y); out[i] = y; } }
+  else if (kind === 'hum') for (let i = 0; i < n; i++) { let v = 0; for (let h = 1; h <= 6; h++) v += Math.sin(2 * Math.PI * 50 * h * i / SR) / h; out[i] = v + 0.05 * g(); }
+  let s = 0; for (const v of out) s += v * v;
+  const k = rms / Math.sqrt(s / n);
+  return Int16Array.from(out, (v) => Math.max(-32768, Math.min(32767, Math.round(v * k))));
+}
+function withClaps(base, times, amp = 20000) {
+  const a = Int16Array.from(base), r = rng(99);
+  for (const ms of times) { const st = Math.round(ms * SR / 1000); for (let i = 0; i < 1280 && st + i < a.length; i++) a[st + i] = Math.max(-32768, Math.min(32767, a[st + i] + (r() - 0.5) * 2 * amp * Math.exp(-i / (SR * 0.015)))); }
+  return a;
+}
+
+test('Laute gleichmäßige Hintergrundgeräusche (Rauschen, Brummen, Rumpeln) werden ausgeblendet: Doppelklatscher wird trotzdem erkannt', () => {
+  for (const [kind, level] of [['white', 2000], ['hum', 2000], ['rumble', 2000]]) {
+    const g = run(withClaps(stationary(kind, SR * 7, level, 5), [3000, 3400]));
+    assert.equal(g.doubles, 1, `${kind} bei Lautstärke ${level}`);
+  }
+});
+
+test('Dauerhafte laute Geräusche allein lösen nie aus (30 s)', () => {
+  for (const [kind, level] of [['white', 4000], ['hum', 4000], ['rumble', 6000]]) {
+    assert.equal(run(stationary(kind, SR * 30, level, 7)).doubles, 0, kind);
+  }
+});
+
+test('Ein Geräusch, das schon läuft und dann lauter wird, ist kein Klatscher; ein Klick (sofort wieder weg) auch nicht', () => {
+  // Lüfter wird nach 3 s deutlich lauter und bleibt so
+  const quiet = stationary('white', SR * 3, 500, 3), loud = stationary('white', SR * 5, 3500, 4);
+  const a = new Int16Array(quiet.length + loud.length); a.set(quiet); a.set(loud, quiet.length);
+  assert.equal(run(a).doubles, 0);
+  // zwei sehr kurze Klicks (2 ms) im Abstand von 400 ms
+  const c = stationary('white', SR * 5, 300, 8);
+  for (const ms of [2000, 2400]) { const st = Math.round(ms * SR / 1000); for (let i = 0; i < 32; i++) c[st + i] = Math.max(-32768, Math.min(32767, c[st + i] + 20000 * Math.exp(-i / 6) * (i % 2 ? 1 : -1))); }
+  assert.equal(run(c).doubles, 0);
+});

@@ -3,3 +3,5 @@ node_modules/
 data/
 jarvis.log
 .jarvis.pid
+__pycache__/
+*.pyc
