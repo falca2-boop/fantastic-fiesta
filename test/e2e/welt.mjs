@@ -10,7 +10,7 @@ const gdelt = { type: 'FeatureCollection', features: [
   { geometry: { type: 'Point', coordinates: [30.52, 50.45] }, properties: { name: 'Kyiv, Ukraine', count: 42, html: '<a href="https://example.org/a" target="_blank">Raketenalarm in Kyiv</a>' } },
   { geometry: { type: 'Point', coordinates: [35.2, 31.7] }, properties: { name: 'Jerusalem', count: 7, html: '' } } ] };
 const fetchFn = async (url) => {
-  if (String(url).includes('googleapis.com/youtube')) return { ok: true, status: 200, json: async () => ({ items: [{ id: { videoId: 'LiveCam1234' }, snippet: { title: 'Kyjiw Live', channelTitle: 'Stadtkanal' } }, { id: { videoId: 'Digi24Live1' }, snippet: { title: 'Digi24 Live', channelTitle: 'Digi24' } }, { id: { videoId: 'DozhdLive01' }, snippet: { title: 'Dozhd Live', channelTitle: 'Дождь' } }] }) };
+  if (String(url).includes('googleapis.com/youtube')) return { ok: true, status: 200, json: async () => ({ items: [{ id: { videoId: 'LiveCam1234' }, snippet: { title: 'Kyjiw Live', channelTitle: 'Stadtkanal' } }] }) };
   if (String(url).includes('gdeltproject')) return { ok: true, status: 200, text: async () => JSON.stringify(gdelt) };
   return { ok: true, status: 200, text: async () => rss(String(url).includes('bbc') ? 'BBC' : 'Andere') };
 };
@@ -39,10 +39,7 @@ try {
   check('Livestream-Player startet mit Euronews (nocookie-Domain)', (await page.locator('#wVideo iframe').getAttribute('src')).startsWith('https://www.youtube-nocookie.com/embed/live_stream?channel=UCSrZ3UV4jOidv8ppoVuvW9Q'));
   await page.locator('#wTabs button', { hasText: 'DW News' }).click();
   check('Kanalwechsel lädt DW News', (await page.locator('#wVideo iframe').getAttribute('src')).includes('UCknLrEdhRCp1aegoMqRaCZg'));
-  await page.locator('#wTabs button', { hasText: 'RO · Digi24' }).click(); await page.waitForTimeout(600);
-  check('Rumänischer Sender: Livestream wird automatisch gefunden und eingebettet', (await page.locator('#wVideo iframe').getAttribute('src')).includes('/embed/Digi24Live1'));
-  await page.locator('#wTabs button', { hasText: 'RU · Dozhd' }).click(); await page.waitForTimeout(600);
-  check('Russischer Sender: Tab ist aktiv und der Player läuft', (await page.locator('#wTabs button.on').textContent()) === 'RU · Dozhd' && (await page.locator('#wVideo iframe').getAttribute('src')).includes('/embed/DozhdLive01'));
+  check('Keine russischen oder rumänischen Sender in der Leiste', (await page.locator('#wTabs button', { hasText: /^(RO|RU) ·/ }).count()) === 0 && (await page.locator('#wTabs button').count()) === 5);
   await page.fill('#wCustomUrl', 'https://www.youtube.com/watch?v=dQw4w9WgXcQ'); await page.click('#wCustom button');
   check('Eigener YouTube-Link wird eingebettet', (await page.locator('#wVideo iframe').getAttribute('src')).includes('/embed/dQw4w9WgXcQ'));
   await page.fill('#wCustomUrl', 'https://evil.example/watch?v=dQw4w9WgXcQ'); await page.click('#wCustom button');

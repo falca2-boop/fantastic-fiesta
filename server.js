@@ -10,7 +10,7 @@ import { takeDueReminders } from './lib/tools.js';
 import { DEFAULT_GEMINI_MODEL } from './lib/gemini.js';
 import { loadEnvFile } from './lib/env.js';
 import { vaultDirFromEnv, recentNotes } from './lib/vault.js';
-import { loadNews, loadEvents, findLiveCam, STREAMS } from './lib/world.js';
+import { loadNews, loadEvents, findLiveCam } from './lib/world.js';
 import { mailConfigFromEnv, startMailWatcher, takeMailAlerts } from './lib/mail.js';
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
@@ -112,13 +112,6 @@ export function createServer(opts = {}) {
         }
         if (pathname === '/api/world/events' && req.method === 'GET') {
           try { return json(res, 200, { points: await loadEvents(cfg.fetchFn) }); } catch (e) { return json(res, 502, { error: 'Krisenmeldungen gerade nicht erreichbar.' }); }
-        }
-        if (pathname === '/api/world/streams' && req.method === 'GET') return json(res, 200, { streams: Object.entries(STREAMS).map(([key, v]) => ({ key, name: v.name })), keyConfigured: !!cfg.youtubeKey });
-        if (pathname === '/api/world/stream' && req.method === 'GET') {
-          const st = STREAMS[new URL(req.url, 'http://localhost').searchParams.get('key') || ''];
-          if (!st) return json(res, 404, { error: 'Unbekannter Sender.' });
-          try { return json(res, 200, { live: await findLiveCam({ query: st.query, key: cfg.youtubeKey, match: st.match, fetchFn: cfg.fetchFn }) }); }
-          catch (e) { return json(res, e.code === 'nokey' ? 200 : 502, { live: null, error: e.code === 'nokey' ? 'nokey' : 'YouTube gerade nicht erreichbar: ' + e.message }); }
         }
         if (pathname === '/api/world/cam' && req.method === 'GET') {
           // Nur Cams aus world/cams.json (kein freier Suchtext, schützt das YouTube-Kontingent)

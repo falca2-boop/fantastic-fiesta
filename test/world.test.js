@@ -74,24 +74,9 @@ test('API /api/world/cam: nur bekannte Cams, ohne Schlüssel „nokey“, mit Sc
 });
 
 test('findLiveCam mit Kanalfilter: Fremdkanäle (Re-Streams) werden übergangen', async () => {
-  const items = [{ id: { videoId: 'aaaaaaaaaaa' }, snippet: { title: 'Fake', channelTitle: 'Irgendwer' } }, { id: { videoId: 'bbbbbbbbbbb' }, snippet: { title: 'Live', channelTitle: 'Digi24' } }];
+  const items = [{ id: { videoId: 'aaaaaaaaaaa' }, snippet: { title: 'Fake', channelTitle: 'Irgendwer' } }, { id: { videoId: 'bbbbbbbbbbb' }, snippet: { title: 'Live', channelTitle: 'Beispielsender' } }];
   const fetchFn = async () => ({ ok: true, status: 200, json: async () => ({ items }) });
-  const r = await findLiveCam({ query: 'Digi24 filter', key: 'K', match: /digi ?24/i, fetchFn });
+  const r = await findLiveCam({ query: 'Filter A', key: 'K', match: /beispielsender/i, fetchFn });
   assert.equal(r.videoId, 'bbbbbbbbbbb');
-  assert.equal(await findLiveCam({ query: 'Realitatea filter', key: 'K', match: /realitatea/i, fetchFn }), null);
-});
-
-test('API /api/world/stream: bekannte Sender, unbekannt = 404, ohne Schlüssel nokey', async () => {
-  const fetchFn = async () => ({ ok: true, status: 200, json: async () => ({ items: [{ id: { videoId: 'ccccccccccc' }, snippet: { title: 'T', channelTitle: 'Digi24' } }] }) });
-  for (const key of ['', 'K']) {
-    const { server } = createServer({ store: new Store(null), apiKey: 'k', fetchFn, voice: null, mail: null, youtubeKey: key });
-    await new Promise((r) => server.listen(0, '127.0.0.1', r));
-    const base = 'http://127.0.0.1:' + server.address().port;
-    const j = await (await fetch(base + '/api/world/stream?key=digi24')).json();
-    if (key) assert.equal(j.live.videoId, 'ccccccccccc'); else assert.equal(j.error, 'nokey');
-    assert.equal((await fetch(base + '/api/world/stream?key=phantasie')).status, 404);
-    const list = await (await fetch(base + '/api/world/streams')).json();
-    assert.ok(list.streams.some((s) => s.key === 'dozhd') && list.streams.some((s) => s.key === 'digi24'));
-    server.close();
-  }
+  assert.equal(await findLiveCam({ query: 'Filter B', key: 'K', match: /anderersender/i, fetchFn }), null);
 });

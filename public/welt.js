@@ -20,9 +20,6 @@
     { name: 'France 24', id: 'UCQfwfsi5VrQ8yKZ-UWmAEFg' },
     { name: 'Sky News', id: 'UCoMdktPbSTixAyNGwb-UYkQ' },
     { name: 'Al Jazeera', id: 'UCNye-wNBqNL5ZzHSJj3l8Bg' },
-    { name: 'RO · Digi24', key: 'digi24' }, { name: 'RO · Antena 3 CNN', key: 'antena3' }, { name: 'RO · Realitatea Plus', key: 'realitatea' },
-    { name: 'RO · TVR Info', key: 'tvrinfo' }, { name: 'RO · Euronews', key: 'euronewsro' },
-    { name: 'RU · Dozhd', key: 'dozhd' }, { name: 'RU · Current Time', key: 'currenttime' }, { name: 'RU · DW', key: 'dwru' }, { name: 'RU · Россия 24 (Staatssender)', key: 'russia24' },
   ];
   const ALLOW = 'autoplay; encrypted-media; picture-in-picture; fullscreen';
   function playEmbed(src, openUrl, target) {
