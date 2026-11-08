@@ -271,7 +271,7 @@ test('open_website: sichere Adressen, Suche, Opener', async () => {
 });
 
 test('open_website wird an die KI übergeben und im Prompt erwähnt', async () => {
-  const store = new Store(':memory:'); let body;
+  const store = new Store(null); let body;
   const fetchFn = async (url, o) => { body = JSON.parse(o.body); return { ok: true, status: 200, json: async () => ({ stop_reason: 'end_turn', content: [{ type: 'text', text: 'ok' }] }) }; };
   await chat({ store, message: 'öffne YouTube', apiKey: 'k', model: 'm', userName: 'A', fetchFn });
   assert.ok(body.tools.some((t) => t.name === 'open_website'));
