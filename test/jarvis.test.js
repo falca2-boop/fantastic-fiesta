@@ -257,3 +257,15 @@ test('Server: /api/health meldet, ob die Oberfläche offen ist (letzte Abfrage v
     assert.equal((await (await fetch(base + '/api/health')).json()).uiActive, true);
   });
 });
+
+import { websiteUrl, runTool as runToolWeb } from '../lib/tools.js';
+test('open_website: sichere Adressen, Suche, Opener', async () => {
+  assert.equal(websiteUrl({ url: 'youtube.com' }), 'https://youtube.com/');
+  assert.equal(websiteUrl({ url: 'javascript:alert(1)' }), null);
+  assert.equal(websiteUrl({ url: 'file:///etc/passwd' }), null);
+  assert.equal(websiteUrl({ search: 'Wetter Wien' }), 'https://www.google.com/search?q=Wetter%20Wien');
+  let opened; const store = { data: {}, save() {} };
+  const out = await runToolWeb(store, 'open_website', { url: 'https://example.com' }, { openUrl: async (u) => { opened = u; return true; } });
+  assert.match(out, /Geöffnet/); assert.equal(opened, 'https://example.com/');
+  assert.equal(await runToolWeb(store, 'open_website', { url: 'ftp://x' }, { openUrl: async () => true }), 'Ungültige Adresse.');
+});
