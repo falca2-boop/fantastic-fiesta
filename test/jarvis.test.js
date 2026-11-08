@@ -269,3 +269,11 @@ test('open_website: sichere Adressen, Suche, Opener', async () => {
   assert.match(out, /Geöffnet/); assert.equal(opened, 'https://example.com/');
   assert.equal(await runToolWeb(store, 'open_website', { url: 'ftp://x' }, { openUrl: async () => true }), 'Ungültige Adresse.');
 });
+
+test('open_website wird an die KI übergeben und im Prompt erwähnt', async () => {
+  const store = new Store(':memory:'); let body;
+  const fetchFn = async (url, o) => { body = JSON.parse(o.body); return { ok: true, status: 200, json: async () => ({ stop_reason: 'end_turn', content: [{ type: 'text', text: 'ok' }] }) }; };
+  await chat({ store, message: 'öffne YouTube', apiKey: 'k', model: 'm', userName: 'A', fetchFn });
+  assert.ok(body.tools.some((t) => t.name === 'open_website'));
+  assert.match(body.system, /open_website/);
+});

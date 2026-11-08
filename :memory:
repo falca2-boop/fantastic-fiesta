@@ -1,0 +1,17 @@
+{
+  "tasks": [],
+  "notes": [],
+  "reminders": [],
+  "facts": [],
+  "goal": null,
+  "history": [
+    {
+      "role": "user",
+      "content": "öffne YouTube"
+    },
+    {
+      "role": "assistant",
+      "content": "ok"
+    }
+  ]
+}
