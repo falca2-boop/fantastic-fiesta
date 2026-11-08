@@ -356,3 +356,12 @@ test('Jarvis: ask_agent läuft über den Agent-Runner, Agenten-Werkzeuge werden 
   const names = (await import('../lib/tools.js')).toolDefinitions({}).map((t) => t.name);
   for (const n of ['ask_agent', 'create_agent', 'list_agents', 'delete_agent']) assert.ok(names.includes(n));
 });
+
+test('Eingebaute Agenten: alle Werkzeuge erlaubt und ausschließlich lesend', () => {
+  const s = new Store(null);
+  const names = listAgents(s).map((a) => a.name);
+  for (const n of ['recherche', 'nachrichten', 'analyst', 'notizen', 'planer', 'firmensucher', 'briefschreiber', 'morgenbriefing', 'marktbeobachter']) assert.ok(names.includes(n), n);
+  for (const a of listAgents(s)) assert.ok(a.tools.every((t) => AGENT_TOOLS.includes(t)), a.name);
+  const brief = listAgents(s).find((a) => a.name === 'briefschreiber');
+  assert.ok(!brief.tools.includes('external_action') && !brief.tools.includes('add_note') && /sendest nichts/.test(brief.role));
+});

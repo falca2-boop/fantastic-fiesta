@@ -144,7 +144,7 @@ Bibliotheken liegen unter `public/vendor/` (globe.gl, three.js, NASA-Texturen; M
 
 ## Agenten
 
-**In Jarvis:** Für größere Aufgaben beauftragt Jarvis Spezial-Agenten mit eigener Rolle und eigenen Werkzeugen (nur Claude als KI-Anbieter): `recherche` (Web), `nachrichten` (Schlagzeilen und Einordnung), `analyst` (Strategie), `notizen` (Obsidian), `planer` (Tagesplan), `firmensucher` (siehe unten). Sie dürfen nur lesen und recherchieren, nichts speichern, senden oder öffnen. Eigene Agenten legst du per Sprache an: *„Erstelle mir einen Agenten, der täglich die wichtigsten Tech-Nachrichten einordnet.“* (bis zu 8, mit „Zeig meine Agenten“ oder in der Karte „Agenten“ zu sehen, „Lösche den Agenten …“ entfernt sie). Code: `lib/agents.js`.
+**In Jarvis:** Für größere Aufgaben beauftragt Jarvis Spezial-Agenten mit eigener Rolle und eigenen Werkzeugen (nur Claude als KI-Anbieter): `recherche` (Web), `nachrichten` (Schlagzeilen und Einordnung), `analyst` (Strategie), `notizen` (Obsidian), `planer` (Tagesplan), `firmensucher` (siehe unten), `briefschreiber`, `morgenbriefing` und `marktbeobachter`. Sie dürfen nur lesen und recherchieren, nichts speichern, senden oder öffnen. Eigene Agenten legst du per Sprache an: *„Erstelle mir einen Agenten, der täglich die wichtigsten Tech-Nachrichten einordnet.“* (bis zu 8, mit „Zeig meine Agenten“ oder in der Karte „Agenten“ zu sehen, „Lösche den Agenten …“ entfernt sie). Code: `lib/agents.js`.
 
 **Für Claude Code:** Unter `.claude/agents/` liegen Helfer für die Entwicklung (`jarvis-tester`, `jarvis-reviewer`, `jarvis-doku`), siehe dort die README.
 
@@ -156,3 +156,9 @@ Bibliotheken liegen unter `public/vendor/` (globe.gl, three.js, NASA-Texturen; M
 - **Ohne Chat-Assistent:** Betriebe mit Webseite, auf deren **Startseite** keine bekannte Chat-Software (Tidio, Intercom, Crisp, tawk.to, LiveChat, HubSpot, Userlike …) erkannt wird. Prüft nur die Startseite, Adressen im lokalen Netz werden nie angefragt.
 - **Grenzen:** OpenStreetMap ist nicht vollständig. Manche Betriebe haben eine Webseite, die nur nicht eingetragen ist. Darum gegenprüft der Agent per Websuche, und du solltest vor dem Kontakt kurz selbst nachsehen. Der Agent kontaktiert niemanden.
 - **Recht (DACH):** Telefonwerbung und Werbe-Mails an Firmen sind ohne Einwilligung oft unzulässig (z. B. UWG in Deutschland, § 174 TKG in Österreich). Ein persönlicher Brief oder Besuch ist unkritisch. Im Zweifel vorher rechtlich klären.
+
+### Weitere Agenten
+
+- **briefschreiber:** Entwirft pro Firma einen kurzen, ehrlichen, persönlichen Brief mit Angebot (Webseite, Chat-Assistent), mit Platzhalter `[Absender]`. Er schreibt nur Text und versendet nichts. Ablauf: erst den Firmensucher, dann *„Lass den Briefschreiber Briefe für diese Liste entwerfen.“*, dann *„Speichere die Briefe als Notiz.“*
+- **morgenbriefing:** Die wichtigsten Meldungen aus Welt, Europa und Wirtschaft/Technik mit Quellen. *„Gib mir mein Morgenbriefing, Schwerpunkt Technik.“* Es läuft auf Zuruf, nicht automatisch. Ein täglicher Zeitplan bräuchte einen Zeitgeber (z. B. n8n oder `cron`).
+- **marktbeobachter:** Recherchiert Preise, Konkurrenten oder Produkte per Websuche und vergleicht mit dem zuletzt in Obsidian gespeicherten Stand (Notiz „Markt: Thema“). Keine Anlageberatung.
