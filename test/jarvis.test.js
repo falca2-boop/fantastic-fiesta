@@ -193,3 +193,17 @@ test('Gemini: Fehler 429 wird verständlich gemeldet, Server wählt Gemini anhan
     });
   } finally { for (const k of ['ANTHROPIC_API_KEY', 'JARVIS_PROVIDER', 'GEMINI_API_KEY']) { if (saved[k] === undefined) delete process.env[k]; else process.env[k] = saved[k]; } }
 });
+
+test('Server: Aufgabe per Klick erledigen, Notizen und Anzahl Fakten im Zustand', async () => {
+  const store = new Store(null);
+  store.data.tasks.push({ id: 'a1', text: 'Test', due: '', done: false });
+  store.data.notes.push({ id: 'n1', text: 'Erste Notiz', ts: '2026-10-09T08:00:00Z' });
+  store.data.facts.push('Mag Kaffee');
+  await withServer({ store }, async (base) => {
+    const st = await (await fetch(base + '/api/state')).json();
+    assert.equal(st.tasks.length, 1); assert.equal(st.notes[0].text, 'Erste Notiz'); assert.equal(st.factCount, 1);
+    assert.equal((await fetch(base + '/api/tasks/complete', { method: 'POST', body: '{"id":"nope"}' })).status, 404);
+    const done = await (await fetch(base + '/api/tasks/complete', { method: 'POST', body: '{"id":"a1"}' })).json();
+    assert.equal(done.state.tasks.length, 0);
+  });
+});

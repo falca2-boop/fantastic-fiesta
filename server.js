@@ -8,7 +8,7 @@ import { chat, AgentError } from './lib/agent.js';
 import { takeDueReminders } from './lib/tools.js';
 import { DEFAULT_GEMINI_MODEL } from './lib/gemini.js';
 import { loadEnvFile } from './lib/env.js';
-import { vaultDirFromEnv } from './lib/vault.js';
+import { vaultDirFromEnv, recentNotes } from './lib/vault.js';
 import { mailConfigFromEnv, startMailWatcher } from './lib/mail.js';
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
@@ -62,6 +62,10 @@ export function createServer(opts = {}) {
     return {
       userName: cfg.userName,
       goal: d.goal,
+      notes: store.vaultDir
+        ? recentNotes(store.vaultDir, 4)
+        : d.notes.slice(-4).reverse().map(n => ({ title: '', text: n.text.slice(0, 160), ts: n.ts })),
+      factCount: d.facts.length,
       tasks: d.tasks.filter(t => !t.done).map(({ id, text, due }) => ({ id, text, due })),
       reminders: d.reminders.filter(r => !r.fired).sort((a, b) => new Date(a.at) - new Date(b.at)).map(({ id, text, at }) => ({ id, text, at })),
     };
@@ -93,6 +97,15 @@ export function createServer(opts = {}) {
 
         if (pathname === '/api/state' && req.method === 'GET') return json(res, 200, publicState());
         if (pathname === '/api/poll' && req.method === 'GET') return json(res, 200, { fired: takeDueReminders(store).map(({ id, text }) => ({ id, text })), state: publicState() });
+
+        if (pathname === '/api/tasks/complete' && req.method === 'POST') {
+          let body;
+          try { body = JSON.parse(await readBody(req)); } catch (e) { if (e instanceof AgentError) throw e; return json(res, 400, { error: 'Ungültiges JSON.' }); }
+          const task = store.data.tasks.find(t => t.id === body.id);
+          if (!task) return json(res, 404, { error: 'Aufgabe nicht gefunden.' });
+          task.done = true; store.save();
+          return json(res, 200, { state: publicState() });
+        }
 
         if (pathname === '/api/chat' && req.method === 'POST') {
           let body;

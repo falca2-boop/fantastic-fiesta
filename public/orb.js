@@ -14,7 +14,9 @@
   };
 
   const modeEnergy = { idle: 0.15, listening: 0.55, thinking: 0.4, speaking: 0.75 };
-  const ACCENT = { r: 56, g: 217, b: 255 };
+  // Akzentfarbe kommt aus dem CSS (--accent-rgb), damit sie an einer Stelle änderbar ist
+  const rgb = (getComputedStyle(document.documentElement).getPropertyValue('--accent-rgb') || '255,138,61').split(',').map(n => parseInt(n, 10));
+  const ACCENT = { r: rgb[0] || 255, g: rgb[1] || 138, b: rgb[2] || 61 };
 
   function resize() {
     const rect = canvas.getBoundingClientRect();
@@ -23,6 +25,7 @@
     ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
   }
   window.addEventListener('resize', resize);
+  if (window.ResizeObserver) new ResizeObserver(resize).observe(canvas);
 
   // Ring-Partikel
   const rings = [];
@@ -39,12 +42,12 @@
 
     ctx.clearRect(0, 0, W, H);
     const cx = W / 2, cy = H / 2;
-    const base = Math.min(W, H) * 0.30;
+    const base = Math.min(W, H) * 0.32;
     const col = (a) => `rgba(${ACCENT.r},${ACCENT.g},${ACCENT.b},${a})`;
 
     // Äußerer Glow / Aura
     const pulse = Math.sin(state.t * 2) * 0.5 + 0.5;
-    const auraR = base * (1.7 + e * 0.6 + pulse * 0.08 * e);
+    const auraR = Math.min(W, H) * 0.5;
     const aura = ctx.createRadialGradient(cx, cy, base * 0.4, cx, cy, auraR);
     aura.addColorStop(0, col(0.22 + e * 0.25));
     aura.addColorStop(0.4, col(0.08));
@@ -93,7 +96,7 @@
     // Leuchtender Kern
     const coreR = base * (0.5 + e * 0.14 + pulse * 0.03);
     const core = ctx.createRadialGradient(cx, cy - coreR * 0.2, 0, cx, cy, coreR);
-    core.addColorStop(0, `rgba(230,250,255,${0.9})`);
+    core.addColorStop(0, 'rgba(255,248,240,0.92)');
     core.addColorStop(0.25, col(0.85));
     core.addColorStop(0.7, col(0.28));
     core.addColorStop(1, col(0));

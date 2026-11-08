@@ -1,10 +1,13 @@
 /* JARVIS – Browser-Frontend. Alle KI-Logik, Werkzeuge und Daten liegen auf dem Server (/api/*). */
 (function () {
   const $ = (id) => document.getElementById(id);
-  const micBtn = $('micBtn'), textInput = $('textInput'), dialog = $('dialog'), stateLabel = $('stateLabel');
-  const goalPanel = $('goalPanel'), goalText = $('goalText'), sidePanel = $('sidePanel');
+  const micBtn = $('micBtn'), textInput = $('textInput'), dialog = $('dialog'), composer = $('composer');
+  const stateText = $('stateText'), stateDot = $('stateDot'), clockEl = $('clock'), banner = $('banner');
   const unsupported = $('unsupported'), orbCanvas = $('orb');
   const apiOverlay = $('apiOverlay'), tokenInput = $('tokenInput'), tokenSaveBtn = $('tokenSaveBtn'), tokenError = $('tokenError');
+  const overlayOpen = () => apiOverlay.classList.contains('show');
+  const el = (tag, cls, text) => { const n = document.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = text; return n; };
+  const icon = (id) => { const s = document.createElementNS('http://www.w3.org/2000/svg', 'svg'); s.setAttribute('class', 'i'); const u = document.createElementNS('http://www.w3.org/2000/svg', 'use'); u.setAttribute('href', '#' + id); s.appendChild(u); return s; };
 
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
   const synth = window.speechSynthesis;
@@ -27,7 +30,7 @@
   // ---------- Zugang ----------
   function askToken(msg) {
     tokenError.textContent = msg || '';
-    apiOverlay.style.display = 'flex';
+    apiOverlay.classList.add('show');
     tokenInput.focus();
   }
   tokenSaveBtn.addEventListener('click', async () => {
@@ -35,7 +38,7 @@
     try {
       await api('/api/state');
       try { localStorage.setItem('jarvis_token', TOKEN); } catch (e) {}
-      apiOverlay.style.display = 'none';
+      apiOverlay.classList.remove('show');
       await boot(true);
     } catch (e) { askToken(e.code === 401 ? 'Token ist falsch.' : e.message); }
   });
@@ -108,62 +111,144 @@
   }
 
   // ---------- UI ----------
+  const STATE = {
+    idle: ['Bereit', 'ok'], listening: ['Höre zu …', 'live'], thinking: ['Denke nach …', 'live'], speaking: ['Spreche …', 'live'],
+  };
   function setState(mode) {
     window.Orb && window.Orb.setMode(mode);
-    const labels = { idle: 'Bereit', listening: 'Höre zu…', thinking: 'Verarbeite…', speaking: 'Spreche…' };
-    stateLabel.textContent = labels[mode] || '';
+    const [label, cls] = STATE[mode] || STATE.idle;
+    stateText.textContent = label;
+    stateDot.className = 'dot ' + cls;
   }
+
+  const hhmm = (d) => d.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
   function addBubble(text, who, interim) {
-    const b = document.createElement('div');
-    b.className = 'bubble ' + who + (interim ? ' interim' : '');
-    b.textContent = text;
-    dialog.appendChild(b);
-    while (dialog.children.length > 10) dialog.removeChild(dialog.firstChild);
-    return b;
+    const m = el('div', 'msg ' + who + (interim ? ' interim' : ''));
+    const meta = el('div', 'meta');
+    meta.append(el('span', '', who === 'user' ? 'Du' : 'Jarvis'), el('span', '', hhmm(new Date())));
+    m.append(meta, el('div', 'bubble', text));
+    dialog.appendChild(m);
+    while (dialog.children.length > 60) dialog.removeChild(dialog.firstChild);
+    dialog.scrollTop = dialog.scrollHeight;
+    return { remove: () => m.remove(), set textContent(t) { m.querySelector('.bubble').textContent = t; } };
+  }
+  let typingEl = null;
+  function showTyping(on) {
+    if (on && !typingEl) {
+      typingEl = el('div', 'msg jarvis typing');
+      const b = el('div', 'bubble'); b.append(el('i'), el('i'), el('i'));
+      typingEl.append(b);
+      dialog.appendChild(typingEl); dialog.scrollTop = dialog.scrollHeight;
+    } else if (!on && typingEl) { typingEl.remove(); typingEl = null; }
   }
   function jarvisSay(text) { addBubble(text, 'jarvis'); speak(text); }
 
   const fmtTime = (iso) => new Date(iso).toLocaleString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+  function relTime(iso) {
+    const min = Math.round((new Date(iso) - Date.now()) / 60000);
+    if (min < 1) return 'jetzt';
+    if (min < 60) return 'in ' + min + ' Min';
+    if (min < 1440) return 'in ' + Math.round(min / 60) + ' Std';
+    return 'in ' + Math.round(min / 1440) + ' T';
+  }
+
+  // Uhr und Begrüßung
+  function tickClock() {
+    const d = new Date();
+    clockEl.textContent = '';
+    clockEl.append(hhmm(d));
+    clockEl.appendChild(el('small', '', d.toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long' })));
+    const h = d.getHours();
+    $('heroTitle').textContent = (h < 5 ? 'Noch wach' : h < 11 ? 'Guten Morgen' : h < 17 ? 'Guten Tag' : h < 22 ? 'Guten Abend' : 'Gute Nacht') + ', ' + USER_NAME + '.';
+  }
+  setInterval(tickClock, 30000);
 
   function renderState(s) {
     if (!s) return;
-    if (s.userName) USER_NAME = s.userName;
-    if (s.goal) {
-      goalText.textContent = '';
-      const label = document.createTextNode('Ziel: ');
-      const strong = document.createElement('strong');
-      strong.style.color = '#eafaff';
-      strong.textContent = s.goal.text.slice(0, 80);
-      goalText.append(label, strong);
-      if (s.goal.realisierbarkeit != null) {
-        const sp = document.createElement('span');
-        sp.style.cssText = 'font-size:11px;color:#6f8aa0;letter-spacing:2px';
-        sp.textContent = ` · ${s.goal.realisierbarkeit}% realisierbar`;
-        goalText.appendChild(sp);
+    if (s.userName) { USER_NAME = s.userName; tickClock(); }
+
+    // Aufgaben
+    const tl = $('taskList'); tl.textContent = '';
+    $('taskCount').textContent = s.tasks.length;
+    if (!s.tasks.length) tl.appendChild(el('li', 'empty', 'Nichts offen. Sag zum Beispiel: „Füge Aufgabe Zahnarzt anrufen hinzu“.'));
+    s.tasks.forEach((t) => {
+      const li = el('li', 'task');
+      const cb = el('button', 'check'); cb.type = 'button'; cb.title = 'Erledigt'; cb.setAttribute('aria-label', 'Als erledigt markieren: ' + t.text);
+      cb.appendChild(icon('i-check'));
+      cb.addEventListener('click', async () => {
+        li.classList.add('done');
+        try { renderState((await api('/api/tasks/complete', { method: 'POST', body: JSON.stringify({ id: t.id }) })).state); }
+        catch (e) { li.classList.remove('done'); }
+      });
+      li.append(cb, el('span', 't', t.text));
+      if (t.due) li.appendChild(el('span', 'pill', t.due));
+      tl.appendChild(li);
+    });
+
+    // Erinnerungen
+    const rl = $('remList'); rl.textContent = '';
+    $('remCount').textContent = s.reminders.length;
+    if (!s.reminders.length) rl.appendChild(el('li', 'empty', 'Keine Erinnerungen. Sag: „Erinnere mich morgen um 9 an …“.'));
+    s.reminders.forEach((r) => {
+      const li = el('li', 'rem');
+      const t = el('time', '', new Date(r.at).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }));
+      t.appendChild(el('small', '', relTime(r.at)));
+      t.title = fmtTime(r.at);
+      li.append(t, el('span', '', r.text));
+      rl.appendChild(li);
+    });
+
+    // Ziel
+    const gb = $('goalBox'); gb.textContent = '';
+    if (!s.goal) gb.appendChild(el('div', 'empty', 'Noch kein Ziel. Sag: „Mein Ziel ist …“, dann plane ich mit dir die Schritte.'));
+    else {
+      const pct = Number.isFinite(s.goal.realisierbarkeit) ? Math.max(0, Math.min(100, s.goal.realisierbarkeit)) : null;
+      if (pct != null) {
+        const ring = el('div', 'ring');
+        const R = 30, C = 2 * Math.PI * R;
+        ring.innerHTML = `<svg viewBox="0 0 76 76"><circle class="bg" cx="38" cy="38" r="${R}"/><circle class="fg" cx="38" cy="38" r="${R}" stroke-dasharray="${C.toFixed(1)}" stroke-dashoffset="${(C * (1 - pct / 100)).toFixed(1)}"/></svg>`;
+        ring.appendChild(el('b', '', pct + '%'));
+        gb.appendChild(ring);
+      } else gb.style.gridTemplateColumns = '1fr';
+      const info = el('div');
+      info.append(el('h3', '', s.goal.text.slice(0, 120)), el('div', 'sub', pct != null ? 'Realisierbarkeit' : 'In Arbeit'));
+      gb.appendChild(info);
+      if (s.goal.schritte && s.goal.schritte.length) {
+        const ol = el('ol', 'steps');
+        s.goal.schritte.slice(0, 5).forEach((st) => ol.appendChild(el('li', '', String(st))));
+        gb.appendChild(ol);
       }
-      goalPanel.classList.add('show');
     }
-    sidePanel.textContent = '';
-    const section = (title, items) => {
-      if (!items.length) return;
-      const h = document.createElement('div'); h.className = 'lbl'; h.textContent = title; sidePanel.appendChild(h);
-      items.forEach(t => { const d = document.createElement('div'); d.className = 'item'; d.textContent = t; sidePanel.appendChild(d); });
-    };
-    section('Aufgaben', s.tasks.map(t => '▸ ' + t.text + (t.due ? ` (${t.due})` : '')));
-    section('Erinnerungen', s.reminders.map(r => '⏰ ' + fmtTime(r.at) + ' · ' + r.text));
-    sidePanel.classList.toggle('show', !!(s.tasks.length || s.reminders.length));
+
+    // Notizen
+    const nl = $('noteList'); nl.textContent = '';
+    if (!s.notes || !s.notes.length) nl.appendChild(el('div', 'empty', 'Noch keine Notizen. Sag: „Notiere …“.'));
+    (s.notes || []).forEach((n) => { const d = el('div', 'note'); if (n.title) d.appendChild(el('b', '', n.title)); d.appendChild(el('p', '', n.text)); nl.appendChild(d); });
+  }
+
+  function renderSystem(h) {
+    const box = $('sysBox'); box.textContent = '';
+    const item = (label, status) => { const d = el('div'); d.append(el('span', 'dot ' + status), el('span', '', label)); box.appendChild(d); };
+    item(h.provider === 'gemini' ? 'KI: Gemini' : 'KI: Claude', h.keyConfigured ? 'ok' : 'bad');
+    item(h.voice ? 'Stimme: ElevenLabs' : 'Stimme: Browser', h.voice ? 'ok' : 'warn');
+    item(h.obsidian ? 'Obsidian verbunden' : 'Obsidian aus', h.obsidian ? 'ok' : 'warn');
+    item(h.mailWatch ? 'Mail-Alarm aktiv' : 'Mail-Alarm aus', h.mailWatch ? 'ok' : 'warn');
   }
 
   // ---------- Gespräch ----------
   async function respond(text) {
     setState('thinking');
+    showTyping(true);
     try {
       const data = await api('/api/chat', { method: 'POST', body: JSON.stringify({ message: text, offsetMinutes: new Date().getTimezoneOffset() }) });
+      showTyping(false);
       renderState(data.state);
       jarvisSay(data.reply);
     } catch (err) {
+      showTyping(false);
       if (err.code === 401) { askToken('Bitte Zugangs-Token eingeben.'); setState('idle'); return; }
-      jarvisSay('Das hat nicht geklappt. ' + (err.message || '') );
+      const m = addBubble('Das hat nicht geklappt. ' + (err.message || ''), 'jarvis');
+      dialog.lastChild.classList.add('error');
       setState('idle');
     }
   }
@@ -185,7 +270,7 @@
       }
     } catch (e) { /* offline oder Token fehlt – nächster Versuch folgt */ }
   }
-  setInterval(() => { if (apiOverlay.style.display === 'none') poll(); }, 10000);
+  setInterval(() => { if (!overlayOpen()) poll(); }, 10000);
 
   // ---------- Mikrofon-Pegel ----------
   let audioCtx = null, analyser = null, micData = null, rafId = null;
@@ -243,7 +328,7 @@
   }
 
   function initRecognition() {
-    if (!SR) { unsupported.style.display = 'flex'; return; }
+    if (!SR) { unsupported.classList.add('show'); return; }
     recognition = new SR();
     recognition.lang = 'de-DE';
     recognition.interimResults = true;
@@ -298,7 +383,7 @@
   }
 
   function toggleListen() {
-    if (apiOverlay.style.display !== 'none') return;
+    if (overlayOpen()) return;
     if (!recognition) { textInput.focus(); return; }
     if (listening) {
       // Klick während Dauer-Hören: sofort Befehl annehmen, zweiter Klick beendet das Hören
@@ -316,12 +401,13 @@
 
   micBtn.addEventListener('click', toggleListen);
   orbCanvas.addEventListener('click', toggleListen);
-  textInput.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') { handleInput(textInput.value); textInput.value = ''; }
-  });
+  composer.addEventListener('submit', (e) => { e.preventDefault(); stopSpeaking(); handleInput(textInput.value); textInput.value = ''; });
+  $('suggest').addEventListener('click', (e) => { const b = e.target.closest('button[data-q]'); if (b) { stopSpeaking(); handleInput(b.dataset.q); } });
+  $('unsupportedOk').addEventListener('click', () => unsupported.classList.remove('show'));
 
   initRecognition();
   setState('idle');
+  tickClock();
 
   // ---------- Start ----------
   let greeted = false;
@@ -338,10 +424,11 @@
     let health;
     try { health = await api('/api/health'); } catch (e) { addBubble('Server nicht erreichbar.', 'jarvis'); return; }
     voiceOn = !!health.voice;
-    if (!health.keyConfigured) addBubble('Auf dem Server fehlt ANTHROPIC_API_KEY. Ohne ihn kann ich nicht antworten.', 'jarvis');
+    renderSystem(health);
+    if (!health.keyConfigured) { banner.textContent = 'Auf dem Server fehlt der KI-Key (' + (health.provider === 'gemini' ? 'GEMINI_API_KEY' : 'ANTHROPIC_API_KEY') + '). Ohne ihn kann ich nicht antworten.'; banner.classList.add('show'); }
     try {
       renderState(await api('/api/state'));
-      apiOverlay.style.display = 'none';
+      apiOverlay.classList.remove('show');
     } catch (e) {
       if (e.code === 401) { askToken(TOKEN ? 'Token ist falsch.' : ''); return; }
     }
