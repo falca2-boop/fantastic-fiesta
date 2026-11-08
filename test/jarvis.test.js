@@ -1,3 +1,6 @@
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Store } from '../lib/store.js';
@@ -276,4 +279,14 @@ test('open_website wird an die KI übergeben und im Prompt erwähnt', async () =
   await chat({ store, message: 'öffne YouTube', apiKey: 'k', model: 'm', userName: 'A', fetchFn });
   assert.ok(body.tools.some((t) => t.name === 'open_website'));
   assert.match(body.system, /open_website/);
+});
+
+test('doppelte Erinnerungen werden nicht angelegt und beim Laden bereinigt', async () => {
+  const f = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'rem-')), 'd.json');
+  const at = new Date(Date.now() + 3600e3).toISOString();
+  fs.writeFileSync(f, JSON.stringify({ reminders: [{ id: 'a', text: 'Postfach prüfen', at, fired: false }, { id: 'b', text: 'postfach prüfen', at, fired: false }] }));
+  const s = new Store(f);
+  assert.equal(s.data.reminders.length, 1);
+  const out = await runTool(s, 'set_reminder', { text: 'Postfach prüfen', at });
+  assert.match(out, /schon/); assert.equal(s.data.reminders.length, 1);
 });

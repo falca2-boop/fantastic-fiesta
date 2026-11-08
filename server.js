@@ -1,3 +1,4 @@
+import { toolDefinitions } from './lib/tools.js';
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -96,7 +97,7 @@ export function createServer(opts = {}) {
     try {
       const { pathname } = new URL(req.url, 'http://localhost');
 
-      if (pathname === '/api/health') return json(res, 200, { ok: true, tokenRequired: !!cfg.token, keyConfigured: !!cfg.apiKey, provider: cfg.provider, uiActive: uiActive(), mailWatch: !!cfg.mail, voice: !!cfg.voice, obsidian: !!store.vaultDir });
+      if (pathname === '/api/health') return json(res, 200, { ok: true, tokenRequired: !!cfg.token, keyConfigured: !!cfg.apiKey, provider: cfg.provider, uiActive: uiActive(), mailWatch: !!cfg.mail, voice: !!cfg.voice, obsidian: !!store.vaultDir, tools: toolDefinitions({ webhookEnabled: !!cfg.webhookUrl, mailEnabled: !!cfg.mail }).map(t => t.name), pid: process.pid });
 
       if (pathname.startsWith('/api/')) {
         if (!authorized(req)) return json(res, 401, { error: 'Zugangs-Token fehlt oder ist falsch.' });

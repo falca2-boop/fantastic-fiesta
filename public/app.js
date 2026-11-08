@@ -261,6 +261,7 @@
     item(h.provider === 'gemini' ? 'KI: Gemini' : 'KI: Claude', h.keyConfigured ? 'ok' : 'bad');
     item(h.voice ? 'Stimme: ElevenLabs' : 'Stimme: Browser', h.voice ? 'ok' : 'warn');
     item(h.obsidian ? 'Obsidian verbunden' : 'Obsidian aus', h.obsidian ? 'ok' : 'warn');
+    item(h.tools && h.tools.includes('open_website') ? 'Browser öffnen: bereit' : 'Server veraltet – neu starten', h.tools && h.tools.includes('open_website') ? 'ok' : 'bad');
     item(h.mailWatch ? 'Mail-Alarm aktiv' : 'Mail-Alarm aus', h.mailWatch ? 'ok' : 'warn');
   }
 
