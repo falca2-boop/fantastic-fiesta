@@ -6,6 +6,7 @@ import { timingSafeEqual } from 'node:crypto';
 import { Store } from './lib/store.js';
 import { chat, AgentError } from './lib/agent.js';
 import { takeDueReminders } from './lib/tools.js';
+import { loadEnvFile } from './lib/env.js';
 import { vaultDirFromEnv } from './lib/vault.js';
 import { mailConfigFromEnv, startMailWatcher } from './lib/mail.js';
 
@@ -131,6 +132,7 @@ export function createServer(opts = {}) {
 
 // ---------- Start ----------
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  loadEnvFile(path.join(ROOT, '.env'));
   const host = process.env.HOST || '127.0.0.1';
   const port = Number(process.env.PORT) || 8000;
   const { server, cfg, store } = createServer();

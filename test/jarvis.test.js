@@ -131,3 +131,15 @@ test('Obsidian: Notizen und Gedächtnis liegen als Markdown im Vault', async () 
   pre.vaultDir = fs.mkdtempSync(path.join(os.tmpdir(), 'vault-')); pre.syncFacts();
   assert.match(fs.readFileSync(path.join(pre.vaultDir, 'Jarvis', 'Gedächtnis.md'), 'utf8'), /- Alt/);
 });
+
+test('.env-Parser: Kommentare, Anführungszeichen, keine Überschreibung gesetzter Variablen', async () => {
+  const { parseEnv, loadEnvFile } = await import('../lib/env.js');
+  const fs = await import('node:fs'), os = await import('node:os'), path = await import('node:path');
+  assert.deepEqual(parseEnv('# c\nA=1\nB="x y"  \nC=z # kommentar\nD=\n'), { A: '1', B: 'x y', C: 'z', D: '' });
+  const f = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'env-')), '.env');
+  fs.writeFileSync(f, 'A=file\nB=file\n');
+  const env = { A: 'shell' };
+  assert.equal(loadEnvFile(f, env), true);
+  assert.deepEqual(env, { A: 'shell', B: 'file' });
+  assert.equal(loadEnvFile(f + 'x', {}), false);
+});

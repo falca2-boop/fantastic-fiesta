@@ -53,11 +53,12 @@ Ohne die Variable ändert sich nichts.
 
 ## Starten (lokal)
 
+Einsteiger-Anleitung mit Einrichtungsassistent: [SETUP.md](SETUP.md) (`npm run setup`). Kurzfassung:
+
 Voraussetzung: Node.js ab Version 20 (`node --version`).
 
 ```bash
-cp .env.example .env     # ANTHROPIC_API_KEY eintragen
-set -a; . ./.env; set +a
+npm run setup            # fragt die Werte ab und schreibt .env (oder .env.example kopieren und von Hand ausfüllen)
 npm start                # → http://127.0.0.1:8000 in Chrome oder Edge
 ```
 
@@ -87,6 +88,8 @@ npm test
 | `lib/agent.js` | Claude-Schleife mit Werkzeugen, Systemprompt |
 | `lib/tools.js` | Werkzeuge (Aufgaben, Notizen, Erinnerungen, Gedächtnis, n8n) |
 | `lib/store.js` | JSON-Speicher |
+| `lib/env.js` | Liest `.env` beim Start (ohne Zusatzpaket, auch unter Windows) |
+| `scripts/setup.js` | Einrichtungsassistent (`npm run setup`) |
 | `lib/vault.js` | Obsidian-Anbindung (Notizen, Gedächtnis als Markdown) |
 | `lib/mail.js` | IMAP-Überwachung, Filter, Anruf (Twilio) und Push (ntfy) |
 | `public/` | Oberfläche: Orb, Spracherkennung („Hey Jarvis"), Sprachausgabe |
