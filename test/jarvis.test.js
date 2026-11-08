@@ -207,3 +207,14 @@ test('Server: Aufgabe per Klick erledigen, Notizen und Anzahl Fakten im Zustand'
     assert.equal(done.state.tasks.length, 0);
   });
 });
+
+test('Anrede: JARVIS_ADDRESS überschreibt den Namen im Systemprompt und im Zustand', async () => {
+  const { systemPrompt } = await import('../lib/agent.js');
+  const s = new Store(null);
+  assert.match(systemPrompt(s, { userName: 'Boss', address: 'Hey Boss', now: NOW, offsetMinutes: 0 }), /„Hey Boss“/);
+  assert.match(systemPrompt(s, { userName: 'Boss', now: NOW, offsetMinutes: 0 }), /„Boss“/);
+  await withServer({ userName: 'Boss', address: 'Hey Boss' }, async (base) => {
+    const st = await (await fetch(base + '/api/state')).json();
+    assert.equal(st.userName, 'Boss'); assert.equal(st.address, 'Hey Boss');
+  });
+});

@@ -165,7 +165,7 @@
 
   function renderState(s) {
     if (!s) return;
-    if (s.userName) { USER_NAME = s.userName; tickClock(); }
+    if (s.userName) { USER_NAME = s.userName; ADDRESS = s.address || s.userName; tickClock(); }
 
     // Aufgaben
     const tl = $('taskList'); tl.textContent = '';
@@ -299,7 +299,7 @@
   }
 
   // ---------- Spracherkennung mit Wake-Word "Hey Jarvis" ----------
-  let USER_NAME = 'Augustin';
+  let USER_NAME = 'Augustin', ADDRESS = 'Augustin';
   const WAKE_RE = /(?:dsch|tsch|sch|j|y)ar[vw][iy]s+/i;   // erkennt auch "Dscharvis", "Jarwis" …
   let armedUntil = 0;           // bis wann JARVIS auf einen Befehl wartet
   const ARM_MS = 10000;
@@ -417,7 +417,7 @@
     // Klick auf Mikro/Orb startet das Hören selbst – dann keine Begrüßung
     if (ev && ev.target && (ev.target === micBtn || micBtn.contains(ev.target) || ev.target === orbCanvas)) return;
     startListening();
-    jarvisSay(`Systeme online, ${USER_NAME}. Sag Hey Jarvis, wenn du mich brauchst.`);
+    jarvisSay(`${ADDRESS}, Systeme online. Sag Hey Jarvis, wenn du mich brauchst.`);
   }
 
   async function boot(afterToken) {

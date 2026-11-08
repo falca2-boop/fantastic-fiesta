@@ -26,6 +26,7 @@ export function createServer(opts = {}) {
     token: opts.token ?? env.JARVIS_TOKEN ?? '',
     model: opts.model ?? (provider === 'gemini' ? (env.GEMINI_MODEL || DEFAULT_GEMINI_MODEL) : (env.JARVIS_MODEL ?? 'claude-sonnet-5-5')),
     userName: opts.userName ?? env.JARVIS_USER_NAME ?? 'Augustin',
+    address: opts.address ?? env.JARVIS_ADDRESS ?? '',
     webhookUrl: opts.webhookUrl ?? env.N8N_WEBHOOK_URL ?? '',
     fetchFn: opts.fetchFn ?? fetch,
     mail: opts.mail === undefined ? mailConfigFromEnv(env) : opts.mail,
@@ -61,6 +62,7 @@ export function createServer(opts = {}) {
     const d = store.data;
     return {
       userName: cfg.userName,
+      address: cfg.address || cfg.userName,
       goal: d.goal,
       notes: store.vaultDir
         ? recentNotes(store.vaultDir, 4)
@@ -113,7 +115,7 @@ export function createServer(opts = {}) {
           const message = typeof body.message === 'string' ? body.message.trim() : '';
           if (!message || message.length > 4000) return json(res, 400, { error: 'Nachricht fehlt oder ist zu lang.' });
           const offsetMinutes = Number.isFinite(body.offsetMinutes) ? Math.max(-840, Math.min(840, body.offsetMinutes)) : 0;
-          const reply = await enqueue(() => chat({ store, message, offsetMinutes, apiKey: cfg.apiKey, model: cfg.model, provider: cfg.provider, userName: cfg.userName, webhookUrl: cfg.webhookUrl, mailEnabled: !!cfg.mail, fetchFn: cfg.fetchFn }));
+          const reply = await enqueue(() => chat({ store, message, offsetMinutes, apiKey: cfg.apiKey, model: cfg.model, provider: cfg.provider, userName: cfg.userName, address: cfg.address, webhookUrl: cfg.webhookUrl, mailEnabled: !!cfg.mail, fetchFn: cfg.fetchFn }));
           return json(res, 200, { reply, state: publicState() });
         }
         if (pathname === '/api/speak' && req.method === 'POST') {
