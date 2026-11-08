@@ -66,6 +66,10 @@ npm start                # → http://127.0.0.1:8000 in Chrome oder Edge
 
 Das Mikrofon funktioniert auf `localhost` und über `https://`.
 
+## Beim Öffnen: Begrüßung und sofort zuhören
+
+Öffnest du Jarvis, sagt er sofort die Anrede (`JARVIS_ADDRESS`, z. B. „Hey Boss", sonst `JARVIS_USER_NAME`) und hört gleich zu. Der erste Befehl braucht kein „Hey Jarvis". Voraussetzung ist, dass Chrome für die Seite **Mikrofon** und **Ton** erlaubt (Schloss-Symbol → Website-Einstellungen). Sperrt Chrome den Ton ohne Klick, erscheint ein Hinweis, das Zuhören läuft trotzdem, und die Begrüßung folgt beim ersten Klick. Test: `node test/e2e/greeting.mjs` (braucht Playwright).
+
 ## Ein Klick statt Befehle (Linux/Chromebook)
 
 `bash scripts/install-launcher.sh` legt ein **Jarvis**-Symbol im Startmenü an (Linux-Apps). Ein Klick startet Jarvis, falls er nicht läuft, und öffnet ihn im Browser (Port 8001). Der Key und alle Einstellungen kommen aus der `.env`. Im Terminal gehen auch `jarvis-start` und `jarvis-stop`.

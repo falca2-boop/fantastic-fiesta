@@ -59,8 +59,10 @@
     setState('speaking');
     if (recognition && listening) { try { recognition.stop(); } catch (e) {} }
   }
+  let armAfterSpeech = false;     // nach der Begrüßung sofort einen Befehl ohne "Hey Jarvis" annehmen
   function doneSpeaking() {
     setState(listening ? 'listening' : 'idle');
+    if (armAfterSpeech && listening) { armAfterSpeech = false; armedUntil = Date.now() + ARM_MS; }
     if (listening) restartRecognition();
   }
   function stopSpeaking() {
@@ -69,18 +71,22 @@
     if (currentAudio) { const a = currentAudio; currentAudio = null; a.pause(); }
   }
 
+  /** Gibt true zurück, wenn die Sprachausgabe gestartet ist, false wenn Chrome sie ohne Klick blockiert. */
   function speakBrowser(text) {
-    if (!synth) return;
-    const u = new SpeechSynthesisUtterance(text);
-    if (deVoice) u.voice = deVoice;
-    u.lang = 'de-DE'; u.rate = 1.02; u.pitch = 0.9;
-    u.onstart = startedSpeaking;
-    u.onend = doneSpeaking;
-    u.onerror = doneSpeaking;
-    synth.speak(u);
+    return new Promise((resolve) => {
+      if (!synth) return resolve(false);
+      const u = new SpeechSynthesisUtterance(text);
+      if (deVoice) u.voice = deVoice;
+      u.lang = 'de-DE'; u.rate = 1.02; u.pitch = 0.9;
+      u.onstart = () => { startedSpeaking(); resolve(true); };
+      u.onend = doneSpeaking;
+      u.onerror = () => { doneSpeaking(); resolve(false); };
+      synth.speak(u);
+      setTimeout(() => resolve(!!synth.speaking), 2500);        // weder Start noch Fehler gemeldet
+    });
   }
 
-  // Server-Stimme (ElevenLabs); bei jedem Fehler fällt JARVIS auf die Browser-Stimme zurück
+  // Server-Stimme (ElevenLabs); bei jedem Fehler fällt JARVIS auf die Browser-Stimme zurück. Gibt zurück, ob gesprochen wird.
   async function speak(text) {
     stopSpeaking();
     const seq = speakSeq;
@@ -97,21 +103,21 @@
           throw new Error('speak ' + res.status);
         }
         const blob = await res.blob();
-        if (seq !== speakSeq) return;              // inzwischen wurde etwas anderes angefordert
+        if (seq !== speakSeq) return true;         // inzwischen wurde etwas anderes angefordert
         const url = URL.createObjectURL(blob);
         const audio = new Audio(url);
         const finish = () => { URL.revokeObjectURL(url); if (currentAudio === audio) { currentAudio = null; doneSpeaking(); } };
         audio.onended = finish; audio.onerror = finish;
         currentAudio = audio;
+        await audio.play();                        // schlägt fehl, wenn Chrome Ton ohne Klick sperrt
         startedSpeaking();
-        await audio.play();
-        return;
+        return true;
       } catch (e) {
-        if (seq !== speakSeq) return;
+        if (seq !== speakSeq) return true;
         currentAudio = null;
       }
     }
-    speakBrowser(text);
+    return speakBrowser(text);
   }
 
   // ---------- UI ----------
@@ -415,14 +421,29 @@
   tickClock();
 
   // ---------- Start ----------
-  let greeted = false;
-  function greetOnce(ev) {
-    if (greeted) return; greeted = true;
+  // Beim Öffnen sagt JARVIS sofort die Anrede ("Hey Boss") und hört gleich zu; ein erster Befehl braucht kein "Hey Jarvis".
+  // Chrome kann Ton ohne Klick sperren: dann gibt es einen Hinweis, und die Begrüßung folgt beim ersten Klick. Das Hören startet trotzdem.
+  let pendingGreet = false;
+  const greetText = () => `${ADDRESS}.`;
+
+  async function openGreeting() {
+    armAfterSpeech = true;
+    armedUntil = Date.now() + ARM_MS + 3000;
+    if (recognition && !listening) startListening();
+    addBubble(greetText(), 'jarvis');
+    const spoke = await speak(greetText());
+    if (!spoke) {
+      pendingGreet = true;
+      addBubble('Chrome erlaubt mir ohne Klick noch keinen Ton. Klick einmal irgendwo. Dauerhaft: Schloss-Symbol in der Adresszeile → Website-Einstellungen → Ton → Zulassen.', 'jarvis');
+    }
+  }
+
+  function onFirstGesture(ev) {
     try { if (window.Notification && Notification.permission === 'default') Notification.requestPermission(); } catch (e) {}
-    // Klick auf Mikro/Orb startet das Hören selbst – dann keine Begrüßung
+    // Klick auf Mikro/Orb startet das Hören selbst
     if (ev && ev.target && (ev.target === micBtn || micBtn.contains(ev.target) || ev.target === orbCanvas)) return;
-    startListening();
-    jarvisSay(`${ADDRESS}, Systeme online. Sag Hey Jarvis, wenn du mich brauchst.`);
+    if (pendingGreet) { pendingGreet = false; armAfterSpeech = true; if (recognition && !listening) startListening(); speak(greetText()); }
+    else if (recognition && !listening) startListening();     // das automatische Hören ging nicht (z. B. Mikrofon noch nicht erlaubt)
   }
 
   async function boot(afterToken) {
@@ -437,8 +458,9 @@
     } catch (e) {
       if (e.code === 401) { askToken(TOKEN ? 'Token ist falsch.' : ''); return; }
     }
-    if (afterToken) { greeted = false; greetOnce(); }
-    else window.addEventListener('pointerdown', greetOnce, { once: true });
+    window.addEventListener('pointerdown', onFirstGesture, { once: true });
+    window.addEventListener('keydown', onFirstGesture, { once: true });
+    openGreeting();
   }
   boot(false);
 })();
