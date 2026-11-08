@@ -37,6 +37,20 @@ try {
   await page.waitForTimeout(800);
   check('Der erste Befehl wird ohne "Hey Jarvis" angenommen', (await page.locator('.msg.user .bubble').allTextContents()).includes('Wie spät ist es'));
   check('Es wird nur einmal begrüßt', (await page.evaluate(() => window.__spoken.filter((t) => t === 'Hey Boss.').length)) === 1);
+  // Wake-Word: ohne "Jarvis" ignorieren, nur "Hey Jarvis" -> zuhören, danach Befehl; Variante mit Befehl im selben Satz
+  const say = (t) => page.evaluate((t) => { const r = window.__recs[0]; const res = [[{ transcript: t }]]; res[0].isFinal = true; r.onresult({ resultIndex: 0, results: res }); }, t);
+  await page.waitForTimeout(500);
+  const userCount = async () => (await page.locator('.msg.user .bubble').allTextContents());
+  await say('Das Wetter ist schön'); await page.waitForTimeout(400);
+  check('Sprache ohne "Jarvis" wird ignoriert', !(await userCount()).includes('Das Wetter ist schön'));
+  await say('Hey Jarvis'); await page.waitForTimeout(400);
+  check('"Hey Jarvis" zeigt "Ja? Sag deinen Befehl"', (await page.locator('#heard.wake').textContent()).includes('Befehl'));
+  check('Nach "Hey Jarvis" steht der Status auf "Höre zu"', (await page.locator('#stateText').textContent()).includes('Höre zu'));
+  await say('Was steht heute an'); await page.waitForTimeout(600);
+  check('Der Befehl nach "Hey Jarvis" wird angenommen', (await userCount()).includes('Was steht heute an'));
+  await page.waitForTimeout(1500);
+  await say('Hej Dscharwis Plane meinen Tag'); await page.waitForTimeout(600);
+  check('Variante "Dscharwis" + Befehl im selben Satz', (await userCount()).includes('Plane meinen Tag'));
   check('Keine Seitenfehler (Fall 1)', errs.length === 0, errs.join('|'));
   await ctx.close();
 

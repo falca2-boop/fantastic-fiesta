@@ -144,6 +144,12 @@ canvas#orb { width: 100%; height: 100%; display: block; cursor: pointer; }
 }
 .suggest button:hover { border-color: rgba(var(--accent-rgb), 0.55); background: rgba(var(--accent-rgb), 0.1); color: var(--text); transform: translateY(-1px); }
 
+/* Live-Anzeige: was der Browser gerade hört */
+.heard { min-height: 20px; margin-top: 12px; font-size: 13px; color: var(--muted); transition: color .2s, opacity .4s; opacity: 0; }
+.heard.on { opacity: 1; }
+.heard.wake { color: var(--accent-2); }
+.heard.warn { color: var(--warn); }
+
 /* ---------- Chat ---------- */
 .chat { display: grid; grid-template-rows: minmax(0, 1fr) auto; min-height: 0; }
 .messages {

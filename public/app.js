@@ -311,7 +311,32 @@
 
   // ---------- Spracherkennung mit Wake-Word "Hey Jarvis" ----------
   let USER_NAME = 'Augustin', ADDRESS = 'Augustin';
-  const WAKE_RE = /(?:dsch|tsch|sch|j|y)ar[vw][iy]s+/i;   // erkennt auch "Dscharvis", "Jarwis" …
+  // "Jarvis" erkennen, auch wenn die Spracherkennung es anders schreibt (siehe wake.js)
+  const heardEl = document.getElementById('heard');
+  let heardTimer = null;
+  function showHeard(text, cls) {
+    if (!heardEl) return;
+    heardEl.textContent = text;
+    heardEl.className = 'heard on' + (cls ? ' ' + cls : '');
+    clearTimeout(heardTimer);
+    heardTimer = setTimeout(() => { heardEl.className = 'heard'; }, 6000);
+  }
+  // kurzer Ton als Bestätigung des Wake-Words (kein Sprechen, damit das Zuhören nicht unterbrochen wird)
+  let actx = null;
+  function chime() {
+    try {
+      actx = actx || new (window.AudioContext || window.webkitAudioContext)();
+      if (actx.state === 'suspended') actx.resume();
+      const t = actx.currentTime;
+      [660, 880].forEach((f, i) => {
+        const o = actx.createOscillator(), g = actx.createGain();
+        o.type = 'sine'; o.frequency.value = f;
+        g.gain.setValueAtTime(0.0001, t + i * 0.09); g.gain.linearRampToValueAtTime(0.12, t + i * 0.09 + 0.01); g.gain.exponentialRampToValueAtTime(0.0001, t + i * 0.09 + 0.17);
+        o.connect(g); g.connect(actx.destination); o.start(t + i * 0.09); o.stop(t + i * 0.09 + 0.19);
+      });
+    } catch (e) { /* ohne Ton: es gibt die visuelle Bestätigung */ }
+  }
+  let wakeCued = false;          // Wake-Word schon aus dem Zwischenergebnis bestätigt
   let armedUntil = 0;           // bis wann JARVIS auf einen Befehl wartet
   const ARM_MS = 10000;
 
@@ -326,12 +351,14 @@
   function onFinalSpeech(raw) {
     const text = raw.trim();
     if (!text) return;
-    const m = text.match(WAKE_RE);
+    showHeard('Ich höre: ' + text);
+    const m = window.findWake(text);
     if (m) {
       // alles nach dem Wake-Word ist der Befehl
-      const cmd = text.slice(m.index + m[0].length).replace(/^[\s,.:!?-]+/, '');
+      const cmd = text.slice(m.end).replace(/^[\s,.:!?-]+/, '');
       if (cmd.length > 2) { armedUntil = 0; handleInput(cmd); }
-      else { armedUntil = Date.now() + ARM_MS; jarvisSay(`Ja, ${USER_NAME}?`); }
+      else { armedUntil = Date.now() + ARM_MS; if (!wakeCued) chime(); showHeard('Ja? Sag deinen Befehl …', 'wake'); setState('listening'); }
+      wakeCued = false;
       return;
     }
     if (Date.now() < armedUntil) { armedUntil = 0; handleInput(text); }
@@ -351,9 +378,14 @@
         if (r.isFinal) final += r[0].transcript;
         else interim += r[0].transcript;
       }
-      if (interim && (Date.now() < armedUntil || WAKE_RE.test(interim))) {
-        if (!interimBubble) interimBubble = addBubble(interim, 'user', true);
-        else interimBubble.textContent = interim;
+      if (interim) {
+        showHeard('Ich höre: ' + interim);
+        // Wake-Word schon im Zwischenergebnis: sofort bestätigen und auf den Befehl vorbereiten
+        if (window.findWake(interim) && !wakeCued && Date.now() >= armedUntil) { wakeCued = true; armedUntil = Date.now() + ARM_MS; chime(); showHeard('Ja? Sag deinen Befehl …', 'wake'); }
+        if (Date.now() < armedUntil || window.findWake(interim)) {
+          if (!interimBubble) interimBubble = addBubble(interim, 'user', true);
+          else interimBubble.textContent = interim;
+        }
       }
       if (final) {
         if (interimBubble) { interimBubble.remove(); interimBubble = null; }
@@ -372,6 +404,8 @@
         listening = false; micBtn.classList.remove('active'); stopMicMeter(); setState('idle');
         addBubble('Mikrofon-Zugriff wurde blockiert. Bitte im Browser erlauben.', 'jarvis');
       }
+      else if (e.error === 'network') showHeard('Die Spracherkennung braucht Internet (Chrome schickt das Audio zur Auswertung an Google).', 'warn');
+      else if (e.error === 'audio-capture') showHeard('Kein Mikrofon gefunden.', 'warn');
       // andere Fehler (no-speech, aborted): onend startet neu
     };
   }
