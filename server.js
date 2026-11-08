@@ -11,6 +11,7 @@ import { DEFAULT_GEMINI_MODEL } from './lib/gemini.js';
 import { loadEnvFile } from './lib/env.js';
 import { vaultDirFromEnv, recentNotes } from './lib/vault.js';
 import { listAgents } from './lib/agents.js';
+import { usageSummary } from './lib/usage.js';
 import { briefingConfig, takeBriefing, runBriefing, startBriefingScheduler } from './lib/briefing.js';
 import { loadNews, loadEvents, findLiveCam } from './lib/world.js';
 import { mailConfigFromEnv, startMailWatcher, takeMailAlerts } from './lib/mail.js';
@@ -74,6 +75,7 @@ export function createServer(opts = {}) {
         ? recentNotes(store.vaultDir, 4)
         : d.notes.slice(-4).reverse().map(n => ({ title: '', text: n.text.slice(0, 160), ts: n.ts })),
       factCount: d.facts.length,
+      usage: usageSummary(store),
       agents: listAgents(store).map(({ name, role, builtin }) => ({ name, role: role.slice(0, 140), builtin })),
       tasks: d.tasks.filter(t => !t.done).map(({ id, text, due }) => ({ id, text, due })),
       reminders: d.reminders.filter(r => !r.fired).sort((a, b) => new Date(a.at) - new Date(b.at)).map(({ id, text, at }) => ({ id, text, at })),

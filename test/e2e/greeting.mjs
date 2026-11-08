@@ -6,7 +6,7 @@ const require = createRequire(import.meta.url);
 const { chromium } = require('playwright');
 const { createServer } = await import('../../server.js');
 const { Store } = await import('../../lib/store.js');
-const fake = async () => ({ ok: true, status: 200, json: async () => ({ stop_reason: 'end_turn', content: [{ type: 'text', text: 'Boss, es ist 18 Uhr.' }] }) });
+const fake = async () => ({ ok: true, status: 200, json: async () => ({ stop_reason: 'end_turn', content: [{ type: 'text', text: 'Boss, es ist 18 Uhr.' }], usage: { input_tokens: 5000, output_tokens: 100 } }) });
 const { server } = createServer({ store: new Store(null), apiKey: 'k', fetchFn: fake, voice: null, mail: null, userName: 'Boss', address: 'Hey Boss' });
 await new Promise(r => server.listen(8260, '127.0.0.1', r));
 const b = await chromium.launch();
@@ -36,6 +36,8 @@ try {
   await page.evaluate(() => { const r = window.__recs[0]; const res = [[{ transcript: 'Wie spät ist es' }]]; res[0].isFinal = true; r.onresult({ resultIndex: 0, results: res }); });
   await page.waitForTimeout(800);
   check('Der erste Befehl wird ohne "Hey Jarvis" angenommen', (await page.locator('.msg.user .bubble').allTextContents()).includes('Wie spät ist es'));
+  await page.waitForTimeout(500);
+  check('Kostenanzeige im Kasten System zeigt den echten Verbrauch (≈ 0,01 $, 5.100 Token)', /Heute.*≈ 0,01 \$ · 5\.100 Token/.test((await page.locator('#usageBox').textContent()).replace(/\s+/g, ' ')), (await page.locator('#usageBox').textContent()).replace(/\s+/g, ' '));
   check('Es wird nur einmal begrüßt', (await page.evaluate(() => window.__spoken.filter((t) => t === 'Hey Boss.').length)) === 1);
   // Wake-Word: ohne "Jarvis" ignorieren, nur "Hey Jarvis" -> zuhören, danach Befehl; Variante mit Befehl im selben Satz
   const say = (t) => page.evaluate((t) => { const r = window.__recs[0]; const res = [[{ transcript: t }]]; res[0].isFinal = true; r.onresult({ resultIndex: 0, results: res }); }, t);

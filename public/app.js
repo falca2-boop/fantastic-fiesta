@@ -218,6 +218,19 @@
     if (!s) return;
     if (s.userName) { USER_NAME = s.userName; ADDRESS = s.address || s.userName; tickClock(); }
 
+    // Kosten (aus den echten API-Antworten)
+    if (s.usage) {
+      const u = s.usage, box = $('usageBox'); box.textContent = '';
+      const usd = (x) => '≈ ' + x.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' $';
+      const row = (label, value, cls) => { const d = el('div', 'urow' + (cls ? ' ' + cls : '')); d.append(el('span', '', label), el('span', '', value)); box.appendChild(d); };
+      row('Heute', u.today.calls ? usd(u.today.cost) + ' · ' + u.today.tokens.toLocaleString('de-DE') + ' Token' : 'noch nichts verbraucht', u.limitReached ? 'bad' : '');
+      if (u.today.searches) row('Websuchen heute', String(u.today.searches));
+      row('Dieser Monat', usd(u.month.cost));
+      for (const k of u.kinds) row('  ' + k.name, usd(k.cost) + ' · ' + k.calls + '×');
+      if (u.limit) row('Tageslimit', u.limit.toFixed(2) + ' $' + (u.limitReached ? ' erreicht' : ''), u.limitReached ? 'bad' : '');
+      if (u.today.unpriced || u.month.unpriced) row('Hinweis', 'Preis für dieses Modell unbekannt, Kosten unvollständig', 'warn');
+    }
+
     // Agenten
     const al = $('agentList'); al.textContent = '';
     $('agentCount').textContent = (s.agents || []).length;

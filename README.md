@@ -162,3 +162,10 @@ Bibliotheken liegen unter `public/vendor/` (globe.gl, three.js, NASA-Texturen; M
 - **briefschreiber:** Entwirft pro Firma einen kurzen, ehrlichen, persönlichen Brief mit Angebot (Webseite, Chat-Assistent), mit Platzhalter `[Absender]`. Er schreibt nur Text und versendet nichts. Ablauf: erst den Firmensucher, dann *„Lass den Briefschreiber Briefe für diese Liste entwerfen.“*, dann *„Speichere die Briefe als Notiz.“*
 - **morgenbriefing:** Die wichtigsten Meldungen aus Welt, Europa und Wirtschaft/Technik mit Quellen. *„Gib mir mein Morgenbriefing, Schwerpunkt Technik.“* Er läuft auf Zuruf und auf Wunsch **automatisch jeden Morgen**: *„Schick mir jeden Morgen um 7:30 das Briefing, Schwerpunkt Technik.“* (oder `MORNING_BRIEFING_TIME=07:30` in der `.env`; *„Schalte das Morgenbriefing aus“* beendet es). Zur Uhrzeit des Geräts erstellt Jarvis das Briefing, sagt es an, sobald die Seite offen ist, und legt es als Obsidian-Notiz ab. Jarvis muss dafür laufen; wird er später gestartet, holt er es bis zu 3 Stunden nach. Mit Claude als KI.
 - **marktbeobachter:** Recherchiert Preise, Konkurrenten oder Produkte per Websuche und vergleicht mit dem zuletzt in Obsidian gespeicherten Stand (Notiz „Markt: Thema“). Keine Anlageberatung.
+
+
+## Kosten im Blick
+
+Im Kasten **System** zeigt Jarvis den echten Verbrauch: heute und im laufenden Monat in Token und geschätzten US-Dollar, dazu die Websuchen und die teuersten Verwendungen (Gespräch, einzelne Agenten, Morgenbriefing). Die Zahlen stammen aus den Antworten der Anthropic-API (`usage`), die Preise aus der Anthropic-Preisliste (`lib/usage.js`, Sonnet 5.5: 2 $ Eingabe / 10 $ Ausgabe pro Million Token, Websuche 10 $ pro 1.000). Es ist eine Schätzung, maßgeblich ist die Rechnung in der Anthropic Console. Gezählt wird ab dem Update; frühere Nutzung fehlt. Mit Gemini wird nichts gezählt.
+
+Optionales **Tageslimit**: `JARVIS_DAILY_LIMIT_USD=2` in der `.env`. Ist es erreicht, ruft Jarvis bis morgen die KI nicht mehr auf (auch Agenten und Morgenbriefing nicht). Das ersetzt nicht das Ausgabenlimit in der Console, ergänzt es aber.
