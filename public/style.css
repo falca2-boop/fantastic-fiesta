@@ -119,24 +119,28 @@ a.chip:hover { color: var(--text); border-color: var(--accent); }
 .main { display: grid; grid-template-rows: auto minmax(0, 1fr); gap: 18px; min-height: 0; }
 
 .hero {
+  --orb: clamp(230px, 38vh, 420px);          /* Größe der Orb-Kugel: wächst mit der Fensterhöhe */
   display: grid;
-  grid-template-columns: 250px minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr);
+  justify-items: center;
+  text-align: center;
   align-items: center;
-  gap: 8px;
-  padding: 10px 28px 10px 10px;
+  gap: 0;
+  padding: 4px 28px 14px;
   position: relative;
   overflow: hidden;
 }
 .hero::after {
   content: ""; position: absolute; inset: 0; pointer-events: none;
-  background: radial-gradient(420px 220px at 12% 50%, rgba(var(--accent-rgb), 0.10), transparent 70%);
+  background: radial-gradient(520px 300px at 50% 30%, rgba(var(--accent-rgb), 0.12), transparent 70%);
 }
-.orb-wrap { position: relative; width: 250px; height: 250px; z-index: 1; }
-canvas#orb { width: 100%; height: 100%; display: block; cursor: pointer; }
+.orb-wrap { position: relative; width: var(--orb); height: var(--orb); margin-bottom: calc(var(--orb) * -0.17); z-index: 1; pointer-events: none; }
+canvas#orb { width: 100%; height: 100%; display: block; cursor: pointer; pointer-events: auto; }
 .hero-text { position: relative; z-index: 1; min-width: 0; }
 .eyebrow { font-size: 12px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--accent-2); }
 .hero h1 { font-size: clamp(24px, 3.1vw, 36px); line-height: 1.15; font-weight: 700; letter-spacing: -0.02em; margin: 6px 0 6px; }
-.hero p { color: var(--text-2); max-width: 52ch; }
+.hero p { color: var(--text-2); max-width: 52ch; margin-inline: auto; }
+.hero .suggest { justify-content: center; }
 .suggest { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
 .suggest button {
   padding: 8px 14px; border-radius: 999px;
@@ -288,8 +292,6 @@ canvas#orb { width: 100%; height: 100%; display: block; cursor: pointer; }
 /* ---------- Responsive ---------- */
 @media (max-width: 1180px) {
   .app { grid-template-columns: minmax(0, 1fr) 330px; }
-  .hero { grid-template-columns: 200px minmax(0, 1fr); }
-  .orb-wrap { width: 200px; height: 200px; }
 }
 @media (max-width: 900px) {
   body { overflow: auto; }
@@ -298,10 +300,7 @@ canvas#orb { width: 100%; height: 100%; display: block; cursor: pointer; }
   .chat { min-height: 440px; max-height: 70vh; }
   .side { overflow: visible; }
   .clock small { display: none; }
-  .hero { grid-template-columns: 1fr; justify-items: center; text-align: center; padding: 14px 18px 22px; }
-  .hero p { margin-inline: auto; }
-  .suggest { justify-content: center; }
-  .orb-wrap { width: 190px; height: 190px; }
+  .hero { --orb: 230px; padding: 10px 18px 22px; }
   #sysChip { display: none; }
 }
 @media (max-width: 480px) {
@@ -329,3 +328,6 @@ canvas#orb { width: 100%; height: 100%; display: block; cursor: pointer; }
 .chip.cost.warn { color: var(--warn); border-color: rgba(255, 194, 71, 0.5); }
 .chip.cost.bad { color: var(--danger); border-color: rgba(255, 92, 122, 0.5); }
 #cardCost .usage { margin-top: 0; padding-top: 0; border-top: 0; font-size: 0.88rem; }
+
+/* Niedrige Fenster: Beschreibung ausblenden, damit der Chat Platz behält */
+@media (max-height: 940px) and (min-width: 901px) { .hero p { display: none; } .hero .suggest { margin-top: 10px; } }
