@@ -152,7 +152,25 @@
       dialog.appendChild(typingEl); dialog.scrollTop = dialog.scrollHeight;
     } else if (!on && typingEl) { typingEl.remove(); typingEl = null; }
   }
-  function jarvisSay(text) { addBubble(text, 'jarvis'); speak(text); }
+  // Nichts doppelt vorlesen: bereits gesprochene Sätze merkt sich der Browser (auch über neue Chats hinweg).
+  const SPOKEN_KEY = 'jarvis.spoken';
+  const normSentence = (s) => s.toLowerCase().replace(/[^a-zäöüß0-9 ]/g, '').replace(/\s+/g, ' ').trim();
+  function loadSpoken() { try { return JSON.parse(localStorage.getItem(SPOKEN_KEY) || '[]'); } catch (e) { return []; } }
+  function saveSpoken(list) { try { localStorage.setItem(SPOKEN_KEY, JSON.stringify(list.slice(-300))); } catch (e) {} }
+  function freshSpeech(text) {
+    const seen = loadSpoken();
+    const set = new Set(seen);
+    const out = [];
+    for (const sent of text.match(/[^.!?]+[.!?]*/g) || []) {
+      const key = normSentence(sent);
+      if (key.length < 12) { out.push(sent); continue; }       // kurze Bestätigungen dürfen sich wiederholen
+      if (set.has(key)) continue;
+      set.add(key); seen.push(key); out.push(sent);
+    }
+    saveSpoken(seen);
+    return out.join(' ').trim();
+  }
+  function jarvisSay(text) { addBubble(text, 'jarvis'); const t = freshSpeech(text); if (t) speak(t); }
 
   const fmtTime = (iso) => new Date(iso).toLocaleString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
   function relTime(iso) {
