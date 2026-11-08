@@ -36,6 +36,14 @@
         <label><input type="checkbox" id="tEvents" checked /> <span class="dot ev"></span> Krisenmeldungen (24 h)</label>
         <label><input type="checkbox" id="tSpin" checked /> Drehen</label>
       </div>
+      <div class="w-3d" aria-label="3D-Einstellungen">
+        <div class="w-3d-row" role="group" aria-label="Darstellung">
+          <button type="button" data-skin="satellit" class="on">Satellit</button>
+          <button type="button" data-skin="nacht">Nacht</button>
+          <button type="button" data-skin="dunkel">Dunkel</button>
+        </div>
+        <label class="w-3d-slider">3D-Höhe <input type="range" id="r3d" min="0" max="100" value="40" aria-label="3D-Höhe von Relief, Kontinenten und Säulen" /></label>
+      </div>
       <div class="w-fallback" id="wFallback" hidden></div>
       <aside class="w-info" id="wInfo" aria-live="polite" hidden></aside>
     </section>

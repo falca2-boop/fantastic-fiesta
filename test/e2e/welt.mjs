@@ -64,6 +64,16 @@ try {
   check('Adresse ?region=asien wählt den Kontinent', (await p2.locator('#wInfo h3').textContent()) === 'Asien');
   if (process.env.SHOT) await p2.screenshot({ path: process.env.SHOT.replace('.png', '-asien.png') });
   await p2.close();
+  const alt0 = await page.evaluate(() => window.__welt.globe.polygonAltitude()({ properties: { continent: 'Afrika' } }));
+  await page.locator('#r3d').fill('100');
+  const alt1 = await page.evaluate(() => window.__welt.globe.polygonAltitude()({ properties: { continent: 'Afrika' } }));
+  check('3D-Höhe: Regler baut die Kontinente höher (und Relief stärker)', alt1 > alt0 && (await page.evaluate(() => window.__welt.globe.globeMaterial().bumpScale)) === 25, alt0 + ' -> ' + alt1);
+  await page.locator('#r3d').fill('0');
+  check('3D-Höhe 0: flache Ansicht', (await page.evaluate(() => window.__welt.getDepth())) === 0);
+  await page.locator('#r3d').fill('40');
+  await page.click('.w-3d-row button[data-skin="nacht"]');
+  check('Darstellung Nacht: Stadtlichter-Textur', (await page.evaluate(() => window.__welt.globe.globeImageUrl())).includes('earth-night.jpg') && (await page.locator('.w-3d-row button.on').textContent()) === 'Nacht');
+  await page.click('.w-3d-row button[data-skin="satellit"]');
   await page.click('.w-regions button[data-region="nahost"]');
   check('Regionswechsel markiert Nahost', (await page.locator('.w-regions button.on').textContent()) === 'Nahost');
   check('Keine Seitenfehler', errs.length === 0, errs.join('|'));

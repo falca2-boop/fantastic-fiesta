@@ -107,7 +107,10 @@
   const VIEWS = {
     asien: { lat: 38, lng: 90, altitude: 1.9 }, afrika: { lat: 2, lng: 20, altitude: 1.9 }, nordamerika: { lat: 42, lng: -100, altitude: 1.9 },
     suedamerika: { lat: -15, lng: -60, altitude: 1.9 }, ozeanien: { lat: -25, lng: 140, altitude: 1.9 }, antarktis: { lat: -82, lng: 0, altitude: 2.0 }, welt: { lat: 20, lng: 10, altitude: 2.4 }, europa: { lat: 50, lng: 14, altitude: 1.15 }, ukraine: { lat: 49, lng: 32, altitude: 0.75 }, nahost: { lat: 31.5, lng: 38, altitude: 0.95 } };
-  let globe = null, cams = [], events = [], countries = [], hoverCont = null, selectedCont = null;
+  let globe = null, cams = [], events = [], countries = [], hoverCont = null, selectedCont = null, depth = 1;   // depth: 3D-Höhe (1 = Standard)
+  const SKINS = { satellit: 'vendor/earth-blue-marble.jpg', nacht: 'vendor/earth-night.jpg', dunkel: 'vendor/earth-dark.jpg' };
+  const pointAlt = (p) => (p.kind === 'cam' ? 0.02 * depth : 0.015 + Math.min(0.22, Math.log10(p.count + 1) * 0.07) * depth);
+  const polyAlt = (f) => (f.properties.continent === hoverCont || f.properties.continent === selectedCont ? 0.028 : 0.006) * depth;
   const contByKey = Object.fromEntries(Object.entries(CONTINENTS).map(([n, c]) => [c.key, n]));
   const esc = (t) => String(t).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
@@ -187,13 +190,13 @@
         .pointLat('lat').pointLng('lng')
         .pointColor((p) => (p.kind === 'cam' ? '#3df0ff' : '#ff5c5c'))
         .pointRadius((p) => (p.kind === 'cam' ? 0.28 : Math.min(1.1, 0.25 + Math.log10(p.count + 1) * 0.3)))
-        .pointAltitude((p) => (p.kind === 'cam' ? 0.02 : 0.015))
+        .pointAltitude(pointAlt)
         .pointLabel((p) => p.name)
         .onPointClick((p) => { showInfo(p); globe.pointOfView({ lat: p.lat, lng: p.lng, altitude: 0.6 }, 1000); })
         .polygonCapColor((f) => { const c = CONTINENTS[f.properties.continent]; const on = f.properties.continent === hoverCont || f.properties.continent === selectedCont; return 'rgba(' + c.color + ',' + (on ? 0.42 : 0.13) + ')'; })
         .polygonSideColor((f) => 'rgba(' + CONTINENTS[f.properties.continent].color + ',0.18)')
         .polygonStrokeColor((f) => 'rgba(' + CONTINENTS[f.properties.continent].color + ',0.75)')
-        .polygonAltitude((f) => (f.properties.continent === hoverCont || f.properties.continent === selectedCont ? 0.028 : 0.006))
+        .polygonAltitude(polyAlt)
         .polygonsTransitionDuration(300)
         .polygonLabel((f) => '<b>' + esc(f.properties.name) + '</b><br><span style="opacity:.75">' + esc(f.properties.continent) + '</span>')
         .onPolygonHover((f) => { const n = f ? f.properties.continent : null; if (n !== hoverCont) { hoverCont = n; globe.polygonsData(globe.polygonsData()); } })
@@ -211,7 +214,20 @@
       new ResizeObserver(fit).observe(host); fit();
       $('tSpin').addEventListener('change', () => { c.autoRotate = $('tSpin').checked; });
       c.addEventListener('start', () => { c.autoRotate = false; $('tSpin').checked = false; });
-      window.__welt = { globe, soft, showInfo: (p) => showInfo(p), selectContinent: (n) => selectContinent(n) };
+      // 3D: Relief (Bump-Map) kräftiger machen, Kontinente und Ereignis-Säulen in die Höhe bauen
+      const mat = globe.globeMaterial(); mat.bumpScale = 10;
+      function apply3d() {
+        const v = Number($('r3d').value);
+        depth = v / 40;
+        mat.bumpScale = v / 4;
+        globe.polygonAltitude(polyAlt).pointAltitude(pointAlt);
+      }
+      $('r3d').addEventListener('input', apply3d);
+      for (const b of document.querySelectorAll('.w-3d-row button')) b.addEventListener('click', () => {
+        globe.globeImageUrl(SKINS[b.dataset.skin]);
+        for (const x of document.querySelectorAll('.w-3d-row button')) x.classList.toggle('on', x === b);
+      });
+      window.__welt = { globe, soft, apply3d, getDepth: () => depth, showInfo: (p) => showInfo(p), selectContinent: (n) => selectContinent(n) };
     } catch (err) {
       globe = null; console.error('[Welt] Globus konnte nicht starten', err);
       $('wFallback').hidden = false; $('wFallback').textContent = 'Die 3D-Weltkugel braucht WebGL und startet hier nicht. Livestream und Schlagzeilen funktionieren trotzdem.';
