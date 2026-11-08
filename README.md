@@ -95,7 +95,7 @@ npm test
 | `lib/gemini.js` | Gemini-Anbindung (Werkzeug-Umwandlung, Websuche über Google) |
 | `lib/vault.js` | Obsidian-Anbindung (Notizen, Gedächtnis als Markdown) |
 | `lib/mail.js` | IMAP-Überwachung, Filter, Anruf (Twilio) und Push (ntfy) |
-| `public/` | Oberfläche: Orb, Spracherkennung („Hey Jarvis"), Sprachausgabe |
+| `public/` | Oberfläche: Dashboard, Neural-Pulse-Animation (`neural.js`), Spracherkennung („Hey Jarvis"), Sprachausgabe |
 
 Einschränkungen: Spracherkennung und -ausgabe nutzen die Browser-Funktionen (Chrome/Edge); Erinnerungen werden
 gesprochen, solange ein Tab offen ist, sonst beim nächsten Öffnen nachgeholt. Der Speicher ist für **einen** Nutzer ausgelegt.

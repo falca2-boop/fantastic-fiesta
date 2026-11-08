@@ -132,6 +132,7 @@
     meta.append(el('span', '', who === 'user' ? 'Du' : 'Jarvis'), el('span', '', hhmm(new Date())));
     m.append(meta, el('div', 'bubble', text));
     dialog.appendChild(m);
+    if (window.Orb && window.Orb.burst && !interim) window.Orb.burst(who === 'user' ? 5 : 9);
     while (dialog.children.length > 60) dialog.removeChild(dialog.firstChild);
     dialog.scrollTop = dialog.scrollHeight;
     return { remove: () => m.remove(), set textContent(t) { m.querySelector('.bubble').textContent = t; } };
