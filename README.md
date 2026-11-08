@@ -40,6 +40,17 @@ Standardmäßig spricht JARVIS mit der Stimme deines Browsers. Mit einer ElevenL
 Fällt die Stimme aus (kein Guthaben, Fehler), spricht JARVIS automatisch mit der Browser-Stimme weiter.
 Jede Antwort verbraucht ElevenLabs-Guthaben (pro Zeichen); Texte sind auf 800 Zeichen begrenzt.
 
+## Obsidian
+
+Mit `OBSIDIAN_VAULT_DIR=/pfad/zu/deinem/Vault` speichert JARVIS Notizen und Gedächtnis als Markdown in deinem Vault:
+
+- `Jarvis/Notizen/<Datum> <Titel>.md`: eine Datei pro Notiz. Eigene Dateien in diesem Ordner liest er mit.
+- `Jarvis/Gedächtnis.md`: ein Fakt pro Listenpunkt. Bearbeitest du die Datei, gilt beim nächsten Gespräch deine Fassung.
+
+Bestehende Fakten werden beim ersten Start in die Datei übernommen; alte Notizen aus `store.json` bleiben dort liegen.
+Aufgaben und Erinnerungen bleiben in `data/store.json`. Jarvis muss auf demselben Rechner laufen wie der Vault (oder der Vault dorthin synchronisiert werden).
+Ohne die Variable ändert sich nichts.
+
 ## Starten (lokal)
 
 Voraussetzung: Node.js ab Version 20 (`node --version`).
@@ -76,6 +87,7 @@ npm test
 | `lib/agent.js` | Claude-Schleife mit Werkzeugen, Systemprompt |
 | `lib/tools.js` | Werkzeuge (Aufgaben, Notizen, Erinnerungen, Gedächtnis, n8n) |
 | `lib/store.js` | JSON-Speicher |
+| `lib/vault.js` | Obsidian-Anbindung (Notizen, Gedächtnis als Markdown) |
 | `lib/mail.js` | IMAP-Überwachung, Filter, Anruf (Twilio) und Push (ntfy) |
 | `public/` | Oberfläche: Orb, Spracherkennung („Hey Jarvis"), Sprachausgabe |
 

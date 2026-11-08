@@ -6,6 +6,7 @@ import { timingSafeEqual } from 'node:crypto';
 import { Store } from './lib/store.js';
 import { chat, AgentError } from './lib/agent.js';
 import { takeDueReminders } from './lib/tools.js';
+import { vaultDirFromEnv } from './lib/vault.js';
 import { mailConfigFromEnv, startMailWatcher } from './lib/mail.js';
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
@@ -30,7 +31,7 @@ export function createServer(opts = {}) {
           : null)
       : opts.voice,
   };
-  const store = opts.store ?? new Store(path.join(env.DATA_DIR || path.join(ROOT, 'data'), 'store.json'));
+  const store = opts.store ?? new Store(path.join(env.DATA_DIR || path.join(ROOT, 'data'), 'store.json'), { vaultDir: vaultDirFromEnv(env) });
 
   const authorized = (req) => {
     if (!cfg.token) return true;               // nur erlaubt, wenn der Server lokal bindet (siehe main)
@@ -81,7 +82,7 @@ export function createServer(opts = {}) {
     try {
       const { pathname } = new URL(req.url, 'http://localhost');
 
-      if (pathname === '/api/health') return json(res, 200, { ok: true, tokenRequired: !!cfg.token, keyConfigured: !!cfg.apiKey, mailWatch: !!cfg.mail, voice: !!cfg.voice });
+      if (pathname === '/api/health') return json(res, 200, { ok: true, tokenRequired: !!cfg.token, keyConfigured: !!cfg.apiKey, mailWatch: !!cfg.mail, voice: !!cfg.voice, obsidian: !!store.vaultDir });
 
       if (pathname.startsWith('/api/')) {
         if (!authorized(req)) return json(res, 401, { error: 'Zugangs-Token fehlt oder ist falsch.' });
@@ -138,6 +139,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     process.exit(1);
   }
   if (!cfg.apiKey) console.warn('Warnung: ANTHROPIC_API_KEY ist nicht gesetzt – JARVIS kann nicht antworten.');
+  if (store.vaultDir) console.log('Obsidian-Vault: ' + store.vaultDir);
   if (cfg.mail) { startMailWatcher({ store, config: cfg.mail }); console.log('Mail-Überwachung aktiv für ' + cfg.mail.imap.user); }
   server.listen(port, host, () => console.log(`JARVIS läuft auf http://${host}:${port}`));
 }

@@ -106,3 +106,28 @@ test('Server: /api/speak ohne Stimme-Konfiguration meldet 501, ElevenLabs-Fehler
     assert.equal((await fetch(base + '/api/speak', { method: 'POST', body: '{"text":"Hallo"}' })).status, 502);
   });
 });
+
+test('Obsidian: Notizen und Gedächtnis liegen als Markdown im Vault', async () => {
+  const fs = await import('node:fs'), os = await import('node:os'), path = await import('node:path');
+  const vault = fs.mkdtempSync(path.join(os.tmpdir(), 'vault-'));
+  const s = new Store(null, { vaultDir: vault });
+  assert.match(await runTool(s, 'add_note', { text: 'Idee: Podcast / Folge #1' }, { now: NOW }), /Obsidian/);
+  const files = fs.readdirSync(path.join(vault, 'Jarvis', 'Notizen'));
+  assert.deepEqual(files, ['2026-10-09 Idee Podcast Folge 1.md']);
+  fs.writeFileSync(path.join(vault, 'Jarvis', 'Notizen', 'Eigene.md'), 'von Hand geschrieben');
+  const list = await runTool(s, 'list_notes', {});
+  assert.match(list, /Podcast/); assert.match(list, /von Hand/);
+  assert.equal(s.data.notes.length, 0);
+
+  await runTool(s, 'remember', { fact: 'Trinkt Kaffee schwarz' });
+  assert.match(fs.readFileSync(path.join(vault, 'Jarvis', 'Gedächtnis.md'), 'utf8'), /- Trinkt Kaffee schwarz/);
+  fs.appendFileSync(path.join(vault, 'Jarvis', 'Gedächtnis.md'), '- Wohnt in Köln\n');
+  await runTool(s, 'remember', { fact: 'Mag Tee nicht' });
+  assert.deepEqual(s.data.facts, ['Trinkt Kaffee schwarz', 'Wohnt in Köln', 'Mag Tee nicht']);
+  await runTool(s, 'forget', { contains: 'köln' });
+  assert.doesNotMatch(fs.readFileSync(path.join(vault, 'Jarvis', 'Gedächtnis.md'), 'utf8'), /Köln/);
+
+  const pre = new Store(null); pre.data.facts = ['Alt'];
+  pre.vaultDir = fs.mkdtempSync(path.join(os.tmpdir(), 'vault-')); pre.syncFacts();
+  assert.match(fs.readFileSync(path.join(pre.vaultDir, 'Jarvis', 'Gedächtnis.md'), 'utf8'), /- Alt/);
+});
