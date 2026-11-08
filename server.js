@@ -1,3 +1,4 @@
+import { toolDefinitions } from './lib/tools.js';
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -6,23 +7,36 @@ import { timingSafeEqual } from 'node:crypto';
 import { Store } from './lib/store.js';
 import { chat, AgentError } from './lib/agent.js';
 import { takeDueReminders } from './lib/tools.js';
-import { mailConfigFromEnv, startMailWatcher } from './lib/mail.js';
+import { DEFAULT_GEMINI_MODEL } from './lib/gemini.js';
+import { loadEnvFile } from './lib/env.js';
+import { vaultDirFromEnv, recentNotes } from './lib/vault.js';
+import { listAgents } from './lib/agents.js';
+import { usageSummary } from './lib/usage.js';
+import { recordFeedback, learnedList, deleteLearnedAt, runLearning, learningConfig, startLearningScheduler } from './lib/learning.js';
+import { briefingConfig, takeBriefing, runBriefing, startBriefingScheduler } from './lib/briefing.js';
+import { loadNews, loadEvents, findLiveCam } from './lib/world.js';
+import { mailConfigFromEnv, startMailWatcher, takeMailAlerts } from './lib/mail.js';
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
 const PUBLIC_DIR = path.join(ROOT, 'public');
-const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml', '.ico': 'image/x-icon' };
+const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml', '.ico': 'image/x-icon', '.json': 'application/json; charset=utf-8', '.jpg': 'image/jpeg', '.png': 'image/png' };
 
 const isLoopback = (h) => ['127.0.0.1', '::1', 'localhost'].includes(h);
 
 export function createServer(opts = {}) {
   const env = process.env;
+  const provider = opts.provider ?? env.JARVIS_PROVIDER ?? (!env.ANTHROPIC_API_KEY && (env.GEMINI_API_KEY || env.GOOGLE_API_KEY) ? 'gemini' : 'anthropic');
   const cfg = {
-    apiKey: opts.apiKey ?? env.ANTHROPIC_API_KEY ?? '',
+    provider,
+    apiKey: opts.apiKey ?? (provider === 'gemini' ? (env.GEMINI_API_KEY || env.GOOGLE_API_KEY || '') : (env.ANTHROPIC_API_KEY ?? '')),
     token: opts.token ?? env.JARVIS_TOKEN ?? '',
-    model: opts.model ?? env.JARVIS_MODEL ?? 'claude-sonnet-5-5',
+    model: opts.model ?? (provider === 'gemini' ? (env.GEMINI_MODEL || DEFAULT_GEMINI_MODEL) : (env.JARVIS_MODEL ?? 'claude-sonnet-5-5')),
     userName: opts.userName ?? env.JARVIS_USER_NAME ?? 'Augustin',
+    address: opts.address ?? env.JARVIS_ADDRESS ?? '',
     webhookUrl: opts.webhookUrl ?? env.N8N_WEBHOOK_URL ?? '',
     fetchFn: opts.fetchFn ?? fetch,
+    baseUrl: opts.baseUrl ?? '',
+    youtubeKey: opts.youtubeKey ?? env.YOUTUBE_API_KEY ?? '',
     mail: opts.mail === undefined ? mailConfigFromEnv(env) : opts.mail,
     voice: opts.voice === undefined
       ? (env.ELEVENLABS_API_KEY && env.ELEVENLABS_VOICE_ID
@@ -30,7 +44,7 @@ export function createServer(opts = {}) {
           : null)
       : opts.voice,
   };
-  const store = opts.store ?? new Store(path.join(env.DATA_DIR || path.join(ROOT, 'data'), 'store.json'));
+  const store = opts.store ?? new Store(path.join(env.DATA_DIR || path.join(ROOT, 'data'), 'store.json'), { vaultDir: vaultDirFromEnv(env) });
 
   const authorized = (req) => {
     if (!cfg.token) return true;               // nur erlaubt, wenn der Server lokal bindet (siehe main)
@@ -56,11 +70,24 @@ export function createServer(opts = {}) {
     const d = store.data;
     return {
       userName: cfg.userName,
+      address: cfg.address || cfg.userName,
       goal: d.goal,
+      notes: store.vaultDir
+        ? recentNotes(store.vaultDir, 4)
+        : d.notes.slice(-4).reverse().map(n => ({ title: '', text: n.text.slice(0, 160), ts: n.ts })),
+      factCount: d.facts.length,
+      usage: usageSummary(store),
+      learned: learnedList(store),
+      learning: { time: learningConfig(store).time, last: d.learning ? d.learning.summary : '', proposals: (d.agentProposals || []).length },
+      agents: listAgents(store).map(({ name, role, builtin }) => ({ name, role: role.slice(0, 140), builtin })),
       tasks: d.tasks.filter(t => !t.done).map(({ id, text, due }) => ({ id, text, due })),
-      reminders: d.reminders.filter(r => !r.fired).sort((a, b) => new Date(a.at) - new Date(b.at)).map(({ id, text, at }) => ({ id, text, at })),
+      reminders: d.reminders.filter(r => !r.fired).sort((a, b) => new Date(a.at) - new Date(b.at)).map(({ id, text, at, repeat }) => ({ id, text, at, repeat: repeat || '' })),
     };
   };
+
+  // Ist die Oberfläche offen? (sie fragt alle 10 s /api/poll ab; Hintergrund-Tabs werden von Chrome gedrosselt, daher großzügig)
+  let lastUi = 0;
+  const uiActive = () => Date.now() - lastUi < 90_000;
 
   // Chat-Anfragen nacheinander abarbeiten, damit der Speicher konsistent bleibt
   let queue = Promise.resolve();
@@ -72,7 +99,7 @@ export function createServer(opts = {}) {
     if (file !== PUBLIC_DIR && !file.startsWith(PUBLIC_DIR + path.sep)) { res.writeHead(403); return res.end('Forbidden'); }
     fs.readFile(file, (err, buf) => {
       if (err) { res.writeHead(404); return res.end('Not found'); }
-      res.writeHead(200, { 'Content-Type': MIME[path.extname(file)] || 'application/octet-stream', 'Cache-Control': 'no-cache' });
+      res.writeHead(200, { 'Content-Type': MIME[path.extname(file)] || 'application/octet-stream', 'Cache-Control': file.includes(path.sep + 'vendor' + path.sep) ? 'public, max-age=604800' : 'no-cache' });
       res.end(buf);
     });
   };
@@ -81,13 +108,50 @@ export function createServer(opts = {}) {
     try {
       const { pathname } = new URL(req.url, 'http://localhost');
 
-      if (pathname === '/api/health') return json(res, 200, { ok: true, tokenRequired: !!cfg.token, keyConfigured: !!cfg.apiKey, mailWatch: !!cfg.mail, voice: !!cfg.voice });
+      if (pathname === '/api/health') return json(res, 200, { ok: true, tokenRequired: !!cfg.token, keyConfigured: !!cfg.apiKey, provider: cfg.provider, uiActive: uiActive(), mailWatch: !!cfg.mail, voice: !!cfg.voice, obsidian: !!store.vaultDir, liveCams: !!cfg.youtubeKey, briefing: briefingConfig(store).time, tools: toolDefinitions({ webhookEnabled: !!cfg.webhookUrl, mailEnabled: !!cfg.mail, obsidianEnabled: !!store.vaultDir }).map(t => t.name), pid: process.pid });
 
       if (pathname.startsWith('/api/')) {
         if (!authorized(req)) return json(res, 401, { error: 'Zugangs-Token fehlt oder ist falsch.' });
 
+        if ((pathname === '/api/state' || pathname === '/api/poll') && req.method === 'GET') lastUi = Date.now();
         if (pathname === '/api/state' && req.method === 'GET') return json(res, 200, publicState());
-        if (pathname === '/api/poll' && req.method === 'GET') return json(res, 200, { fired: takeDueReminders(store).map(({ id, text }) => ({ id, text })), state: publicState() });
+        if (pathname === '/api/feedback' && req.method === 'POST') {
+          let b; try { b = JSON.parse(await readBody(req)); } catch (e) { return json(res, 400, { error: 'Ungültiges JSON.' }); }
+          try { recordFeedback(store, { rating: b.rating, user: b.user, reply: b.reply }); return json(res, 200, { ok: true }); } catch (e) { return json(res, 400, { error: e.message }); }
+        }
+        if (pathname === '/api/learned/delete' && req.method === 'POST') {
+          let b; try { b = JSON.parse(await readBody(req)); } catch (e) { return json(res, 400, { error: 'Ungültiges JSON.' }); }
+          return json(res, 200, { ok: deleteLearnedAt(store, Number(b.index)), state: publicState() });
+        }
+        if (pathname === '/api/world/news' && req.method === 'GET') {
+          try { return json(res, 200, { items: await loadNews(cfg.fetchFn) }); } catch (e) { return json(res, 502, { error: e.message }); }
+        }
+        if (pathname === '/api/world/events' && req.method === 'GET') {
+          try { return json(res, 200, { points: await loadEvents(cfg.fetchFn) }); } catch (e) { return json(res, 502, { error: 'Krisenmeldungen gerade nicht erreichbar.' }); }
+        }
+        if (pathname === '/api/world/cam' && req.method === 'GET') {
+          // Nur Cams aus world/cams.json (kein freier Suchtext, schützt das YouTube-Kontingent)
+          const name = new URL(req.url, 'http://localhost').searchParams.get('name') || '';
+          let list = []; try { list = JSON.parse(fs.readFileSync(path.join(PUBLIC_DIR, 'world', 'cams.json'), 'utf8')).cams || []; } catch (e) { /* leer */ }
+          const cam = list.find((c) => c.name === name);
+          if (!cam) return json(res, 404, { error: 'Unbekannte Cam.' });
+          try {
+            const found = await findLiveCam({ query: cam.suchtext || cam.name + ' live cam', key: cfg.youtubeKey, fetchFn: cfg.fetchFn });
+            return json(res, 200, { live: found });
+          } catch (e) {
+            return json(res, e.code === 'nokey' ? 200 : 502, { live: null, error: e.code === 'nokey' ? 'nokey' : 'YouTube gerade nicht erreichbar: ' + e.message });
+          }
+        }
+        if (pathname === '/api/poll' && req.method === 'GET') return json(res, 200, { fired: takeDueReminders(store).map(({ id, text, at, late }) => ({ id, text, at, late })), mail: takeMailAlerts(store), briefing: takeBriefing(store), state: publicState() });
+
+        if (pathname === '/api/tasks/complete' && req.method === 'POST') {
+          let body;
+          try { body = JSON.parse(await readBody(req)); } catch (e) { if (e instanceof AgentError) throw e; return json(res, 400, { error: 'Ungültiges JSON.' }); }
+          const task = store.data.tasks.find(t => t.id === body.id);
+          if (!task) return json(res, 404, { error: 'Aufgabe nicht gefunden.' });
+          task.done = true; store.save();
+          return json(res, 200, { state: publicState() });
+        }
 
         if (pathname === '/api/chat' && req.method === 'POST') {
           let body;
@@ -95,7 +159,7 @@ export function createServer(opts = {}) {
           const message = typeof body.message === 'string' ? body.message.trim() : '';
           if (!message || message.length > 4000) return json(res, 400, { error: 'Nachricht fehlt oder ist zu lang.' });
           const offsetMinutes = Number.isFinite(body.offsetMinutes) ? Math.max(-840, Math.min(840, body.offsetMinutes)) : 0;
-          const reply = await enqueue(() => chat({ store, message, offsetMinutes, apiKey: cfg.apiKey, model: cfg.model, userName: cfg.userName, webhookUrl: cfg.webhookUrl, mailEnabled: !!cfg.mail, fetchFn: cfg.fetchFn }));
+          const reply = await enqueue(() => chat({ store, message, offsetMinutes, apiKey: cfg.apiKey, model: cfg.model, provider: cfg.provider, userName: cfg.userName, address: cfg.address, webhookUrl: cfg.webhookUrl, mailEnabled: !!cfg.mail, baseUrl: cfg.baseUrl, fetchFn: cfg.fetchFn }));
           return json(res, 200, { reply, state: publicState() });
         }
         if (pathname === '/api/speak' && req.method === 'POST') {
@@ -108,7 +172,13 @@ export function createServer(opts = {}) {
             `https://api.elevenlabs.io/v1/text-to-speech/${encodeURIComponent(cfg.voice.voiceId)}?output_format=mp3_44100_64`,
             { method: 'POST', headers: { 'Content-Type': 'application/json', 'xi-api-key': cfg.voice.apiKey },
               body: JSON.stringify({ text, model_id: cfg.voice.model }) });
-          if (!upstream.ok) { console.warn('ElevenLabs HTTP ' + upstream.status); return json(res, 502, { error: 'Stimme nicht verfügbar (ElevenLabs ' + upstream.status + ').' }); }
+          if (!upstream.ok) {
+            let detail = '';
+            try { const j = JSON.parse(await upstream.text()); detail = String(j.detail?.message || j.detail || '').slice(0, 200); } catch {}
+            const hint = { 401: 'Der ElevenLabs-Key ist ungültig.', 402: 'Diese Stimme braucht einen bezahlten ElevenLabs-Tarif (Bibliotheksstimmen gehen per API nicht im kostenlosen Tarif).', 404: 'Stimme nicht gefunden: ID falsch oder nicht unter „Meine Stimmen“.', 429: 'ElevenLabs-Limit erreicht.' }[upstream.status] || '';
+            console.warn('ElevenLabs HTTP ' + upstream.status + (detail ? ': ' + detail : ''));
+            return json(res, 502, { error: 'Stimme nicht verfügbar (ElevenLabs ' + upstream.status + '). ' + (hint || detail) });
+          }
           const audio = Buffer.from(await upstream.arrayBuffer());
           res.writeHead(200, { 'Content-Type': 'audio/mpeg', 'Content-Length': audio.length, 'Cache-Control': 'no-store' });
           return res.end(audio);
@@ -130,14 +200,23 @@ export function createServer(opts = {}) {
 
 // ---------- Start ----------
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  loadEnvFile(path.join(ROOT, '.env'));
   const host = process.env.HOST || '127.0.0.1';
   const port = Number(process.env.PORT) || 8000;
-  const { server, cfg, store } = createServer();
+  const { server, cfg, store } = createServer({ baseUrl: `http://${host === '0.0.0.0' ? '127.0.0.1' : host}:${port}` });
   if (!isLoopback(host) && !cfg.token) {
     console.error('Abbruch: Der Server ist von außen erreichbar (HOST=' + host + '), aber JARVIS_TOKEN ist nicht gesetzt.');
     process.exit(1);
   }
-  if (!cfg.apiKey) console.warn('Warnung: ANTHROPIC_API_KEY ist nicht gesetzt – JARVIS kann nicht antworten.');
+  if (!cfg.apiKey) console.warn('Warnung: Kein API-Key gesetzt (' + (cfg.provider === 'gemini' ? 'GEMINI_API_KEY' : 'ANTHROPIC_API_KEY') + ') – JARVIS kann nicht antworten.');
+  console.log('KI-Anbieter: ' + cfg.provider + ' (' + cfg.model + ')');
+  if (store.vaultDir) console.log('Obsidian-Vault: ' + store.vaultDir);
   if (cfg.mail) { startMailWatcher({ store, config: cfg.mail }); console.log('Mail-Überwachung aktiv für ' + cfg.mail.imap.user); }
+  if (cfg.provider === 'anthropic' && cfg.apiKey) {
+    startLearningScheduler({ store, getRun: () => ({ now }) => runLearning({ store, apiKey: cfg.apiKey, model: cfg.model, fetchFn: cfg.fetchFn, now }) });
+    const lc = learningConfig(store); if (lc.time) console.log('Tägliche Lernrunde um ' + lc.time + ' Uhr');
+    startBriefingScheduler({ store, getRun: () => ({ topics, now }) => runBriefing({ store, apiKey: cfg.apiKey, model: cfg.model, fetchFn: cfg.fetchFn, baseUrl: cfg.baseUrl, topics, now }) });
+    const bc = briefingConfig(store); if (bc.time) console.log('Morgenbriefing täglich um ' + bc.time + ' Uhr');
+  }
   server.listen(port, host, () => console.log(`JARVIS läuft auf http://${host}:${port}`));
 }

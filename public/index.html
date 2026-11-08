@@ -3,315 +3,146 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#000000" />
   <title>JARVIS</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <style>
-    :root {
-      --accent: #38d9ff;
-      --accent-dim: #1a6b8f;
-      --bg: #04070d;
-      --danger: #ff5c7a;
-      --ok: #55ffa8;
-    }
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    html, body {
-      height: 100%;
-      background: var(--bg);
-      color: #cfe9ff;
-      font-family: "Segoe UI", "Helvetica Neue", system-ui, sans-serif;
-      overflow: hidden;
-    }
-    body {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      background:
-        radial-gradient(circle at 50% 40%, rgba(56,217,255,0.08), transparent 60%),
-        radial-gradient(circle at 50% 120%, rgba(56,217,255,0.10), transparent 55%),
-        var(--bg);
-    }
-    /* subtle grid */
-    body::before {
-      content: "";
-      position: fixed;
-      inset: 0;
-      background-image:
-        linear-gradient(rgba(56,217,255,0.04) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(56,217,255,0.04) 1px, transparent 1px);
-      background-size: 46px 46px;
-      mask-image: radial-gradient(circle at 50% 45%, black, transparent 75%);
-      pointer-events: none;
-    }
-
-    .stage {
-      position: relative;
-      width: min(70vw, 70vh, 560px);
-      aspect-ratio: 1;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      z-index: 2;
-    }
-    canvas#orb {
-      width: 100%;
-      height: 100%;
-      cursor: pointer;
-      filter: drop-shadow(0 0 40px rgba(56,217,255,0.35));
-    }
-
-    .hud-top {
-      position: fixed;
-      top: 28px;
-      left: 0; right: 0;
-      text-align: center;
-      z-index: 3;
-      pointer-events: none;
-    }
-    .hud-top .brand {
-      font-size: 13px;
-      letter-spacing: 8px;
-      color: var(--accent);
-      opacity: 0.8;
-    }
-    .state-label {
-      margin-top: 6px;
-      font-size: 12px;
-      letter-spacing: 3px;
-      text-transform: uppercase;
-      color: #6f8aa0;
-      min-height: 16px;
-    }
-
-    /* Goal panel */
-    .goal-panel {
-      position: fixed;
-      top: 90px;
-      left: 50%;
-      transform: translateX(-50%);
-      z-index: 3;
-      background: rgba(8,18,28,0.55);
-      border: 1px solid rgba(56,217,255,0.25);
-      border-radius: 14px;
-      padding: 12px 22px;
-      backdrop-filter: blur(8px);
-      text-align: center;
-      max-width: 90vw;
-      opacity: 0;
-      transition: opacity .4s;
-    }
-    .goal-panel.show { opacity: 1; }
-    .goal-panel .lbl {
-      font-size: 10px; letter-spacing: 3px; color: #5f7a90; text-transform: uppercase;
-    }
-    .goal-panel .goal-text {
-      margin-top: 4px; font-size: 18px; color: #eafaff;
-    }
-    .goal-panel .goal-amount { color: var(--accent); font-weight: 600; }
-
-    .side-panel { position: fixed; top: 90px; right: 24px; z-index: 3; width: min(300px, 40vw); display: none; flex-direction: column; gap: 6px; }
-    .side-panel.show { display: flex; }
-    .side-panel .lbl { font-size: 10px; letter-spacing: 3px; color: #5f7a90; text-transform: uppercase; margin-top: 8px; }
-    .side-panel .item { font-size: 13px; color: #bfe3f5; background: rgba(10,22,34,0.6); border: 1px solid rgba(56,217,255,0.14); border-radius: 8px; padding: 6px 10px; }
-
-    /* Transcript / dialog */
-    .dialog {
-      position: fixed;
-      bottom: 130px;
-      left: 50%;
-      transform: translateX(-50%);
-      width: min(760px, 90vw);
-      z-index: 3;
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-      max-height: 34vh;
-      overflow: hidden;
-      -webkit-mask-image: linear-gradient(transparent, black 22%);
-      mask-image: linear-gradient(transparent, black 22%);
-    }
-    .bubble {
-      align-self: flex-start;
-      max-width: 85%;
-      padding: 10px 16px;
-      border-radius: 14px;
-      font-size: 15px;
-      line-height: 1.45;
-      animation: rise .35s ease both;
-    }
-    .bubble.user {
-      align-self: flex-end;
-      background: rgba(56,217,255,0.14);
-      border: 1px solid rgba(56,217,255,0.3);
-      color: #eafaff;
-    }
-    .bubble.jarvis {
-      background: rgba(10,22,34,0.7);
-      border: 1px solid rgba(56,217,255,0.16);
-      color: #bfe3f5;
-    }
-    .bubble.interim { opacity: .55; font-style: italic; }
-    @keyframes rise { from { opacity: 0; transform: translateY(12px);} to {opacity:1; transform:none;} }
-
-    /* Controls */
-    .controls {
-      position: fixed;
-      bottom: 42px;
-      left: 50%;
-      transform: translateX(-50%);
-      z-index: 4;
-      display: flex;
-      align-items: center;
-      gap: 18px;
-    }
-    .mic-btn {
-      width: 68px; height: 68px;
-      border-radius: 50%;
-      border: 1px solid rgba(56,217,255,0.4);
-      background: rgba(10,26,38,0.8);
-      color: var(--accent);
-      cursor: pointer;
-      display: grid; place-items: center;
-      transition: all .2s;
-      position: relative;
-    }
-    .mic-btn:hover { background: rgba(20,44,60,0.9); }
-    .mic-btn.active {
-      background: var(--accent);
-      color: #04121a;
-      box-shadow: 0 0 0 0 rgba(56,217,255,0.6);
-      animation: micpulse 1.6s infinite;
-    }
-    @keyframes micpulse {
-      0% { box-shadow: 0 0 0 0 rgba(56,217,255,0.55); }
-      100% { box-shadow: 0 0 0 22px rgba(56,217,255,0); }
-    }
-    .mic-btn svg { width: 28px; height: 28px; }
-    .text-input {
-      background: rgba(8,18,28,0.7);
-      border: 1px solid rgba(56,217,255,0.25);
-      border-radius: 24px;
-      padding: 14px 20px;
-      color: #eafaff;
-      font-size: 15px;
-      width: min(420px, 60vw);
-      outline: none;
-    }
-    .text-input::placeholder { color: #4f6b80; }
-    .text-input:focus { border-color: var(--accent); }
-
-    .hint {
-      position: fixed;
-      bottom: 14px;
-      left: 0; right: 0;
-      text-align: center;
-      font-size: 11px;
-      color: #40566a;
-      z-index: 3;
-    }
-    .unsupported {
-      position: fixed; inset: 0; display: none;
-      align-items: center; justify-content: center;
-      background: rgba(4,7,13,0.9); z-index: 20; text-align: center; padding: 30px;
-    }
-
-    /* API Key Setup */
-    .api-overlay {
-      position: fixed; inset: 0;
-      background: rgba(4,7,13,0.97);
-      z-index: 30;
-      display: flex; align-items: center; justify-content: center;
-      flex-direction: column; gap: 18px; padding: 30px;
-      text-align: center;
-    }
-    .api-overlay h2 { color: var(--accent); letter-spacing: 4px; font-size: 18px; }
-    .api-overlay p { color: #7fa0b5; font-size: 14px; max-width: 420px; line-height: 1.6; }
-    .api-overlay input {
-      background: rgba(8,18,28,0.8);
-      border: 1px solid rgba(56,217,255,0.35);
-      border-radius: 10px;
-      padding: 14px 20px;
-      color: #eafaff;
-      font-size: 15px;
-      width: min(380px, 90vw);
-      outline: none;
-      letter-spacing: 1px;
-    }
-    .api-overlay input:focus { border-color: var(--accent); }
-    .api-overlay button {
-      background: var(--accent);
-      color: #04121a;
-      border: none;
-      border-radius: 10px;
-      padding: 13px 36px;
-      font-size: 15px;
-      font-weight: 700;
-      cursor: pointer;
-      letter-spacing: 2px;
-    }
-    .api-overlay .skip-btn {
-      background: transparent;
-      color: #4f6b80;
-      font-size: 12px;
-      padding: 6px 12px;
-      font-weight: 400;
-      letter-spacing: 1px;
-    }
-    .api-overlay .api-hint {
-      font-size: 11px; color: #3a5060;
-    }
-  </style>
+  <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-  <div class="hud-top">
-    <div class="brand">J · A · R · V · I · S</div>
-    <div class="state-label" id="stateLabel">Bereit</div>
+  <!-- Icons (Linien-Symbole, eine Quelle für alle) -->
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <symbol id="i-mic" viewBox="0 0 24 24"><path d="M12 2a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M5 11a7 7 0 0 0 14 0M12 18v4"/></symbol>
+    <symbol id="i-send" viewBox="0 0 24 24"><path d="M22 2 11 13M22 2l-7 20-4-9-9-4 20-7z"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12 5 5 9-10"/></symbol>
+    <symbol id="i-list" viewBox="0 0 24 24"><path d="M9 6h12M9 12h12M9 18h12M4 6h.01M4 12h.01M4 18h.01"/></symbol>
+    <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
+    <symbol id="i-target" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1"/></symbol>
+    <symbol id="i-note" viewBox="0 0 24 24"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6M8 13h8M8 17h5"/></symbol>
+    <symbol id="i-chip" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2"/><path d="M9 2v4M15 2v4M9 18v4M15 18v4M2 9h4M2 15h4M18 9h4M18 15h4"/></symbol>
+    <symbol id="i-bolt" viewBox="0 0 24 24"><path d="M13 2 4 14h7l-1 8 9-12h-7z"/></symbol>
+  </svg>
+
+  <canvas id="bg" aria-hidden="true"></canvas>
+
+  <div class="app">
+    <header class="topbar">
+      <div class="brand">
+        <div class="logo"><svg class="i" style="stroke-width:2.2"><use href="#i-bolt"/></svg></div>
+        <div>
+          <div class="brand-name">JARVIS</div>
+          <div class="brand-sub">Dein persönlicher Assistent</div>
+        </div>
+      </div>
+      <div class="spacer"></div>
+      <div class="chip" id="stateChip" role="status" aria-live="polite"><span class="dot ok" id="stateDot"></span><span id="stateText">Bereit</span></div>
+      <div class="chip cost" id="costChip" title="Geschätzte Kosten heute (aus den echten API-Antworten)">≈ 0,00 $</div>
+      <a class="chip" href="welt.html" id="worldLink" title="Weltkugel, Livestream und Nachrichten">Welt</a>
+      <div class="chip clock" id="clock">--:--</div>
+    </header>
+
+    <main class="main">
+      <section class="card hero" aria-label="Willkommen">
+        <div class="orb-wrap"><canvas id="orb" title="Klicken zum Sprechen"></canvas></div>
+        <div class="hero-text">
+          <div class="eyebrow" id="heroEyebrow">Systeme online</div>
+          <h1 id="heroTitle">Hallo.</h1>
+          <p id="heroSub">Sag „Hey Jarvis“ oder tippe unten. Ich erledige Aufgaben, Erinnerungen, Notizen und Recherchen für dich.</p>
+          <div class="suggest" id="suggest">
+            <button type="button" data-q="Plane meinen Tag">Plane meinen Tag</button>
+            <button type="button" data-q="Was steht heute an?">Was steht heute an?</button>
+            <button type="button" data-q="Welche Notizen habe ich?">Meine Notizen</button>
+            <button type="button" data-q="Was gibt es Neues in den Nachrichten?">Nachrichten</button>
+          </div>
+          <div class="live-reply" id="liveReply" aria-live="polite"></div>
+          <div class="heard" id="heard" aria-live="off"></div>
+        </div>
+      </section>
+    </main>
+
+    <!-- Unten in der Mitte: Eingabe und Mikrofon (immer sichtbar) -->
+    <form class="composer bar" id="composer" autocomplete="off">
+      <div class="field">
+    <input id="textInput" placeholder="Was soll ich für dich erledigen?" aria-label="Nachricht an Jarvis" />
+    <button class="icon-btn send" type="submit" title="Senden" aria-label="Senden"><svg class="i"><use href="#i-send"/></svg></button>
+      </div>
+      <button class="mic-btn" id="micBtn" type="button" title="Sprechen (oder sag „Hey Jarvis“)" aria-label="Mikrofon"><svg class="i" style="stroke-width:2"><use href="#i-mic"/></svg></button>
+    </form>
+
+    <!-- Links aufklappbar: Gespräch -->
+    <button class="tab tab-left" id="tabChat" type="button" aria-expanded="false" aria-controls="drawerChat"><svg class="i"><use href="#i-note"/></svg><span>Gespräch</span><b class="badge" id="chatBadge" hidden>0</b></button>
+    <section class="drawer drawer-left chat" id="drawerChat" aria-label="Gespräch" aria-hidden="true">
+      <div class="drawer-h"><span>Gespräch</span><button class="drawer-x" type="button" data-close="drawerChat" aria-label="Schließen">×</button></div>
+        <div class="banner" id="banner" role="alert"></div>
+        <div class="messages" id="dialog" aria-live="polite"></div>
+    </section>
+
+    <!-- Rechts aufklappbar: Übersicht -->
+    <button class="tab tab-right" id="tabSide" type="button" aria-expanded="false" aria-controls="drawerSide"><svg class="i"><use href="#i-list"/></svg><span>Übersicht</span></button>
+    <aside class="drawer drawer-right side" id="drawerSide" aria-label="Übersicht" aria-hidden="true">
+      <div class="drawer-h"><span>Übersicht</span><button class="drawer-x" type="button" data-close="drawerSide" aria-label="Schließen">×</button></div>
+      <section class="card" id="cardCost">
+        <div class="card-h"><svg class="i"><use href="#i-bolt"/></svg>Kosten</div>
+        <div class="card-b"><div class="usage" id="usageBox" aria-live="polite"></div></div>
+      </section>
+
+      <section class="card" id="cardTasks">
+        <div class="card-h"><svg class="i"><use href="#i-list"/></svg>Aufgaben<span class="count" id="taskCount">0</span></div>
+        <div class="card-b"><ul class="list" id="taskList"></ul></div>
+      </section>
+
+      <section class="card" id="cardRem">
+        <div class="card-h"><svg class="i"><use href="#i-clock"/></svg>Erinnerungen<span class="count" id="remCount">0</span></div>
+        <div class="card-b"><ul class="timeline" id="remList"></ul></div>
+      </section>
+
+      <section class="card" id="cardGoal">
+        <div class="card-h"><svg class="i"><use href="#i-target"/></svg>Aktuelles Ziel</div>
+        <div class="card-b"><div class="goal" id="goalBox"></div></div>
+      </section>
+
+      <section class="card" id="cardNotes">
+        <div class="card-h"><svg class="i"><use href="#i-note"/></svg>Neueste Notizen</div>
+        <div class="card-b" id="noteList"></div>
+      </section>
+
+      <section class="card" id="cardLearned">
+        <div class="card-h"><svg class="i"><use href="#i-target"/></svg>Gelernt<span class="count" id="learnedCount">0</span></div>
+        <div class="card-b"><ul class="list" id="learnedList"></ul><div class="learn-info" id="learnedInfo"></div></div>
+      </section>
+
+      <section class="card" id="cardAgents">
+        <div class="card-h"><svg class="i"><use href="#i-chip"/></svg>Agenten<span class="count" id="agentCount">0</span></div>
+        <div class="card-b"><ul class="list" id="agentList"></ul></div>
+      </section>
+
+      <section class="card" id="cardSys">
+        <div class="card-h"><svg class="i"><use href="#i-chip"/></svg>System</div>
+        <div class="card-b"><div class="sys" id="sysBox"></div></div>
+      </section>
+    </aside>
   </div>
-
-  <div class="goal-panel" id="goalPanel">
-    <div class="lbl">Aktuelles Ziel</div>
-    <div class="goal-text" id="goalText"></div>
-  </div>
-
-  <div class="stage">
-    <canvas id="orb"></canvas>
-  </div>
-
-  <div class="side-panel" id="sidePanel"></div>
-
-  <div class="dialog" id="dialog"></div>
-
-  <div class="controls">
-    <input class="text-input" id="textInput" placeholder="Was soll ich für dich erledigen?" />
-    <button class="mic-btn" id="micBtn" title="Sprechen">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-        <path d="M12 2a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/>
-        <path d="M5 11a7 7 0 0 0 14 0"/>
-        <line x1="12" y1="18" x2="12" y2="22"/>
-      </svg>
-    </button>
-  </div>
-
-  <div class="hint">Sag „Hey Jarvis“ oder klicke auf den Orb · Chrome/Edge empfohlen</div>
 
   <!-- Zugang -->
-  <div class="api-overlay" id="apiOverlay" style="display:none">
-    <h2>JARVIS · ZUGANG</h2>
-    <p>Gib deinen <strong style="color:#eafaff">Zugangs-Token</strong> ein. Er steht in der Server-Einstellung <code>JARVIS_TOKEN</code>.</p>
-    <input type="password" id="tokenInput" placeholder="Zugangs-Token" autocomplete="off" />
-    <button id="tokenSaveBtn">ENTSPERREN</button>
-    <div class="api-hint" id="tokenError" style="color:#ff5c7a"></div>
-  </div>
-
-  <div class="unsupported" id="unsupported">
-    <div>
-      <h2 style="color:var(--accent)">Spracherkennung nicht verfügbar</h2>
-      <p style="margin-top:10px;max-width:420px;color:#9fc">Dein Browser unterstützt die Web Speech API nicht.
-      Nutze Chrome oder Edge — du kannst aber trotzdem über das Textfeld mit JARVIS sprechen.</p>
+  <div class="overlay" id="apiOverlay">
+    <div class="card dialog-card">
+      <div class="logo"><svg class="i" style="stroke-width:2.2"><use href="#i-bolt"/></svg></div>
+      <h2>Zugang</h2>
+      <p>Gib deinen Zugangs-Token ein. Er steht in der Server-Einstellung <code>JARVIS_TOKEN</code>.</p>
+      <input type="password" id="tokenInput" placeholder="Zugangs-Token" autocomplete="off" aria-label="Zugangs-Token" />
+      <button class="btn" id="tokenSaveBtn" type="button">Entsperren</button>
+      <div class="err" id="tokenError"></div>
     </div>
   </div>
 
-  <script src="orb.js"></script>
+  <div class="overlay" id="unsupported">
+    <div class="card dialog-card">
+      <h2>Spracherkennung nicht verfügbar</h2>
+      <p>Dein Browser unterstützt die Spracherkennung nicht. Nutze Chrome oder Edge. Über das Textfeld kannst du trotzdem mit Jarvis schreiben.</p>
+      <button class="btn" type="button" id="unsupportedOk">Verstanden</button>
+    </div>
+  </div>
+
+  <script src="neural.js"></script>
+  <script src="wake.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

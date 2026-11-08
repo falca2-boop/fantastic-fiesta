@@ -4,7 +4,8 @@ Persönlicher Sprachassistent mit eigenem Server. Du sagst **„Hey Jarvis"**, e
 erledigt Dinge für dich (Anrede: Augustin, einstellbar).
 
 - **Websuche** (live), **Aufgaben**, **Notizen**, **Erinnerungen** (er spricht sie zur Zeit aus), **Gedächtnis** über dich, **Tagesplan**
-- **Server-Backend (Node, keine Abhängigkeiten):** Der Anthropic API Key liegt nur auf dem Server, nie im Browser.
+- **KI-Anbieter:** Claude (Anthropic) oder Google Gemini (AI Studio, kostenloser Tarif möglich). Gewählt wird über `JARVIS_PROVIDER` oder automatisch nach dem gesetzten Key.
+- **Server-Backend (Node, keine Abhängigkeiten):** Der API Key liegt nur auf dem Server, nie im Browser.
   Daten liegen in `data/store.json` und sind auf jedem Gerät dieselben.
 - **E-Mail / Kalender / Notion** über einen optionalen n8n-Webhook (`N8N_WEBHOOK_URL`). Der Workflow muss die
   Aktionen (`send_email`, `create_event` …) selbst ausführen. JARVIS fragt vor dem Senden nach.
@@ -40,17 +41,50 @@ Standardmäßig spricht JARVIS mit der Stimme deines Browsers. Mit einer ElevenL
 Fällt die Stimme aus (kein Guthaben, Fehler), spricht JARVIS automatisch mit der Browser-Stimme weiter.
 Jede Antwort verbraucht ElevenLabs-Guthaben (pro Zeichen); Texte sind auf 800 Zeichen begrenzt.
 
+## Obsidian
+
+Mit `OBSIDIAN_VAULT_DIR=/pfad/zu/deinem/Vault` speichert JARVIS Notizen und Gedächtnis als Markdown in deinem Vault:
+
+- `Jarvis/Notizen/<Datum> <Titel>.md`: eine Datei pro Notiz. Eigene Dateien in diesem Ordner liest er mit.
+- `Jarvis/Gedächtnis.md`: ein Fakt pro Listenpunkt. Bearbeitest du die Datei, gilt beim nächsten Gespräch deine Fassung.
+
+Bestehende Fakten werden beim ersten Start in die Datei übernommen; alte Notizen aus `store.json` bleiben dort liegen.
+Aufgaben und Erinnerungen bleiben in `data/store.json`. Jarvis muss auf demselben Rechner laufen wie der Vault (oder der Vault dorthin synchronisiert werden).
+Mit `OBSIDIAN_SUBFOLDER=00-INBOX/Jarvis` legst du einen anderen Unterordner statt `Jarvis` fest (nur relative Pfade).
+Ohne die Variable ändert sich nichts.
+
 ## Starten (lokal)
+
+Einsteiger-Anleitung mit Einrichtungsassistent: [SETUP.md](SETUP.md) (`npm run setup`). Kurzfassung:
 
 Voraussetzung: Node.js ab Version 20 (`node --version`).
 
 ```bash
-cp .env.example .env     # ANTHROPIC_API_KEY eintragen
-set -a; . ./.env; set +a
+npm run setup            # fragt die Werte ab und schreibt .env (oder .env.example kopieren und von Hand ausfüllen)
 npm start                # → http://127.0.0.1:8000 in Chrome oder Edge
 ```
 
 Das Mikrofon funktioniert auf `localhost` und über `https://`.
+
+## Beim Öffnen: Begrüßung und sofort zuhören
+
+Öffnest du Jarvis, sagt er sofort die Anrede (`JARVIS_ADDRESS`, z. B. „Hey Boss", sonst `JARVIS_USER_NAME`) und hört gleich zu. Der erste Befehl braucht kein „Hey Jarvis". Voraussetzung ist, dass Chrome für die Seite **Mikrofon** und **Ton** erlaubt (Schloss-Symbol → Website-Einstellungen). Sperrt Chrome den Ton ohne Klick, erscheint ein Hinweis, das Zuhören läuft trotzdem, und die Begrüßung folgt beim ersten Klick. Test: `node test/e2e/greeting.mjs` (braucht Playwright).
+
+## Ein Klick statt Befehle (Linux/Chromebook)
+
+`bash scripts/install-launcher.sh` legt ein **Jarvis**-Symbol im Startmenü an (Linux-Apps). Ein Klick startet Jarvis, falls er nicht läuft, und öffnet ihn im Browser (Port 8001). Der Key und alle Einstellungen kommen aus der `.env`. Im Terminal gehen auch `jarvis-start` und `jarvis-stop`.
+
+## „Hey Jarvis" oder zweimal klatschen öffnet Jarvis (Linux/Chromebook)
+
+`bash scripts/install-clap.sh` richtet einen Hintergrunddienst ein. Er hört auf **„Hey Jarvis"** und/oder **zweimal klatschen** und startet dann Jarvis und öffnet ihn im Browser, **falls die Jarvis-Seite nicht schon offen ist** (der Server merkt sich die letzte Abfrage der Oberfläche).
+
+- **Auslöser wählen:** `JARVIS_TRIGGER=wake bash scripts/install-clap.sh` (nur „Hey Jarvis"), `clap` (nur Klatschen), Standard `both`. Später ändern: in `~/.config/systemd/user/jarvis-clap.service`, dann `systemctl --user daemon-reload && systemctl --user restart jarvis-clap`.
+- **Datenschutz:** Das Audio wird nur im Arbeitsspeicher ausgewertet, nichts wird gespeichert oder gesendet, es gibt keine Cloud und kein Konto. ChromeOS zeigt, solange das Mikrofon genutzt wird, ein Mikrofon-Symbol.
+- **Wake-Word:** `scripts/wake-worker.py` nutzt die offenen openWakeWord-Modelle (Modell „hey_jarvis") mit `onnxruntime` und `numpy` in einer eigenen Umgebung unter `~/.local/share/jarvis/wake-env` (ca. 160 MB, braucht ca. 4 % eines Prozessorkerns). Schwelle: `WAKE_THRESHOLD` (Standard 0,6; höher = weniger Fehlauslösungen), Sperrzeit nach einem Treffer 5 Sekunden. Die Modelle sind auf Englisch trainiert; „Hey Jarvis" mit deutscher Aussprache wird erfahrungsgemäß erkannt, aber nicht immer so zuverlässig.
+- **Klatschen:** Zwei kurze, scharfe Knalle im Abstand von 0,18 bis 0,9 Sekunden. Sprache, Musik, einzelne Geräusche und Applaus (drei und mehr) lösen nichts aus. Empfindlichkeit: `CLAP_SENSITIVITY` (1 bis 10, Standard 6).
+- **Voraussetzung:** ChromeOS → Einstellungen → Entwickler → Linux → Mikrofon erlauben (danach Linux neu starten). Das Programm hört nur, solange Linux läuft.
+- **Testen:** `node scripts/clap-listener.js --test` zeigt live einen Pegel und meldet Treffer, ohne Jarvis zu starten.
+- **Ausschalten:** `systemctl --user disable --now jarvis-clap`.
 
 ## Im Netz betreiben (z. B. Render, Railway, Fly.io)
 
@@ -76,8 +110,88 @@ npm test
 | `lib/agent.js` | Claude-Schleife mit Werkzeugen, Systemprompt |
 | `lib/tools.js` | Werkzeuge (Aufgaben, Notizen, Erinnerungen, Gedächtnis, n8n) |
 | `lib/store.js` | JSON-Speicher |
+| `lib/env.js` | Liest `.env` beim Start (ohne Zusatzpaket, auch unter Windows) |
+| `scripts/setup.js` | Einrichtungsassistent (`npm run setup`) |
+| `lib/gemini.js` | Gemini-Anbindung (Werkzeug-Umwandlung, Websuche über Google) |
+| `lib/vault.js` | Obsidian-Anbindung (Notizen, Gedächtnis als Markdown) |
 | `lib/mail.js` | IMAP-Überwachung, Filter, Anruf (Twilio) und Push (ntfy) |
-| `public/` | Oberfläche: Orb, Spracherkennung („Hey Jarvis"), Sprachausgabe |
+| `public/` | Oberfläche: Dashboard, Neural-Pulse-Animation (`neural.js`), Spracherkennung („Hey Jarvis"), Sprachausgabe |
 
 Einschränkungen: Spracherkennung und -ausgabe nutzen die Browser-Funktionen (Chrome/Edge); Erinnerungen werden
 gesprochen, solange ein Tab offen ist, sonst beim nächsten Öffnen nachgeholt. Der Speicher ist für **einen** Nutzer ausgelegt.
+
+## Obsidian-Plugin: Knowledge Universe
+
+Im Ordner [`obsidian-knowledge-universe/`](obsidian-knowledge-universe/README.md) liegt ein eigenständiges Obsidian-Plugin, das den Vault als 3D-Partikel-Universum darstellt (Three.js). Installation und Bedienung stehen dort.
+
+
+## Welt-Ansicht (Nachrichten, Livestream, Weltkugel)
+
+Im Kopf von Jarvis führt der Knopf **Welt** (oder „Hey Jarvis, zeig die Weltkugel“) zu `/welt.html`. Die Jarvis-Kugel auf der Startseite bleibt unverändert.
+
+- **Weltkugel** (realistische Erde, lokal mitgeliefert, drehbar, Region-Knöpfe Welt/Europa/Ukraine/Nahost): cyanfarbene Punkte sind Live-Cams, rote Punkte sind **Krisenmeldungen der letzten 24 Stunden** (GDELT, öffentlich, ohne Schlüssel, alle 10 Minuten aktualisiert). Klick auf einen Punkt zeigt Details und Quellen.
+- **3D:** Die Kugel ist eine echte 3D-Kugel (mit der Maus drehen, mit dem Rad zoomen). Der Regler **3D-Höhe** (oben links) hebt Relief, Kontinentflächen und die Säulen der Krisenmeldungen an (0 = flach). Darstellung: Satellit, Nacht (Stadtlichter) oder Dunkel.
+- **Städte und Dörfer:** Ein Klick auf die Kugel zoomt hinein, schaltet auf die Karte „Städte & Dörfer“ (OpenStreetMap-Kacheln, werden beim Heranzoomen immer schärfer nachgeladen) und zeigt den Ort mit Region und Land (OpenStreetMap Nominatim, nur bei Klick oder Suche). „Satellit HD“ lädt hochaufgelöste Luftbilder (Esri). Über das Suchfeld oben springst du zu jeder Stadt oder jedem Dorf. Dafür braucht die Seite Internet; die Orte und Karten kommen nicht aus dem Projekt.
+- **Straßen und Häuser:** Die Karte lädt bis Zoomstufe 19 nach (einzelne Straßen und Gebäude). Weitere Klicks auf die Karte zoomen jeweils tiefer, der Knopf „Auf Straßen und Häuser zoomen“ springt direkt hin, eine Anzeige unten rechts nennt die Zoomstufe (Welt … Stadtviertel … Straßen & Häuser).
+- **Echtzeit-Sonne:** Tag und Nacht folgen dem echten Sonnenstand (ausschaltbar).
+- **Kontinente:** Alle sieben Kontinente sind als leicht erhabene, farbige Flächen mit Ländergrenzen und Beschriftung auf der Kugel (Knopf pro Kontinent, Klick auf eine Fläche zeigt Größe und Länder, "Kontinente" lässt sich ausschalten). Daten: `public/world/continents.json` (Natural Earth über world-atlas, per `scripts/build-continents.mjs` erzeugt). „Hey Jarvis, zeig mir Afrika auf der Weltkugel“ funktioniert ebenfalls.
+- **Live-Cams:** Mit `YOUTUBE_API_KEY` (kostenlos) sucht Jarvis beim Klick automatisch ein **gerade laufendes, einbettbares** Live-Video zum Ort (Ergebnis 3 Stunden zwischengespeichert). Ohne Schlüssel öffnet der Knopf die YouTube-Live-Suche. Eigene Orte oder feste Cams: `public/world/cams.json` (`"youtube": "<Video-ID>"`).
+- **Livestream:** Euronews, DW, France 24, Sky News, Al Jazeera (offizielle YouTube-Live-Kanäle), Außerdem geht jeder eigene YouTube-Link.
+- **Schlagzeilen:** DW, Tagesschau, BBC World, Al Jazeera (RSS, alle 5 Minuten). Jarvis kann sie auch vorlesen: „Was gibt es Neues in der Ukraine?“
+
+Bibliotheken liegen unter `public/vendor/` (globe.gl, three.js, NASA-Texturen; MIT). Test: `node test/e2e/welt.mjs`.
+
+
+## Agenten
+
+**In Jarvis:** Für größere Aufgaben beauftragt Jarvis Spezial-Agenten mit eigener Rolle und eigenen Werkzeugen (nur Claude als KI-Anbieter): `recherche` (Web), `nachrichten` (Schlagzeilen und Einordnung), `analyst` (Strategie), `notizen` (Obsidian), `planer` (Tagesplan), `firmensucher` (siehe unten), `briefschreiber`, `morgenbriefing` und `marktbeobachter`. Sie dürfen nur lesen und recherchieren, nichts speichern, senden oder öffnen. Eigene Agenten legst du per Sprache an: *„Erstelle mir einen Agenten, der täglich die wichtigsten Tech-Nachrichten einordnet.“* (bis zu 8, mit „Zeig meine Agenten“ oder in der Karte „Agenten“ zu sehen, „Lösche den Agenten …“ entfernt sie). Code: `lib/agents.js`.
+
+**Für Claude Code:** Unter `.claude/agents/` liegen Helfer für die Entwicklung (`jarvis-tester`, `jarvis-reviewer`, `jarvis-doku`), siehe dort die README.
+
+### Agent „firmensucher“ (Firmen ohne Webseite oder ohne Chat-Assistent)
+
+*„Hey Jarvis, beauftrage den Firmensucher: Friseure in Graz ohne Webseite.“* oder *„… Restaurants in Linz, die keinen Chat-Assistenten auf ihrer Webseite haben.“* Der Agent liefert standardmäßig **3 bis 5 Treffer** (mehr nur auf Wunsch, z. B. „zehn Treffer“) als Liste mit Name, Adresse, Telefon, Mail, dem Grund und einer Angebotsidee. Mit „Speichere die Liste als Notiz“ landet sie in Obsidian.
+
+- **Ohne Webseite:** Betriebe mit Namen in OpenStreetMap (öffentliche Daten, ohne Schlüssel), bei denen weder Webseite noch Kontakt-Webseite eingetragen ist. Branchen u. a. friseur, restaurant, zahnarzt, bäckerei, elektriker, hotel (oder direkt `shop=hairdresser`).
+- **Ohne Chat-Assistent:** Betriebe mit Webseite, auf deren **Startseite** keine bekannte Chat-Software (Tidio, Intercom, Crisp, tawk.to, LiveChat, HubSpot, Userlike …) erkannt wird. Prüft nur die Startseite, Adressen im lokalen Netz werden nie angefragt.
+- **Grenzen:** OpenStreetMap ist nicht vollständig. Manche Betriebe haben eine Webseite, die nur nicht eingetragen ist. Darum gegenprüft der Agent per Websuche, und du solltest vor dem Kontakt kurz selbst nachsehen. Der Agent kontaktiert niemanden.
+- **Recht (DACH):** Telefonwerbung und Werbe-Mails an Firmen sind ohne Einwilligung oft unzulässig (z. B. UWG in Deutschland, § 174 TKG in Österreich). Ein persönlicher Brief oder Besuch ist unkritisch. Im Zweifel vorher rechtlich klären.
+
+### Weitere Agenten
+
+- **briefschreiber:** Entwirft pro Firma einen kurzen, ehrlichen, persönlichen Brief mit Angebot (Webseite, Chat-Assistent), mit Platzhalter `[Absender]`. Er schreibt nur Text und versendet nichts. Ablauf: erst den Firmensucher, dann *„Lass den Briefschreiber Briefe für diese Liste entwerfen.“*, dann *„Speichere die Briefe als Notiz.“*
+- **morgenbriefing:** Die wichtigsten Meldungen aus Welt, Europa und Wirtschaft/Technik mit Quellen. *„Gib mir mein Morgenbriefing, Schwerpunkt Technik.“* Er läuft auf Zuruf und auf Wunsch **automatisch jeden Morgen**: *„Schick mir jeden Morgen um 7:30 das Briefing, Schwerpunkt Technik.“* (oder `MORNING_BRIEFING_TIME=07:30` in der `.env`; *„Schalte das Morgenbriefing aus“* beendet es). Zur Uhrzeit des Geräts erstellt Jarvis das Briefing, sagt es an, sobald die Seite offen ist, und legt es als Obsidian-Notiz ab. Jarvis muss dafür laufen; wird er später gestartet, holt er es bis zu 3 Stunden nach. Mit Claude als KI.
+- **marktbeobachter:** Recherchiert Preise, Konkurrenten oder Produkte per Websuche und vergleicht mit dem zuletzt in Obsidian gespeicherten Stand (Notiz „Markt: Thema“). Keine Anlageberatung.
+
+
+## Kosten im Blick
+
+Im Kasten **System** zeigt Jarvis den echten Verbrauch: heute und im laufenden Monat in Token und geschätzten US-Dollar, dazu die Websuchen und die teuersten Verwendungen (Gespräch, einzelne Agenten, Morgenbriefing). Die Zahlen stammen aus den Antworten der Anthropic-API (`usage`), die Preise aus der Anthropic-Preisliste (`lib/usage.js`, Sonnet 5.5: 2 $ Eingabe / 10 $ Ausgabe pro Million Token, Websuche 10 $ pro 1.000). Es ist eine Schätzung, maßgeblich ist die Rechnung in der Anthropic Console. Gezählt wird ab dem Update; frühere Nutzung fehlt. Mit Gemini wird nichts gezählt.
+
+Optionales **Tageslimit**: `JARVIS_DAILY_LIMIT_USD=2` in der `.env`. Ist es erreicht, ruft Jarvis bis morgen die KI nicht mehr auf (auch Agenten und Morgenbriefing nicht). Das ersetzt nicht das Ausgabenlimit in der Console, ergänzt es aber.
+
+
+## Jarvis als Freund
+
+Jarvis spricht dich mit „du“ an, warm, locker und mit Humor, fragt nach deinem Tag, nutzt das, was er über dich weiß, und sagt auch Unbequemes freundlich und ehrlich. Er ist eine KI und sagt das, wenn du fragst. Auf Zuruf antwortet er **immer**: „Hey Jarvis“ beantwortet er sofort mit einem freundlichen Satz („Ja, ich bin da.“, „Schieß los …“) und hört dann zu; auch kurze Zurufe wie „Danke“ oder „Bist du da?“ bekommen eine Antwort; klappt etwas nicht, sagt er das ebenfalls laut. Der Ton steht in `systemPrompt` (`lib/agent.js`).
+
+**Gespräch und Verlauf:** Nach jeder Antwort hört Jarvis noch etwa 15 Sekunden weiter zu: Folgefragen brauchen kein „Hey Jarvis“ (in der Anzeige steht „Ich höre weiter zu“). Sagst du nur „Hey Jarvis“, antwortet er schon nach einer kurzen Pause, ohne auf Chromes spätes Endergebnis zu warten. Der Chatverlauf bleibt nach dem Neuladen erhalten (die letzten 60 Nachrichten, im Browser gespeichert, getrennt durch „Früheres Gespräch“ und „Jetzt“); Jarvis selbst erinnert sich an die letzten 20 Nachrichten. Der Verlauf liegt nur in diesem Browser.
+
+## Oberfläche
+
+Die Orb-Kugel füllt fast den ganzen Bildschirm (Mitte, Kreis mit leuchtendem Rand). Darunter stehen Begrüßung, Vorschläge und die **letzte Antwort von Jarvis**, unten in der Mitte Eingabe und Mikrofon. Am linken Rand klappt der Reiter **Gespräch** den Chatverlauf auf (ein Zähler zeigt neue Antworten), am rechten Rand der Reiter **Übersicht** die Kästchen (Kosten, Aufgaben, Erinnerungen, Ziel, Notizen, Agenten, System). Schließen mit dem ×, mit Escape oder mit einem Klick auf die Kugel. Hintergrund: Schwarz. Farben stehen als Variablen oben in `public/style.css`.
+
+## Jarvis lernt von selbst
+
+- **Daumen hoch/runter** unter jeder Antwort (links im Gespräch). Das ist das wichtigste Signal.
+- **Tägliche Lernrunde** um 22:30 (Uhrzeit des Geräts, Jarvis muss laufen; ändern per `LEARN_TIME=21:00` oder Sprache: *„Lerne täglich um 21 Uhr“* / *„Schalte das Lernen aus“*; `JARVIS_LEARNING=off` schaltet sie ab; „Lerne jetzt aus heute“ startet sie sofort). Sie wertet dein Feedback und deine eigenen Nachrichten aus und aktualisiert **gelernte Vorlieben** (bis zu 12, fließen in jede Antwort ein), neue **Fakten** über dich, **Vorschläge für Agenten** und schreibt eine **Lernnotiz** in Obsidian. Kostet pro Tag nur wenige Cent und steht in der Kostenanzeige als „Lernrunde“.
+- **Du behältst die Kontrolle:** Alles Gelernte steht in der Karte „Gelernt“ (Übersicht rechts), jede Zeile lässt sich mit × löschen, oder sag *„Vergiss, dass ich Humor mag“*. Agenten ändern sich **nur nach deinem Ja**: *„Zeig die Vorschläge für die Agenten“*, dann *„Übernimm Vorschlag abc12“*.
+- **Schutz:** Gelernt wird nur aus dem, was du sagst und bewertest, nicht aus Webinhalten. Zugangsdaten, Links und Adressen werden nie übernommen. Code: `lib/learning.js`.
+
+## Notizen und Erinnerungen merken
+
+- **Merken:** *„Merk dir, dass Anna Dienstag Zeit hat“* (Fakt), *„Notiere: Angebot für Projekt Alpha bis Freitag“* (Notiz, mit Obsidian im Vault), *„Erinnere mich morgen um 9 an den Zahnarzt“* (Erinnerung).
+- **Wiederholen:** *„Erinnere mich jeden Tag um 9 ans Postfach“*, *„werktags um 8“*, *„jeden Montag …“* legt **eine** wiederholende Erinnerung an (kein Mehrfach-Eintragen mehr). Sie rückt nach dem Sprechen auf den nächsten Termin, in der Karte steht „↻ täglich“.
+- **Nachschlagen:** Jarvis kennt offene Erinnerungen und die letzten Notizen ständig; *„Was hatte ich zu Projekt Alpha notiert?“* durchsucht alle Notizen (`search_notes`), *„Welche Erinnerungen habe ich?“* zeigt sie mit den zuletzt ausgesprochenen (`list_reminders`).
+- **Verpasst:** War Jarvis zur Erinnerungszeit nicht erreichbar, kommt sie beim nächsten Öffnen mit „(eigentlich um 09:00 fällig)“. Erinnerungen werden immer gesprochen, auch wenn der Satz gleich lautet.
+- **Aufräumen:** *„Lösche die Erinnerung Postfach“* (sofort), *„Lösche die Notiz mit der Milch“* (Jarvis fragt vorher nach; gelöscht wird nur in den Jarvis-Notizen, nie in deinen eigenen Obsidian-Notizen).

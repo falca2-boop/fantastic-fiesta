@@ -1,0 +1,9 @@
+{
+  "id": "knowledge-universe",
+  "name": "Knowledge Universe",
+  "version": "1.0.0",
+  "minAppVersion": "1.4.0",
+  "description": "Dein Vault als lebendiges 3D-Universum aus leuchtenden Partikeln: Notizen, Links und Tags als kosmisches neuronales Netz.",
+  "author": "Augustin",
+  "isDesktopOnly": false
+}

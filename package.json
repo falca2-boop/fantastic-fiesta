@@ -8,8 +8,10 @@
     "node": ">=20"
   },
   "scripts": {
+    "setup:mail": "node scripts/setup-mail.js",
     "start": "node server.js",
-    "test": "node --test test/jarvis.test.js test/mail.test.js"
+    "test": "node --test test/jarvis.test.js test/mail.test.js test/clap.test.js test/wake.test.js test/world.test.js test/leads.test.js test/briefing.test.js test/usage.test.js test/learning.test.js",
+    "setup": "node scripts/setup.js"
   },
   "dependencies": {
     "imapflow": "2.3.0"

@@ -1,0 +1,102 @@
+/* Knowledge Universe – Obsidian-Plugin. Alle Klassen beginnen mit "ku-". */
+.ku-root {
+  position: relative;
+  padding: 0 !important;
+  overflow: hidden;
+  background: #030305;
+  background-image: radial-gradient(ellipse at 50% 45%, rgba(255, 106, 0, 0.07), transparent 60%),
+                    radial-gradient(ellipse at 20% 80%, rgba(138, 43, 255, 0.06), transparent 55%);
+  color: #eceef2;
+  --ku-accent: #ff6a00;
+  --ku-line: rgba(255, 255, 255, 0.09);
+  --ku-glass: rgba(14, 14, 20, 0.62);
+  font-family: var(--font-interface, system-ui, sans-serif);
+  user-select: none;
+}
+.ku-root .ku-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; outline: none; cursor: grab; touch-action: none; }
+.ku-root .ku-canvas:active { cursor: grabbing; }
+.ku-root .ku-ui { position: absolute; inset: 0; pointer-events: none; }
+.ku-root .ku-ui > * { pointer-events: auto; }
+.ku-root .ku-ui [hidden] { display: none !important; }
+/* Oben links */
+.ku-top-left { position: absolute; top: 18px; left: 22px; pointer-events: none; }
+.ku-root .ku-title { font-size: 13px; font-weight: 700; letter-spacing: 0.32em; color: #fff; text-shadow: 0 0 18px rgba(255, 106, 0, 0.55); }
+.ku-root .ku-stats { display: flex; gap: 14px; margin-top: 6px; font-size: 10.5px; letter-spacing: 0.14em; color: rgba(236, 238, 242, 0.55); flex-wrap: wrap; }
+.ku-root .ku-stat b { color: var(--ku-accent); font-weight: 600; font-variant-numeric: tabular-nums; }
+/* Oben rechts */
+.ku-top-right { position: absolute; top: 14px; right: 16px; display: flex; gap: 8px; align-items: flex-start; }
+.ku-root .ku-search { position: relative; display: flex; align-items: center; width: 230px; height: 36px; padding: 0 12px; gap: 8px;
+  background: var(--ku-glass); border: 1px solid var(--ku-line); border-radius: 18px; backdrop-filter: blur(14px); transition: border-color .15s, width .2s; }
+.ku-root .ku-search:focus-within { border-color: rgba(255, 106, 0, 0.6); width: 280px; }
+.ku-root .ku-search .ku-icon { flex: none; opacity: 0.6; }
+.ku-root .ku-search input { flex: 1; min-width: 0; background: none !important; border: 0 !important; box-shadow: none !important; outline: 0; color: #fff; font-size: 13px; padding: 0; height: 100%; user-select: text; }
+.ku-root .ku-search input::placeholder { color: rgba(236, 238, 242, 0.4); }
+.ku-root .ku-results { position: absolute; top: 42px; left: 0; right: 0; background: rgba(12, 12, 18, 0.92); border: 1px solid var(--ku-line); border-radius: 12px; padding: 4px; backdrop-filter: blur(16px); max-height: 340px; overflow: auto; }
+.ku-root .ku-result { display: flex; align-items: center; gap: 9px; width: 100%; padding: 7px 9px; border: 0; background: none; border-radius: 8px; color: #eceef2; font-size: 12.5px; text-align: left; cursor: pointer; box-shadow: none; height: auto; }
+.ku-root .ku-result:hover, .ku-root .ku-result.is-active { background: rgba(255, 255, 255, 0.08); }
+.ku-root .ku-result-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ku-root .ku-result-sub { font-size: 10.5px; color: rgba(236, 238, 242, 0.4); max-width: 80px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ku-root .ku-result-empty { padding: 10px; font-size: 12px; color: rgba(236, 238, 242, 0.5); }
+.ku-root .ku-dot { width: 8px; height: 8px; border-radius: 50%; flex: none; box-shadow: 0 0 8px currentColor; }
+/* Buttons */
+.ku-icon { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+.ku-root .ku-btn { width: 36px; height: 36px; padding: 0; display: grid; place-items: center; border-radius: 50%; color: rgba(236, 238, 242, 0.85); cursor: pointer;
+  background: var(--ku-glass); border: 1px solid var(--ku-line); backdrop-filter: blur(14px); box-shadow: none; transition: border-color .15s, color .15s, background .15s; }
+.ku-root .ku-btn:hover { color: #fff; border-color: rgba(255, 106, 0, 0.55); background: rgba(255, 106, 0, 0.12); }
+.ku-root .ku-btn.is-active { color: var(--ku-accent); border-color: rgba(255, 106, 0, 0.7); }
+.ku-root .ku-btn.has-filter::after { content: ""; position: absolute; width: 7px; height: 7px; margin: -22px -22px 0 0; border-radius: 50%; background: var(--ku-accent); box-shadow: 0 0 8px var(--ku-accent); }
+.ku-root .ku-btn-wide { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; margin-top: 14px; padding: 9px; border-radius: 10px; cursor: pointer; height: auto;
+  background: rgba(255, 106, 0, 0.16); border: 1px solid rgba(255, 106, 0, 0.45); color: #ffd7b8; font-size: 12.5px; box-shadow: none; }
+.ku-root .ku-btn-wide:hover { background: rgba(255, 106, 0, 0.28); }
+/* Unten */
+.ku-bottom { position: absolute; bottom: 18px; left: 50%; transform: translateX(-50%); display: flex; gap: 8px; padding: 6px; border-radius: 26px;
+  background: var(--ku-glass); border: 1px solid var(--ku-line); backdrop-filter: blur(14px); }
+.ku-root .ku-bottom .ku-btn { background: transparent; border-color: transparent; }
+.ku-root .ku-bottom .ku-btn:hover { background: rgba(255, 255, 255, 0.09); }
+/* Panels */
+.ku-panel { position: absolute; top: 58px; right: 16px; width: 270px; max-height: calc(100% - 140px); overflow: auto; padding: 14px 16px 16px; border-radius: 14px;
+  background: rgba(12, 12, 18, 0.9); border: 1px solid var(--ku-line); backdrop-filter: blur(18px); box-shadow: 0 18px 50px rgba(0, 0, 0, 0.5); }
+.ku-root .ku-panel-title { font-size: 11px; letter-spacing: 0.2em; text-transform: uppercase; color: rgba(236, 238, 242, 0.6); margin-bottom: 10px; }
+.ku-root .ku-panel-sub { font-size: 10.5px; letter-spacing: 0.14em; text-transform: uppercase; color: rgba(236, 238, 242, 0.45); margin: 14px 0 6px; }
+.ku-root .ku-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 6px 0; font-size: 12.5px; color: rgba(236, 238, 242, 0.85); cursor: pointer; }
+.ku-root .ku-row input[type="range"] { width: 120px; accent-color: #ff6a00; }
+.ku-root .ku-row input[type="checkbox"] { accent-color: #ff6a00; width: 16px; height: 16px; }
+.ku-root .ku-row select { background: rgba(255, 255, 255, 0.08); color: #fff; border: 1px solid var(--ku-line); border-radius: 8px; padding: 3px 6px; font-size: 12px; }
+.ku-root .ku-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.ku-root .ku-chip { display: inline-flex; align-items: center; gap: 6px; padding: 3px 9px; border-radius: 999px; cursor: pointer; height: auto; font-size: 11.5px; color: rgba(236, 238, 242, 0.8);
+  background: rgba(255, 255, 255, 0.05); border: 1px solid var(--ku-line); box-shadow: none; }
+.ku-root .ku-chip i { font-style: normal; font-size: 10px; opacity: 0.5; }
+.ku-root .ku-chip:hover { border-color: rgba(255, 106, 0, 0.5); }
+.ku-root .ku-chip.is-on { background: rgba(255, 106, 0, 0.22); border-color: rgba(255, 106, 0, 0.7); color: #fff; }
+.ku-root .ku-link { margin-top: 14px; background: none; border: 0; box-shadow: none; color: var(--ku-accent); font-size: 12px; cursor: pointer; padding: 0; height: auto; }
+/* Tooltip + Details */
+.ku-tooltip { position: absolute; z-index: 5; display: flex; flex-direction: column; gap: 2px; max-width: 220px; padding: 7px 11px; border-radius: 10px; pointer-events: none !important;
+  background: rgba(10, 10, 16, 0.9); border: 1px solid rgba(255, 106, 0, 0.45); box-shadow: 0 0 22px rgba(255, 106, 0, 0.18); font-size: 12px; }
+.ku-root .ku-tooltip b { font-weight: 600; overflow-wrap: anywhere; }
+.ku-root .ku-tooltip span { font-size: 10.5px; color: rgba(236, 238, 242, 0.55); }
+.ku-root .ku-details { position: absolute; right: 16px; bottom: 74px; width: 310px; max-height: 58%; overflow: auto; padding: 14px 16px 16px; border-radius: 14px; user-select: text;
+  background: rgba(12, 12, 18, 0.9); border: 1px solid rgba(255, 106, 0, 0.35); backdrop-filter: blur(18px); box-shadow: 0 18px 60px rgba(0, 0, 0, 0.55), 0 0 40px rgba(255, 106, 0, 0.08); }
+.ku-root .ku-d-head { display: flex; align-items: center; gap: 9px; }
+.ku-root .ku-d-head h3 { flex: 1; margin: 0; font-size: 15px; font-weight: 600; line-height: 1.3; overflow-wrap: anywhere; color: #fff; }
+.ku-root .ku-d-head .ku-btn { width: 28px; height: 28px; }
+.ku-root .ku-d-path { margin-top: 4px; font-size: 10.5px; color: rgba(236, 238, 242, 0.4); overflow-wrap: anywhere; }
+.ku-root .ku-d-stats { margin: 10px 0 8px; font-size: 12px; color: rgba(236, 238, 242, 0.7); }
+.ku-root .ku-d-props { display: grid; grid-template-columns: auto 1fr; gap: 3px 12px; font-size: 11.5px; }
+.ku-root .ku-k { color: rgba(236, 238, 242, 0.45); } .ku-root .ku-v { overflow-wrap: anywhere; }
+.ku-root .ku-d-list { display: flex; flex-direction: column; gap: 2px; }
+.ku-root .ku-d-link { text-align: left; background: none; border: 0; box-shadow: none; padding: 3px 6px; margin: 0 -6px; border-radius: 6px; font-size: 12.5px; color: #ffd0a8; cursor: pointer; height: auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ku-root .ku-d-link:hover { background: rgba(255, 106, 0, 0.14); }
+.ku-root .ku-d-more { font-size: 11px; color: rgba(236, 238, 242, 0.4); padding: 2px 0; }
+
+.ku-root .ku-empty, .ku-root .ku-error { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); max-width: 360px; text-align: center; font-size: 13px; color: rgba(236, 238, 242, 0.6); line-height: 1.6; }
+
+.ku-root .ku-hint { position: absolute; left: 18px; bottom: 74px; max-width: min(420px, calc(100% - 36px)); display: flex; align-items: center; gap: 8px; padding: 8px 8px 8px 14px; border-radius: 12px;
+  background: rgba(30, 22, 8, 0.85); border: 1px solid rgba(255, 170, 0, 0.4); color: #ffe2b0; font-size: 12px; line-height: 1.45; backdrop-filter: blur(12px); }
+.ku-root .ku-hint .ku-btn { width: 26px; height: 26px; flex: none; }
+.ku-root .ku-error-text { color: #ffb3b3; max-width: 520px; user-select: text; }
+@media (max-width: 640px) {
+  .ku-root .ku-search { width: 150px; } .ku-root .ku-search:focus-within { width: 190px; }
+  .ku-root .ku-details { left: 12px; right: 12px; width: auto; bottom: 70px; }
+  .ku-root .ku-panel { left: 12px; right: 12px; width: auto; }
+  .ku-root .ku-stats { font-size: 9.5px; gap: 9px; }
+}@media (prefers-reduced-motion: reduce) { .ku-search, .ku-btn { transition: none; } }

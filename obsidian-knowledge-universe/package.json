@@ -1,0 +1,24 @@
+{
+  "name": "obsidian-knowledge-universe",
+  "version": "1.0.0",
+  "description": "3D particle universe visualisation of an Obsidian vault (Three.js)",
+  "main": "main.js",
+  "private": true,
+  "scripts": {
+    "dev": "node esbuild.config.mjs",
+    "build": "tsc -noEmit -skipLibCheck && node esbuild.config.mjs production",
+    "harness": "node esbuild.config.mjs harness",
+    "test": "node test/run.mjs",
+    "plugin-harness": "node esbuild.config.mjs plugin-harness"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "@types/three": "0.170.0",
+    "builtin-modules": "^4.0.0",
+    "esbuild": "^0.24.0",
+    "obsidian": "latest",
+    "three": "0.170.0",
+    "tslib": "^2.6.0",
+    "typescript": "^5.6.0"
+  }
+}

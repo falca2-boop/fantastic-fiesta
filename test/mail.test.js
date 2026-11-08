@@ -4,6 +4,9 @@ import { Store } from '../lib/store.js';
 import { runTool, toolDefinitions } from '../lib/tools.js';
 import { isImportant, checkMail, mailConfigFromEnv, callText, placeCall } from '../lib/mail.js';
 
+const baseConfig = {
+  imap: {}, ntfy: null, includeSubject: true, defaults: { senders: [], keywords: [] },
+};
 const config = {
   imap: {}, ntfy: { server: 'https://ntfy.example', topic: 't' }, includeSubject: true,
   defaults: { senders: ['finanzamt'], keywords: ['dringend'] },
@@ -11,7 +14,7 @@ const config = {
 const msg = (uid, fromName, subject, fromAddress = 'x@y.de') => ({ uid, fromName, fromAddress, subject });
 
 test('Konfiguration nur, wenn alle vier Variablen gesetzt sind', () => {
-  assert.equal(mailConfigFromEnv({ IMAP_HOST: 'h', IMAP_USER: 'u', IMAP_PASSWORD: 'p' }), null);
+  assert.equal(mailConfigFromEnv({ IMAP_HOST: 'h', IMAP_USER: 'u' }), null);
   const c = mailConfigFromEnv({ IMAP_HOST: 'h', IMAP_USER: 'u', IMAP_PASSWORD: 'p', NTFY_TOPIC: 't', MAIL_IMPORTANT_SENDERS: 'a, b' });
   assert.deepEqual(c.defaults.senders, ['a', 'b']);
   assert.equal(c.imap.port, 993);
@@ -72,8 +75,9 @@ const callCfg = { sid: 'AC1', token: 'tok', from: '+4930111', to: '+49170222' };
 
 test('Konfiguration: Anruf allein reicht, ohne Meldeweg ist die Überwachung aus', () => {
   const base = { IMAP_HOST: 'h', IMAP_USER: 'u', IMAP_PASSWORD: 'p' };
-  assert.equal(mailConfigFromEnv(base), null);
-  assert.equal(mailConfigFromEnv({ ...base, TWILIO_ACCOUNT_SID: 'a', TWILIO_AUTH_TOKEN: 'b' }), null);
+  const screenOnly = mailConfigFromEnv(base);
+  assert.equal(screenOnly.screen, true); assert.equal(screenOnly.ntfy, null); assert.equal(screenOnly.call, null);
+  assert.equal(mailConfigFromEnv({ ...base, MAIL_SCREEN_ALERT: 'false' }).screen, false);
   const c = mailConfigFromEnv({ ...base, TWILIO_ACCOUNT_SID: 'a', TWILIO_AUTH_TOKEN: 'b', TWILIO_FROM: '+1', CALL_TO: '+2' });
   assert.equal(c.ntfy, null);
   assert.equal(c.call.to, '+2');
@@ -130,4 +134,26 @@ test('Push und Anruf zusammen: klappt einer, gilt die Mail als gemeldet', async 
     fetchNew: async () => ({ messages: [msg(2, 'Finanzamt', 'a')] }) });
   assert.equal(pushes.length, 1);
   assert.equal(store.data.mailLastUid, 2);
+});
+
+test('Ansage in der Jarvis-Seite: Meldungen landen in der Warteschlange und werden einmal abgeholt; alertAll meldet jede Mail', async () => {
+  const { takeMailAlerts } = await import('../lib/mail.js');
+  const store = new Store(null); store.data.mailLastUid = 1;
+  const config = { ...baseConfig, ntfy: null, screen: true, alertAll: true, defaults: { senders: [], keywords: [] } };
+  await checkMail({ store, config, fetchNew: async () => ({ messages: [msg(2, 'Oma', 'Kuchen'), msg(3, 'Chef', 'Hallo')] }) });
+  const got = takeMailAlerts(store);
+  assert.deepEqual(got.map((a) => a.from), ['Oma', 'Chef']); assert.equal(got[0].subject, 'Kuchen');
+  assert.deepEqual(takeMailAlerts(store), []);
+});
+
+test('updateEnvFile ersetzt und ergänzt Schlüssel, lässt Rest unberührt, Rechte 600', async () => {
+  const fs = await import('node:fs'); const os = await import('node:os'); const path = await import('node:path');
+  const { updateEnvFile, parseEnv } = await import('../lib/env.js');
+  const f = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'envu-')), '.env');
+  fs.writeFileSync(f, '# Kommentar\nANTHROPIC_API_KEY=sk-ant-x\nIMAP_USER=alt@web.de\n');
+  updateEnvFile(f, { IMAP_USER: 'neu@web.de', IMAP_PASSWORD: 'pa ss#1' });
+  const text = fs.readFileSync(f, 'utf8');
+  assert.match(text, /# Kommentar/); const e = parseEnv(text);
+  assert.equal(e.ANTHROPIC_API_KEY, 'sk-ant-x'); assert.equal(e.IMAP_USER, 'neu@web.de'); assert.equal(e.IMAP_PASSWORD, 'pa ss#1');
+  assert.equal(fs.statSync(f).mode & 0o777, 0o600);
 });

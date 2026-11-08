@@ -1,10 +1,13 @@
 /* JARVIS – Browser-Frontend. Alle KI-Logik, Werkzeuge und Daten liegen auf dem Server (/api/*). */
 (function () {
   const $ = (id) => document.getElementById(id);
-  const micBtn = $('micBtn'), textInput = $('textInput'), dialog = $('dialog'), stateLabel = $('stateLabel');
-  const goalPanel = $('goalPanel'), goalText = $('goalText'), sidePanel = $('sidePanel');
+  const micBtn = $('micBtn'), textInput = $('textInput'), dialog = $('dialog'), composer = $('composer');
+  const stateText = $('stateText'), stateDot = $('stateDot'), clockEl = $('clock'), banner = $('banner');
   const unsupported = $('unsupported'), orbCanvas = $('orb');
   const apiOverlay = $('apiOverlay'), tokenInput = $('tokenInput'), tokenSaveBtn = $('tokenSaveBtn'), tokenError = $('tokenError');
+  const overlayOpen = () => apiOverlay.classList.contains('show');
+  const el = (tag, cls, text) => { const n = document.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = text; return n; };
+  const icon = (id) => { const s = document.createElementNS('http://www.w3.org/2000/svg', 'svg'); s.setAttribute('class', 'i'); const u = document.createElementNS('http://www.w3.org/2000/svg', 'use'); u.setAttribute('href', '#' + id); s.appendChild(u); return s; };
 
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
   const synth = window.speechSynthesis;
@@ -27,7 +30,7 @@
   // ---------- Zugang ----------
   function askToken(msg) {
     tokenError.textContent = msg || '';
-    apiOverlay.style.display = 'flex';
+    apiOverlay.classList.add('show');
     tokenInput.focus();
   }
   tokenSaveBtn.addEventListener('click', async () => {
@@ -35,7 +38,7 @@
     try {
       await api('/api/state');
       try { localStorage.setItem('jarvis_token', TOKEN); } catch (e) {}
-      apiOverlay.style.display = 'none';
+      apiOverlay.classList.remove('show');
       await boot(true);
     } catch (e) { askToken(e.code === 401 ? 'Token ist falsch.' : e.message); }
   });
@@ -49,15 +52,20 @@
   }
   if (synth) { pickVoice(); synth.onvoiceschanged = pickVoice; }
 
-  let voiceOn = false, currentAudio = null, speakSeq = 0;
+  let voiceOn = false, voiceWarned = false, currentAudio = null, speakSeq = 0;
   const isSpeaking = () => !!currentAudio || !!(synth && synth.speaking);
 
   function startedSpeaking() {
     setState('speaking');
     if (recognition && listening) { try { recognition.stop(); } catch (e) {} }
   }
+  const followMs = () => window.JARVIS_FOLLOW_MS || 15000;   // so lange gilt nach einer Antwort jede Äußerung als Folgefrage
+  function keepListening() { armedUntil = Date.now() + followMs(); showHeard('Ich höre weiter zu – sag einfach etwas, oder „Hey Jarvis“.', 'wake'); }
+  window.__disarm = () => { armedUntil = 0; };     // nur für Tests: Folgefenster sofort schließen
+  let armAfterSpeech = false;     // nach der Begrüßung sofort einen Befehl ohne "Hey Jarvis" annehmen
   function doneSpeaking() {
     setState(listening ? 'listening' : 'idle');
+    if (armAfterSpeech && listening) { armAfterSpeech = false; keepListening(); }
     if (listening) restartRecognition();
   }
   function stopSpeaking() {
@@ -66,18 +74,22 @@
     if (currentAudio) { const a = currentAudio; currentAudio = null; a.pause(); }
   }
 
+  /** Gibt true zurück, wenn die Sprachausgabe gestartet ist, false wenn Chrome sie ohne Klick blockiert. */
   function speakBrowser(text) {
-    if (!synth) return;
-    const u = new SpeechSynthesisUtterance(text);
-    if (deVoice) u.voice = deVoice;
-    u.lang = 'de-DE'; u.rate = 1.02; u.pitch = 0.9;
-    u.onstart = startedSpeaking;
-    u.onend = doneSpeaking;
-    u.onerror = doneSpeaking;
-    synth.speak(u);
+    return new Promise((resolve) => {
+      if (!synth) return resolve(false);
+      const u = new SpeechSynthesisUtterance(text);
+      if (deVoice) u.voice = deVoice;
+      u.lang = 'de-DE'; u.rate = 1.02; u.pitch = 0.9;
+      u.onstart = () => { startedSpeaking(); resolve(true); };
+      u.onend = doneSpeaking;
+      u.onerror = () => { doneSpeaking(); resolve(false); };
+      synth.speak(u);
+      setTimeout(() => resolve(!!synth.speaking), 2500);        // weder Start noch Fehler gemeldet
+    });
   }
 
-  // Server-Stimme (ElevenLabs); bei jedem Fehler fällt JARVIS auf die Browser-Stimme zurück
+  // Server-Stimme (ElevenLabs); bei jedem Fehler fällt JARVIS auf die Browser-Stimme zurück. Gibt zurück, ob gesprochen wird.
   async function speak(text) {
     stopSpeaking();
     const seq = speakSeq;
@@ -88,88 +100,330 @@
           headers: { 'Content-Type': 'application/json', ...(TOKEN ? { Authorization: 'Bearer ' + TOKEN } : {}) },
           body: JSON.stringify({ text: text.slice(0, 800) }),
         });
-        if (!res.ok) throw new Error('speak ' + res.status);
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          if (!voiceWarned) { voiceWarned = true; banner.textContent = (err.error || 'Die ElevenLabs-Stimme ist nicht verfügbar.') + ' Ich spreche mit der Browser-Stimme weiter.'; banner.classList.add('show'); }
+          throw new Error('speak ' + res.status);
+        }
         const blob = await res.blob();
-        if (seq !== speakSeq) return;              // inzwischen wurde etwas anderes angefordert
+        if (seq !== speakSeq) return true;         // inzwischen wurde etwas anderes angefordert
         const url = URL.createObjectURL(blob);
         const audio = new Audio(url);
         const finish = () => { URL.revokeObjectURL(url); if (currentAudio === audio) { currentAudio = null; doneSpeaking(); } };
         audio.onended = finish; audio.onerror = finish;
         currentAudio = audio;
+        await audio.play();                        // schlägt fehl, wenn Chrome Ton ohne Klick sperrt
         startedSpeaking();
-        await audio.play();
-        return;
+        return true;
       } catch (e) {
-        if (seq !== speakSeq) return;
+        if (seq !== speakSeq) return true;
         currentAudio = null;
       }
     }
-    speakBrowser(text);
+    return speakBrowser(text);
   }
 
   // ---------- UI ----------
+  const STATE = {
+    idle: ['Bereit', 'ok'], listening: ['Höre zu …', 'live'], thinking: ['Denke nach …', 'live'], speaking: ['Spreche …', 'live'],
+  };
   function setState(mode) {
     window.Orb && window.Orb.setMode(mode);
-    const labels = { idle: 'Bereit', listening: 'Höre zu…', thinking: 'Verarbeite…', speaking: 'Spreche…' };
-    stateLabel.textContent = labels[mode] || '';
+    const [label, cls] = STATE[mode] || STATE.idle;
+    stateText.textContent = label;
+    stateDot.className = 'dot ' + cls;
   }
-  function addBubble(text, who, interim) {
-    const b = document.createElement('div');
-    b.className = 'bubble ' + who + (interim ? ' interim' : '');
-    b.textContent = text;
-    dialog.appendChild(b);
-    while (dialog.children.length > 10) dialog.removeChild(dialog.firstChild);
-    return b;
+
+  const hhmm = (d) => d.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+  // ---------- Aufklappbare Leisten (links Gespräch, rechts Übersicht) ----------
+  const drawerOpen = (id) => !!$(id) && $(id).classList.contains('open');
+  function setDrawer(id, open) {
+    const d = $(id), tab = $(id === 'drawerChat' ? 'tabChat' : 'tabSide'); if (!d || !tab) return;
+    d.classList.toggle('open', open); d.setAttribute('aria-hidden', String(!open)); tab.setAttribute('aria-expanded', String(open));
+    if (open && id === 'drawerChat') { unread = 0; $('chatBadge').hidden = true; dialog.scrollTop = dialog.scrollHeight; }
+    if (open) { const other = id === 'drawerChat' ? 'drawerSide' : 'drawerChat'; if (window.innerWidth <= 900 && drawerOpen(other)) setDrawer(other, false); }
   }
-  function jarvisSay(text) { addBubble(text, 'jarvis'); speak(text); }
+  let unread = 0;
+  function bumpUnread() { unread++; const b = $('chatBadge'); b.textContent = String(unread); b.hidden = false; }
+  // Letzte Antwort bleibt über der Kugel sichtbar, auch wenn das Gespräch eingeklappt ist
+  function showLiveReply(text) {
+    const plain = String(text).split('<<SPRICH>>')[0].replace(/^#+\s*/gm, '').replace(/\*\*/g, '').replace(/\s+/g, ' ').trim();
+    const el2 = $('liveReply'); if (el2) el2.textContent = plain.length > 240 ? plain.slice(0, 237) + ' …' : plain;
+  }
+  $('tabChat').addEventListener('click', () => setDrawer('drawerChat', true));
+  $('tabSide').addEventListener('click', () => setDrawer('drawerSide', true));
+  for (const x of document.querySelectorAll('[data-close]')) x.addEventListener('click', () => setDrawer(x.dataset.close, false));
+  $('liveReply').addEventListener('click', () => setDrawer('drawerChat', true));
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { setDrawer('drawerChat', false); setDrawer('drawerSide', false); } });
+  document.querySelector('.main').addEventListener('click', (e) => { if (e.target.closest('.suggest, .live-reply')) return; setDrawer('drawerChat', false); setDrawer('drawerSide', false); });
+
+  // Chatverlauf bleibt über Neuladen erhalten (im Browser gespeichert, die letzten 60 Nachrichten)
+  const CHAT_KEY = 'jarvis.chat';
+  const loadChat = () => { try { return JSON.parse(localStorage.getItem(CHAT_KEY) || '[]'); } catch (e) { return []; } };
+  const saveChat = (item) => { try { const l = loadChat(); l.push(item); localStorage.setItem(CHAT_KEY, JSON.stringify(l.slice(-60))); } catch (e) {} };
+  const stampText = (ts) => { const d = new Date(ts); return d.toDateString() === new Date().toDateString() ? hhmm(d) : d.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' }) + ' ' + hhmm(d); };
+  // Daumen unter Antworten: Jarvis lernt daraus in der Lernrunde
+  function feedbackRow(reply) {
+    const row = el('div', 'fb'); const asked = lastUserText;
+    const mk = (rating, label, title) => {
+      const b = el('button', '', label); b.type = 'button'; b.title = title; b.setAttribute('aria-label', title);
+      b.addEventListener('click', async () => {
+        for (const x of row.querySelectorAll('button')) x.disabled = true;
+        b.classList.add('on');
+        try { await api('/api/feedback', { method: 'POST', body: JSON.stringify({ rating, user: asked, reply }) }); row.appendChild(el('span', 'fb-thanks', rating === 'up' ? 'Merke ich mir.' : 'Danke, ich lerne daraus.')); }
+        catch (e) { row.appendChild(el('span', 'fb-thanks', 'Konnte das nicht speichern.')); }
+      });
+      return b;
+    };
+    row.append(mk('up', '👍', 'Gute Antwort'), mk('down', '👎', 'Nicht gut'));
+    return row;
+  }
+  /** opts: { save: false } für Begrüßung und Hinweise, { ts } beim Wiederherstellen */
+  function addBubble(text, who, interim, opts) {
+    const o = opts || {};
+    const ts = o.ts || Date.now();
+    const m = el('div', 'msg ' + who + (interim ? ' interim' : ''));
+    const meta = el('div', 'meta');
+    meta.append(el('span', '', who === 'user' ? 'Du' : 'Jarvis'), el('span', '', stampText(ts)));
+    m.append(meta, el('div', 'bubble', text));
+    if (who === 'jarvis' && !interim && !o.restore && o.save !== false) m.appendChild(feedbackRow(text));
+    dialog.appendChild(m);
+    if (!interim && !o.restore) {
+      if (window.Orb && window.Orb.burst) window.Orb.burst(who === 'user' ? 5 : 9);
+      if (o.save !== false) saveChat({ who, text, ts });
+      if (who === 'jarvis') { showLiveReply(text); if (o.save !== false && !drawerOpen('drawerChat')) bumpUnread(); }
+    }
+    while (dialog.children.length > 60) dialog.removeChild(dialog.firstChild);
+    dialog.scrollTop = dialog.scrollHeight;
+    return { node: m.querySelector('.bubble'), remove: () => m.remove(), set textContent(t) { m.querySelector('.bubble').textContent = t; } };
+  }
+  let typingEl = null;
+  function showTyping(on) {
+    if (on && !typingEl) {
+      typingEl = el('div', 'msg jarvis typing');
+      const b = el('div', 'bubble'); b.append(el('i'), el('i'), el('i'));
+      typingEl.append(b);
+      dialog.appendChild(typingEl); dialog.scrollTop = dialog.scrollHeight;
+    } else if (!on && typingEl) { typingEl.remove(); typingEl = null; }
+  }
+  // Nichts doppelt vorlesen: bereits gesprochene Sätze merkt sich der Browser (auch über neue Chats hinweg).
+  const SPOKEN_KEY = 'jarvis.spoken';
+  const normSentence = (s) => s.toLowerCase().replace(/[^a-zäöüß0-9 ]/g, '').replace(/\s+/g, ' ').trim();
+  function loadSpoken() { try { return JSON.parse(localStorage.getItem(SPOKEN_KEY) || '[]'); } catch (e) { return []; } }
+  function saveSpoken(list) { try { localStorage.setItem(SPOKEN_KEY, JSON.stringify(list.slice(-300))); } catch (e) {} }
+  function freshSpeech(text) {
+    const seen = loadSpoken();
+    const set = new Set(seen);
+    const out = [];
+    for (const sent of text.match(/[^.!?]+[.!?]*/g) || []) {
+      const key = normSentence(sent);
+      if (key.length < 12) { out.push(sent); continue; }       // kurze Bestätigungen dürfen sich wiederholen
+      if (set.has(key)) continue;
+      set.add(key); seen.push(key); out.push(sent);
+    }
+    saveSpoken(seen);
+    return out.join(' ').trim();
+  }
+  // Analyse-Modus: Text vor <<SPRICH>> erscheint formatiert im Chat, nur der Teil danach wird gesprochen.
+  const stripMd = (s) => s.replace(/^#+\s*/gm, '').replace(/\*\*/g, '').replace(/^\s*[-*]\s+/gm, '').trim();
+  function renderRich(node, text) {
+    node.textContent = ''; node.classList.add('rich');
+    let list = null;
+    const inline = (parent, t) => t.split(/(\*\*[^*]+\*\*)/).forEach((part) => {
+      if (/^\*\*[^*]+\*\*$/.test(part)) parent.appendChild(el('strong', '', part.slice(2, -2))); else if (part) parent.appendChild(document.createTextNode(part));
+    });
+    for (const raw of text.split('\n')) {
+      const line = raw.trimEnd();
+      const h = line.match(/^#{1,4}\s+(.*)/), li = line.match(/^\s*[-*]\s+(.*)/);
+      if (li) { if (!list) { list = el('ul'); node.appendChild(list); } const i = el('li'); inline(i, li[1]); list.appendChild(i); continue; }
+      list = null;
+      if (h) node.appendChild(el('h4', '', h[1])); else if (line.trim()) { const p = el('p'); inline(p, line); node.appendChild(p); }
+    }
+  }
+  const looksRich = (t) => /^#{1,4}\s|^\s*[-*]\s/m.test(t);
+  function restoreChat() {
+    const list = loadChat();
+    if (!list.length) return;
+    dialog.appendChild(el('div', 'chat-sep', 'Früheres Gespräch'));
+    for (const it of list) {
+      const b = addBubble(it.text, it.who, false, { restore: true, ts: it.ts });
+      if (it.who === 'jarvis' && looksRich(it.text) && b.node) renderRich(b.node, it.text);
+    }
+    dialog.appendChild(el('div', 'chat-sep', 'Jetzt'));
+    dialog.scrollTop = dialog.scrollHeight;
+  }
+  function jarvisSay(text) {
+    const [shown, spokenPart] = String(text).split('<<SPRICH>>');
+    const bubble = addBubble(shown.trim(), 'jarvis');
+    if (looksRich(shown) && bubble.node) renderRich(bubble.node, shown.trim());
+    let t = freshSpeech(stripMd(spokenPart ? spokenPart.trim() : shown));
+    if (!t) t = 'Das hatte ich dir gerade schon gesagt.';        // alles schon gesprochen: trotzdem antworten, nur kurz
+    armAfterSpeech = true;                                        // Gespräch geht weiter: Folgefrage ohne „Hey Jarvis“ möglich
+    speak(t).then((ok) => { if (!ok) keepListening(); });
+  }
 
   const fmtTime = (iso) => new Date(iso).toLocaleString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+  function relTime(iso) {
+    const min = Math.round((new Date(iso) - Date.now()) / 60000);
+    if (min < 1) return 'jetzt';
+    if (min < 60) return 'in ' + min + ' Min';
+    if (min < 1440) return 'in ' + Math.round(min / 60) + ' Std';
+    return 'in ' + Math.round(min / 1440) + ' T';
+  }
+
+  // Uhr und Begrüßung
+  function tickClock() {
+    const d = new Date();
+    clockEl.textContent = '';
+    clockEl.append(hhmm(d));
+    clockEl.appendChild(el('small', '', d.toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long' })));
+    const h = d.getHours();
+    $('heroTitle').textContent = (h < 5 ? 'Noch wach' : h < 11 ? 'Guten Morgen' : h < 17 ? 'Guten Tag' : h < 22 ? 'Guten Abend' : 'Gute Nacht') + ', ' + USER_NAME + '.';
+  }
+  setInterval(tickClock, 30000);
 
   function renderState(s) {
     if (!s) return;
-    if (s.userName) USER_NAME = s.userName;
-    if (s.goal) {
-      goalText.textContent = '';
-      const label = document.createTextNode('Ziel: ');
-      const strong = document.createElement('strong');
-      strong.style.color = '#eafaff';
-      strong.textContent = s.goal.text.slice(0, 80);
-      goalText.append(label, strong);
-      if (s.goal.realisierbarkeit != null) {
-        const sp = document.createElement('span');
-        sp.style.cssText = 'font-size:11px;color:#6f8aa0;letter-spacing:2px';
-        sp.textContent = ` · ${s.goal.realisierbarkeit}% realisierbar`;
-        goalText.appendChild(sp);
-      }
-      goalPanel.classList.add('show');
+    if (s.userName) { USER_NAME = s.userName; ADDRESS = s.address || s.userName; tickClock(); }
+
+    // Kosten (aus den echten API-Antworten)
+    if (s.usage) {
+      const u = s.usage, box = $('usageBox'); box.textContent = '';
+      const usd = (x) => '≈ ' + x.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' $';
+      const row = (label, value, cls) => { const d = el('div', 'urow' + (cls ? ' ' + cls : '')); d.append(el('span', '', label), el('span', '', value)); box.appendChild(d); };
+      const chip = $('costChip');
+      chip.textContent = usd(u.today.cost) + ' heute';
+      chip.classList.toggle('bad', !!u.limitReached);
+      chip.classList.toggle('warn', !u.limitReached && !!u.limit && u.today.cost >= u.limit * 0.8);
+      row('Heute', u.today.calls ? usd(u.today.cost) + ' · ' + u.today.tokens.toLocaleString('de-DE') + ' Token' : 'noch nichts verbraucht', u.limitReached ? 'bad' : '');
+      if (u.today.searches) row('Websuchen heute', String(u.today.searches));
+      row('Dieser Monat', usd(u.month.cost));
+      for (const k of u.kinds) row('  ' + k.name, usd(k.cost) + ' · ' + k.calls + '×');
+      if (u.limit) row('Tageslimit', u.limit.toFixed(2) + ' $' + (u.limitReached ? ' erreicht' : ''), u.limitReached ? 'bad' : '');
+      if (u.today.unpriced || u.month.unpriced) row('Hinweis', 'Preis für dieses Modell unbekannt, Kosten unvollständig', 'warn');
     }
-    sidePanel.textContent = '';
-    const section = (title, items) => {
-      if (!items.length) return;
-      const h = document.createElement('div'); h.className = 'lbl'; h.textContent = title; sidePanel.appendChild(h);
-      items.forEach(t => { const d = document.createElement('div'); d.className = 'item'; d.textContent = t; sidePanel.appendChild(d); });
-    };
-    section('Aufgaben', s.tasks.map(t => '▸ ' + t.text + (t.due ? ` (${t.due})` : '')));
-    section('Erinnerungen', s.reminders.map(r => '⏰ ' + fmtTime(r.at) + ' · ' + r.text));
-    sidePanel.classList.toggle('show', !!(s.tasks.length || s.reminders.length));
+
+    // Gelernt
+    if (s.learned) {
+      const ll = $('learnedList'); ll.textContent = '';
+      $('learnedCount').textContent = s.learned.length;
+      s.learned.forEach((it) => {
+        const li = el('li', 'task'); const body = el('div', '', it.text); const x = el('button', 'learn-x', '×'); x.type = 'button'; x.title = 'Vergessen'; x.setAttribute('aria-label', 'Vergessen: ' + it.text);
+        x.addEventListener('click', async () => { try { renderState((await api('/api/learned/delete', { method: 'POST', body: JSON.stringify({ index: it.i }) })).state); } catch (e) {} });
+        li.append(body, x); ll.appendChild(li);
+      });
+      if (!s.learned.length) ll.appendChild(el('li', 'empty', 'Noch nichts. Bewerte Antworten mit 👍 und 👎, abends lerne ich daraus.'));
+      const info = $('learnedInfo'); info.textContent = '';
+      const L = s.learning || {};
+      info.append(el('div', '', L.time ? 'Lernrunde täglich um ' + L.time + ' Uhr' : 'Lernrunde aus'));
+      if (L.last) info.appendChild(el('div', '', 'Zuletzt: ' + L.last));
+      if (L.proposals) info.appendChild(el('div', 'warn', L.proposals + ' Verbesserungsvorschlag' + (L.proposals > 1 ? 'e' : '') + ' für Agenten, sag: „Zeig die Vorschläge für die Agenten.“'));
+    }
+
+    // Agenten
+    const al = $('agentList'); al.textContent = '';
+    $('agentCount').textContent = (s.agents || []).length;
+    (s.agents || []).forEach((a) => {
+      const li = el('li', 'task'); const body = el('div');
+      body.append(el('div', '', a.name + (a.builtin ? '' : ' · eigen')), el('div', 'sub', a.role));
+      li.appendChild(body); al.appendChild(li);
+    });
+    if (!(s.agents || []).length) al.appendChild(el('li', 'empty', 'Sag: „Erstelle mir einen Agenten, der …“'));
+
+    // Aufgaben
+    const tl = $('taskList'); tl.textContent = '';
+    $('taskCount').textContent = s.tasks.length;
+    if (!s.tasks.length) tl.appendChild(el('li', 'empty', 'Nichts offen. Sag zum Beispiel: „Füge Aufgabe Zahnarzt anrufen hinzu“.'));
+    s.tasks.forEach((t) => {
+      const li = el('li', 'task');
+      const cb = el('button', 'check'); cb.type = 'button'; cb.title = 'Erledigt'; cb.setAttribute('aria-label', 'Als erledigt markieren: ' + t.text);
+      cb.appendChild(icon('i-check'));
+      cb.addEventListener('click', async () => {
+        li.classList.add('done');
+        try { renderState((await api('/api/tasks/complete', { method: 'POST', body: JSON.stringify({ id: t.id }) })).state); }
+        catch (e) { li.classList.remove('done'); }
+      });
+      li.append(cb, el('span', 't', t.text));
+      if (t.due) li.appendChild(el('span', 'pill', t.due));
+      tl.appendChild(li);
+    });
+
+    // Erinnerungen
+    const rl = $('remList'); rl.textContent = '';
+    $('remCount').textContent = s.reminders.length;
+    if (!s.reminders.length) rl.appendChild(el('li', 'empty', 'Keine Erinnerungen. Sag: „Erinnere mich morgen um 9 an …“.'));
+    s.reminders.forEach((r) => {
+      const li = el('li', 'rem');
+      const t = el('time', '', new Date(r.at).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }));
+      t.appendChild(el('small', '', relTime(r.at) + (r.repeat ? ' · ↻ ' + ({ taeglich: 'täglich', werktags: 'werktags', woechentlich: 'wöchentlich' }[r.repeat] || '') : '')));
+      t.title = fmtTime(r.at);
+      li.append(t, el('span', '', r.text));
+      rl.appendChild(li);
+    });
+
+    // Ziel
+    const gb = $('goalBox'); gb.textContent = '';
+    if (!s.goal) gb.appendChild(el('div', 'empty', 'Noch kein Ziel. Sag: „Mein Ziel ist …“, dann plane ich mit dir die Schritte.'));
+    else {
+      const pct = Number.isFinite(s.goal.realisierbarkeit) ? Math.max(0, Math.min(100, s.goal.realisierbarkeit)) : null;
+      if (pct != null) {
+        const ring = el('div', 'ring');
+        const R = 30, C = 2 * Math.PI * R;
+        ring.innerHTML = `<svg viewBox="0 0 76 76"><circle class="bg" cx="38" cy="38" r="${R}"/><circle class="fg" cx="38" cy="38" r="${R}" stroke-dasharray="${C.toFixed(1)}" stroke-dashoffset="${(C * (1 - pct / 100)).toFixed(1)}"/></svg>`;
+        ring.appendChild(el('b', '', pct + '%'));
+        gb.appendChild(ring);
+      } else gb.style.gridTemplateColumns = '1fr';
+      const info = el('div');
+      info.append(el('h3', '', s.goal.text.slice(0, 120)), el('div', 'sub', pct != null ? 'Realisierbarkeit' : 'In Arbeit'));
+      gb.appendChild(info);
+      if (s.goal.schritte && s.goal.schritte.length) {
+        const ol = el('ol', 'steps');
+        s.goal.schritte.slice(0, 5).forEach((st) => ol.appendChild(el('li', '', String(st))));
+        gb.appendChild(ol);
+      }
+    }
+
+    // Notizen
+    const nl = $('noteList'); nl.textContent = '';
+    if (!s.notes || !s.notes.length) nl.appendChild(el('div', 'empty', 'Noch keine Notizen. Sag: „Notiere …“.'));
+    (s.notes || []).forEach((n) => { const d = el('div', 'note'); if (n.title) d.appendChild(el('b', '', n.title)); d.appendChild(el('p', '', n.text)); nl.appendChild(d); });
+  }
+
+  function renderSystem(h) {
+    const box = $('sysBox'); box.textContent = '';
+    const item = (label, status) => { const d = el('div'); d.append(el('span', 'dot ' + status), el('span', '', label)); box.appendChild(d); };
+    item(h.provider === 'gemini' ? 'KI: Gemini' : 'KI: Claude', h.keyConfigured ? 'ok' : 'bad');
+    item(h.voice ? 'Stimme: ElevenLabs' : 'Stimme: Browser', h.voice ? 'ok' : 'warn');
+    item(h.obsidian ? 'Obsidian verbunden' : 'Obsidian aus', h.obsidian ? 'ok' : 'warn');
+    item(h.tools && h.tools.includes('open_universe') ? 'Obsidian-Graph: Jarvis verbunden' : 'Obsidian-Graph: nicht verbunden', h.tools && h.tools.includes('open_universe') ? 'ok' : 'warn');
+    item(h.tools && h.tools.includes('open_website') ? 'Browser öffnen: bereit' : 'Server veraltet – neu starten', h.tools && h.tools.includes('open_website') ? 'ok' : 'bad');
+    item(h.briefing ? 'Morgenbriefing: täglich ' + h.briefing : 'Morgenbriefing aus', h.briefing ? 'ok' : 'warn');
+    item(h.mailWatch ? 'Mail-Alarm aktiv' : 'Mail-Alarm aus', h.mailWatch ? 'ok' : 'warn');
   }
 
   // ---------- Gespräch ----------
   async function respond(text) {
     setState('thinking');
+    showTyping(true);
     try {
       const data = await api('/api/chat', { method: 'POST', body: JSON.stringify({ message: text, offsetMinutes: new Date().getTimezoneOffset() }) });
+      showTyping(false);
       renderState(data.state);
       jarvisSay(data.reply);
     } catch (err) {
+      showTyping(false);
       if (err.code === 401) { askToken('Bitte Zugangs-Token eingeben.'); setState('idle'); return; }
-      jarvisSay('Das hat nicht geklappt. ' + (err.message || '') );
+      const m = addBubble('Das hat nicht geklappt. ' + (err.message || ''), 'jarvis');
+      dialog.lastChild.classList.add('error');
+      armAfterSpeech = true; speak('Hm, das hat gerade nicht geklappt. Versuch es gleich noch einmal.');
       setState('idle');
     }
   }
+  let lastUserText = '';
   function handleInput(text) {
     text = text.trim();
     if (!text) return;
+    lastUserText = text;
     addBubble(text, 'user');
     respond(text);
   }
@@ -179,13 +433,27 @@
     try {
       const data = await api('/api/poll');
       renderState(data.state);
-      data.fired.forEach(r => jarvisSay('Erinnerung: ' + r.text));
+      data.fired.forEach(r => {
+        // Erinnerungen werden immer gesprochen, auch wenn der Satz schon einmal vorkam (z. B. täglich); verpasste mit Hinweis
+        const text = 'Erinnerung: ' + r.text + (r.late > 5 ? ' (eigentlich um ' + hhmm(new Date(r.at)) + ' fällig)' : '');
+        addBubble(text, 'jarvis'); armAfterSpeech = true; speak(text);
+      });
+      if (data.briefing) {
+        const text = 'Dein Morgenbriefing: ' + data.briefing.text;
+        jarvisSay(text);
+        if (window.Notification && Notification.permission === 'granted') { try { new Notification('JARVIS – Morgenbriefing', { body: data.briefing.text.slice(0, 180) }); } catch (e) {} }
+      }
+      (data.mail || []).forEach((a) => {
+        const text = 'Wichtige Mail von ' + a.from + (a.subject ? ': ' + a.subject : '.');
+        jarvisSay(text);
+        if (window.Notification && Notification.permission === 'granted') { try { new Notification('JARVIS – Mail', { body: text }); } catch (e) {} }
+      });
       if (data.fired.length && window.Notification && Notification.permission === 'granted') {
         data.fired.forEach(r => { try { new Notification('JARVIS', { body: r.text }); } catch (e) {} });
       }
     } catch (e) { /* offline oder Token fehlt – nächster Versuch folgt */ }
   }
-  setInterval(() => { if (apiOverlay.style.display === 'none') poll(); }, 10000);
+  setInterval(() => { if (!overlayOpen()) poll(); }, 10000);
 
   // ---------- Mikrofon-Pegel ----------
   let audioCtx = null, analyser = null, micData = null, rafId = null;
@@ -214,8 +482,42 @@
   }
 
   // ---------- Spracherkennung mit Wake-Word "Hey Jarvis" ----------
-  let USER_NAME = 'Augustin';
-  const WAKE_RE = /(?:dsch|tsch|sch|j|y)ar[vw][iy]s+/i;   // erkennt auch "Dscharvis", "Jarwis" …
+  let USER_NAME = 'Augustin', ADDRESS = 'Augustin';
+  // "Jarvis" erkennen, auch wenn die Spracherkennung es anders schreibt (siehe wake.js)
+  const heardEl = document.getElementById('heard');
+  let heardTimer = null;
+  function showHeard(text, cls) {
+    if (!heardEl) return;
+    heardEl.textContent = text;
+    heardEl.className = 'heard on' + (cls ? ' ' + cls : '');
+    clearTimeout(heardTimer);
+    heardTimer = setTimeout(() => { heardEl.className = 'heard'; }, 6000);
+  }
+  // kurzer Ton als Bestätigung des Wake-Words (kein Sprechen, damit das Zuhören nicht unterbrochen wird)
+  let actx = null;
+  // Auf Zuruf („Hey Jarvis“) antwortet Jarvis immer sofort, wie ein Freund; ist der Ton gesperrt, gibt es wenigstens den Signalton.
+  const ACKS = ['Ja, ich bin da.', 'Klar, ich höre dir zu.', 'Schieß los, ich bin ganz Ohr.', 'Immer. Was gibt es?', 'Ja? Sag an.', 'Hey, ich bin da. Was brauchst du?'];
+  let lastAck = -1;
+  function acknowledge() {
+    let i; do { i = Math.floor(Math.random() * ACKS.length); } while (i === lastAck && ACKS.length > 1);
+    lastAck = i;
+    speak(ACKS[i]).then((ok) => { if (!ok) chime(); });
+  }
+  function chime() {
+    try {
+      actx = actx || new (window.AudioContext || window.webkitAudioContext)();
+      if (actx.state === 'suspended') actx.resume();
+      const t = actx.currentTime;
+      [660, 880].forEach((f, i) => {
+        const o = actx.createOscillator(), g = actx.createGain();
+        o.type = 'sine'; o.frequency.value = f;
+        g.gain.setValueAtTime(0.0001, t + i * 0.09); g.gain.linearRampToValueAtTime(0.12, t + i * 0.09 + 0.01); g.gain.exponentialRampToValueAtTime(0.0001, t + i * 0.09 + 0.17);
+        o.connect(g); g.connect(actx.destination); o.start(t + i * 0.09); o.stop(t + i * 0.09 + 0.19);
+      });
+    } catch (e) { /* ohne Ton: es gibt die visuelle Bestätigung */ }
+  }
+  let wakeAckTimer = 0, wakeAcked = false;   // „Hey Jarvis“ schon aus dem Zwischenergebnis beantwortet
+  let wakeCued = false;          // Wake-Word schon aus dem Zwischenergebnis bestätigt
   let armedUntil = 0;           // bis wann JARVIS auf einen Befehl wartet
   const ARM_MS = 10000;
 
@@ -230,12 +532,15 @@
   function onFinalSpeech(raw) {
     const text = raw.trim();
     if (!text) return;
-    const m = text.match(WAKE_RE);
+    showHeard('Ich höre: ' + text);
+    const m = window.findWake(text);
     if (m) {
       // alles nach dem Wake-Word ist der Befehl
-      const cmd = text.slice(m.index + m[0].length).replace(/^[\s,.:!?-]+/, '');
-      if (cmd.length > 2) { armedUntil = 0; handleInput(cmd); }
-      else { armedUntil = Date.now() + ARM_MS; jarvisSay(`Ja, ${USER_NAME}?`); }
+      const cmd = text.slice(m.end).replace(/^[\s,.:!?-]+/, '');
+      if (cmd.length > 2) { armedUntil = 0; clearTimeout(wakeAckTimer); wakeAcked = false; handleInput(cmd); }
+      else { armedUntil = Date.now() + ARM_MS; armAfterSpeech = true; showHeard('Ja? Sag deinen Befehl …', 'wake'); setState('listening'); if (!wakeAcked) acknowledge(); }
+      clearTimeout(wakeAckTimer); wakeAcked = false;
+      wakeCued = false;
       return;
     }
     if (Date.now() < armedUntil) { armedUntil = 0; handleInput(text); }
@@ -243,7 +548,7 @@
   }
 
   function initRecognition() {
-    if (!SR) { unsupported.style.display = 'flex'; return; }
+    if (!SR) { unsupported.classList.add('show'); return; }
     recognition = new SR();
     recognition.lang = 'de-DE';
     recognition.interimResults = true;
@@ -255,9 +560,20 @@
         if (r.isFinal) final += r[0].transcript;
         else interim += r[0].transcript;
       }
-      if (interim && (Date.now() < armedUntil || WAKE_RE.test(interim))) {
-        if (!interimBubble) interimBubble = addBubble(interim, 'user', true);
-        else interimBubble.textContent = interim;
+      if (interim) {
+        showHeard('Ich höre: ' + interim);
+        // Wake-Word schon im Zwischenergebnis: sofort bestätigen und auf den Befehl vorbereiten
+        const wm = window.findWake(interim);
+        if (wm && !wakeCued && Date.now() >= armedUntil) { wakeCued = true; armedUntil = Date.now() + ARM_MS; showHeard('Ja? Sag deinen Befehl …', 'wake'); }
+        // Nur „Hey Jarvis“ gesagt und dann Pause: sofort antworten, ohne auf das späte Endergebnis von Chrome zu warten
+        clearTimeout(wakeAckTimer);
+        if (wm && !interim.slice(wm.end).replace(/[\s,.:!?-]+/g, '')) {
+          wakeAckTimer = setTimeout(() => { wakeAcked = true; armedUntil = Date.now() + ARM_MS; armAfterSpeech = true; acknowledge(); }, 800);
+        }
+        if (Date.now() < armedUntil || window.findWake(interim)) {
+          if (!interimBubble) interimBubble = addBubble(interim, 'user', true);
+          else interimBubble.textContent = interim;
+        }
       }
       if (final) {
         if (interimBubble) { interimBubble.remove(); interimBubble = null; }
@@ -276,6 +592,8 @@
         listening = false; micBtn.classList.remove('active'); stopMicMeter(); setState('idle');
         addBubble('Mikrofon-Zugriff wurde blockiert. Bitte im Browser erlauben.', 'jarvis');
       }
+      else if (e.error === 'network') showHeard('Die Spracherkennung braucht Internet (Chrome schickt das Audio zur Auswertung an Google).', 'warn');
+      else if (e.error === 'audio-capture') showHeard('Kein Mikrofon gefunden.', 'warn');
       // andere Fehler (no-speech, aborted): onend startet neu
     };
   }
@@ -298,7 +616,7 @@
   }
 
   function toggleListen() {
-    if (apiOverlay.style.display !== 'none') return;
+    if (overlayOpen()) return;
     if (!recognition) { textInput.focus(); return; }
     if (listening) {
       // Klick während Dauer-Hören: sofort Befehl annehmen, zweiter Klick beendet das Hören
@@ -316,37 +634,56 @@
 
   micBtn.addEventListener('click', toggleListen);
   orbCanvas.addEventListener('click', toggleListen);
-  textInput.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') { handleInput(textInput.value); textInput.value = ''; }
-  });
+  composer.addEventListener('submit', (e) => { e.preventDefault(); stopSpeaking(); handleInput(textInput.value); textInput.value = ''; });
+  $('suggest').addEventListener('click', (e) => { const b = e.target.closest('button[data-q]'); if (b) { stopSpeaking(); handleInput(b.dataset.q); } });
+  $('unsupportedOk').addEventListener('click', () => unsupported.classList.remove('show'));
 
   initRecognition();
   setState('idle');
+  tickClock();
 
   // ---------- Start ----------
-  let greeted = false;
-  function greetOnce(ev) {
-    if (greeted) return; greeted = true;
+  // Beim Öffnen sagt JARVIS sofort die Anrede ("Hey Boss") und hört gleich zu; ein erster Befehl braucht kein "Hey Jarvis".
+  // Chrome kann Ton ohne Klick sperren: dann gibt es einen Hinweis, und die Begrüßung folgt beim ersten Klick. Das Hören startet trotzdem.
+  let pendingGreet = false;
+  const greetText = () => `${ADDRESS}.`;
+
+  async function openGreeting() {
+    restoreChat();
+    armAfterSpeech = true;
+    armedUntil = Date.now() + ARM_MS + 3000;
+    if (recognition && !listening) startListening();
+    addBubble(greetText(), 'jarvis', false, { save: false });
+    const spoke = await speak(greetText());
+    if (!spoke) {
+      pendingGreet = true;
+      addBubble('Chrome erlaubt mir ohne Klick noch keinen Ton. Klick einmal irgendwo. Dauerhaft: Schloss-Symbol in der Adresszeile → Website-Einstellungen → Ton → Zulassen.', 'jarvis', false, { save: false });
+    }
+  }
+
+  function onFirstGesture(ev) {
     try { if (window.Notification && Notification.permission === 'default') Notification.requestPermission(); } catch (e) {}
-    // Klick auf Mikro/Orb startet das Hören selbst – dann keine Begrüßung
-    if (ev && ev.target && (ev.target === micBtn || micBtn.contains(ev.target) || ev.target === orbCanvas)) return;
-    startListening();
-    jarvisSay(`Systeme online, ${USER_NAME}. Sag Hey Jarvis, wenn du mich brauchst.`);
+    // Klick auf Mikro/Orb startet das Hören selbst
+    const ownClick = !!(ev && ev.target && (ev.target === micBtn || micBtn.contains(ev.target) || ev.target === orbCanvas));   // Mikro/Orb starten das Hören selbst
+    if (pendingGreet) { pendingGreet = false; armAfterSpeech = true; if (recognition && !listening && !ownClick) startListening(); speak(greetText()); }   // der Klick schaltet den Ton frei: Begrüßung nachholen
+    else if (!ownClick && recognition && !listening) startListening();     // das automatische Hören ging nicht (z. B. Mikrofon noch nicht erlaubt)
   }
 
   async function boot(afterToken) {
     let health;
     try { health = await api('/api/health'); } catch (e) { addBubble('Server nicht erreichbar.', 'jarvis'); return; }
     voiceOn = !!health.voice;
-    if (!health.keyConfigured) addBubble('Auf dem Server fehlt ANTHROPIC_API_KEY. Ohne ihn kann ich nicht antworten.', 'jarvis');
+    renderSystem(health);
+    if (!health.keyConfigured) { banner.textContent = 'Auf dem Server fehlt der KI-Key (' + (health.provider === 'gemini' ? 'GEMINI_API_KEY' : 'ANTHROPIC_API_KEY') + '). Ohne ihn kann ich nicht antworten.'; banner.classList.add('show'); }
     try {
       renderState(await api('/api/state'));
-      apiOverlay.style.display = 'none';
+      apiOverlay.classList.remove('show');
     } catch (e) {
       if (e.code === 401) { askToken(TOKEN ? 'Token ist falsch.' : ''); return; }
     }
-    if (afterToken) { greeted = false; greetOnce(); }
-    else window.addEventListener('pointerdown', greetOnce, { once: true });
+    window.addEventListener('pointerdown', onFirstGesture, { once: true });
+    window.addEventListener('keydown', onFirstGesture, { once: true });
+    openGreeting();
   }
   boot(false);
 })();
