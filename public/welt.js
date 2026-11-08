@@ -79,8 +79,21 @@
   }
 
   // ---------- Weltkugel ----------
-  const VIEWS = { welt: { lat: 20, lng: 10, altitude: 2.4 }, europa: { lat: 50, lng: 14, altitude: 1.15 }, ukraine: { lat: 49, lng: 32, altitude: 0.75 }, nahost: { lat: 31.5, lng: 38, altitude: 0.95 } };
-  let globe = null, cams = [], events = [];
+  const CONTINENTS = {
+    Europa: { key: 'europa', color: '61,155,255', label: [54, 15], area: '10,2', note: 'vom Atlantik bis zum Ural' },
+    Asien: { key: 'asien', color: '255,159,67', label: [45, 90], area: '44,6', note: 'größter Kontinent' },
+    Afrika: { key: 'afrika', color: '255,209,102', label: [3, 20], area: '30,4', note: '' },
+    Nordamerika: { key: 'nordamerika', color: '61,240,255', label: [45, -100], area: '24,7', note: 'inklusive Mittelamerika und Karibik' },
+    'Südamerika': { key: 'suedamerika', color: '61,220,151', label: [-15, -60], area: '17,8', note: '' },
+    Ozeanien: { key: 'ozeanien', color: '199,125,255', label: [-25, 135], area: '8,5', note: 'Australien, Neuseeland und die Inseln des Pazifiks' },
+    Antarktis: { key: 'antarktis', color: '230,250,255', label: [-80, 0], area: '14,2', note: 'Eisfläche, keine ständige Bevölkerung' },
+  };
+  const VIEWS = {
+    asien: { lat: 38, lng: 90, altitude: 1.9 }, afrika: { lat: 2, lng: 20, altitude: 1.9 }, nordamerika: { lat: 42, lng: -100, altitude: 1.9 },
+    suedamerika: { lat: -15, lng: -60, altitude: 1.9 }, ozeanien: { lat: -25, lng: 140, altitude: 1.9 }, antarktis: { lat: -82, lng: 0, altitude: 2.0 }, welt: { lat: 20, lng: 10, altitude: 2.4 }, europa: { lat: 50, lng: 14, altitude: 1.15 }, ukraine: { lat: 49, lng: 32, altitude: 0.75 }, nahost: { lat: 31.5, lng: 38, altitude: 0.95 } };
+  let globe = null, cams = [], events = [], countries = [], hoverCont = null, selectedCont = null;
+  const contByKey = Object.fromEntries(Object.entries(CONTINENTS).map(([n, c]) => [c.key, n]));
+  const esc = (t) => String(t).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
   let camToken = 0;
   function showInfo(p) {
@@ -110,6 +123,30 @@
       for (const l of p.links) { const a = el('a', '', l.title); a.href = l.url; a.target = '_blank'; a.rel = 'noopener noreferrer'; box.appendChild(a); }
     }
   }
+  function selectContinent(name) {
+    const c = CONTINENTS[name]; if (!c) return;
+    selectedCont = name; refreshPolygons();
+    const list = countries.filter((f) => f.properties.continent === name).map((f) => f.properties.name).sort((a, b) => a.localeCompare(b, 'de'));
+    const box = $('wInfo'); box.textContent = ''; box.hidden = false;
+    const x = el('button', 'x', '×'); x.type = 'button'; x.setAttribute('aria-label', 'Schließen'); x.onclick = () => { box.hidden = true; selectedCont = null; refreshPolygons(); };
+    box.append(x, el('h3', '', name), el('div', 'sub', 'ca. ' + c.area + ' Mio. km²' + (list.length ? ' · ' + list.length + ' Länder/Gebiete in der Karte' : '') + (c.note ? ' · ' + c.note : '')));
+    if (list.length) box.appendChild(el('div', 'sub', list.slice(0, 14).join(', ') + (list.length > 14 ? ' … +' + (list.length - 14) : '')));
+    const nPts = cams.filter((p) => p.lat != null && continentOfPoint(p) === name).length;
+    if (nPts) box.appendChild(el('div', 'sub', nPts + ' Live-Cam-Orte in dieser Region'));
+    for (const b of document.querySelectorAll('.w-regions button')) b.classList.toggle('on', b.dataset.region === c.key);
+    if (globe) globe.pointOfView(VIEWS[c.key] || VIEWS.europa, 1200);
+  }
+  /** Nächster Kontinent-Mittelpunkt (für die Zählung der Cam-Orte). */
+  function continentOfPoint(p) {
+    let best = null, bd = Infinity;
+    for (const [n, c] of Object.entries(CONTINENTS)) { const d = Math.hypot(p.lat - c.label[0], (p.lng - c.label[1]) * Math.cos(p.lat * Math.PI / 180)); if (d < bd) { bd = d; best = n; } }
+    return best;
+  }
+  function refreshPolygons() {
+    if (!globe) return;
+    globe.polygonsData($('tCont').checked ? countries : []);
+    globe.labelsData($('tCont').checked ? Object.entries(CONTINENTS).map(([name, c]) => ({ name, lat: c.label[0], lng: c.label[1], color: 'rgba(' + c.color + ',0.95)' })) : []);
+  }
   function refreshPoints() {
     if (!globe) return;
     const pts = [];
@@ -121,6 +158,7 @@
   function goto(region) {
     const v = VIEWS[region] || VIEWS.europa;
     for (const b of document.querySelectorAll('.w-regions button')) b.classList.toggle('on', b.dataset.region === region);
+    if (contByKey[region]) { selectContinent(contByKey[region]); return; }
     if (globe) globe.pointOfView(v, 1400);
   }
   function initGlobe() {
@@ -136,6 +174,15 @@
         .pointAltitude((p) => (p.kind === 'cam' ? 0.02 : 0.015))
         .pointLabel((p) => p.name)
         .onPointClick((p) => { showInfo(p); globe.pointOfView({ lat: p.lat, lng: p.lng, altitude: 0.6 }, 1000); })
+        .polygonCapColor((f) => { const c = CONTINENTS[f.properties.continent]; const on = f.properties.continent === hoverCont || f.properties.continent === selectedCont; return 'rgba(' + c.color + ',' + (on ? 0.42 : 0.13) + ')'; })
+        .polygonSideColor((f) => 'rgba(' + CONTINENTS[f.properties.continent].color + ',0.18)')
+        .polygonStrokeColor((f) => 'rgba(' + CONTINENTS[f.properties.continent].color + ',0.75)')
+        .polygonAltitude((f) => (f.properties.continent === hoverCont || f.properties.continent === selectedCont ? 0.028 : 0.006))
+        .polygonsTransitionDuration(300)
+        .polygonLabel((f) => '<b>' + esc(f.properties.name) + '</b><br><span style="opacity:.75">' + esc(f.properties.continent) + '</span>')
+        .onPolygonHover((f) => { const n = f ? f.properties.continent : null; if (n !== hoverCont) { hoverCont = n; globe.polygonsData(globe.polygonsData()); } })
+        .onPolygonClick((f) => selectContinent(f.properties.continent))
+        .labelLat('lat').labelLng('lng').labelText('name').labelColor('color').labelSize(1.5).labelAltitude(0.03).labelDotRadius(0).labelResolution(2)
         .ringsData([]).ringColor(() => (t) => 'rgba(255,92,92,' + (1 - t) + ')').ringMaxRadius(3).ringPropagationSpeed(1.5).ringRepeatPeriod(1400)
         .ringLat('lat').ringLng('lng');
       const gl = globe.renderer().getContext();
@@ -148,7 +195,7 @@
       new ResizeObserver(fit).observe(host); fit();
       $('tSpin').addEventListener('change', () => { c.autoRotate = $('tSpin').checked; });
       c.addEventListener('start', () => { c.autoRotate = false; $('tSpin').checked = false; });
-      window.__welt = { globe, soft, showInfo: (p) => showInfo(p) };
+      window.__welt = { globe, soft, showInfo: (p) => showInfo(p), selectContinent: (n) => selectContinent(n) };
     } catch (err) {
       globe = null; console.error('[Welt] Globus konnte nicht starten', err);
       $('wFallback').hidden = false; $('wFallback').textContent = 'Die 3D-Weltkugel braucht WebGL und startet hier nicht. Livestream und Schlagzeilen funktionieren trotzdem.';
@@ -160,6 +207,9 @@
       const data = await (await fetch('world/cams.json')).json();
       cams = (data.cams || []).filter((c) => Number.isFinite(c.lat) && Number.isFinite(c.lng)).map((c) => ({ ...c, kind: 'cam' }));
     } catch (e) { cams = []; }
+    try { countries = (await (await fetch('world/continents.json')).json()).features || []; } catch (e) { countries = []; }
+    refreshPolygons();
+    if (new URLSearchParams(location.search).get('region') && contByKey[new URLSearchParams(location.search).get('region')]) selectContinent(contByKey[new URLSearchParams(location.search).get('region')]);
     try { events = (await api('/api/world/events')).points.map((p) => ({ ...p, kind: 'event' })); }
     catch (e) { events = []; status(e.code === 401 ? 'Token fehlt: erst Jarvis öffnen.' : 'Krisenmeldungen gerade nicht erreichbar'); }
     refreshPoints();
@@ -170,6 +220,7 @@
   buildTabs(); selectChannel(0);
   initGlobe();
   for (const b of document.querySelectorAll('.w-regions button')) b.addEventListener('click', () => goto(b.dataset.region));
+  $('tCont').addEventListener('change', refreshPolygons);
   $('tCams').addEventListener('change', refreshPoints); $('tEvents').addEventListener('change', refreshPoints);
   const region = new URLSearchParams(location.search).get('region');
   goto(VIEWS[region] ? region : 'europa');

@@ -1,15 +1,16 @@
 /* Welt-Ansicht. Nutzt die Farben aus style.css. Die Jarvis-Kugel auf der Startseite bleibt unberührt. */
-body.welt { overflow: hidden; }
-.w-top { display: flex; align-items: center; gap: 18px; padding: 12px 20px; height: 56px; border-bottom: 1px solid var(--border); background: rgba(2, 10, 14, 0.7); }
+body.welt { overflow: hidden; display: flex; flex-direction: column; }
+.w-top { display: flex; align-items: center; gap: 18px; padding: 8px 20px; min-height: 56px; border-bottom: 1px solid var(--border); background: rgba(2, 10, 14, 0.7); }
 .w-back { color: var(--accent-2); text-decoration: none; font-size: 0.9rem; padding: 6px 12px; border: 1px solid var(--border-strong); border-radius: 999px; }
 .w-back:hover { background: rgba(var(--accent-rgb), 0.1); }
 .w-title { font-weight: 700; letter-spacing: 0.3em; font-size: 0.95rem; }
 .w-status { font-weight: 400; letter-spacing: 0; font-size: 0.75rem; color: var(--muted); margin-left: 8px; }
-.w-regions { margin-left: auto; display: flex; gap: 6px; }
-.w-regions button { background: var(--surface); border: 1px solid var(--border); border-radius: 999px; padding: 6px 14px; font-size: 0.85rem; color: var(--text-2); }
+.w-regions { margin-left: auto; display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; }
+.w-sep { width: 1px; background: var(--border-strong); margin: 2px 4px; }
+.w-regions button { background: var(--surface); border: 1px solid var(--border); border-radius: 999px; padding: 5px 11px; font-size: 0.8rem; color: var(--text-2); }
 .w-regions button:hover, .w-regions button.on { border-color: var(--accent); color: var(--text); background: rgba(var(--accent-rgb), 0.12); }
 
-.w-main { display: grid; grid-template-columns: minmax(0, 1fr) 420px; gap: 14px; padding: 14px; height: calc(100vh - 56px); }
+.w-main { display: grid; grid-template-columns: minmax(0, 1fr) 420px; gap: 14px; padding: 14px; flex: 1; min-height: 0; }
 .w-globe-card { position: relative; border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; background: #01060a; min-height: 0; }
 .w-globe { position: absolute; inset: 0; }
 .w-toggles { position: absolute; left: 14px; bottom: 14px; display: flex; flex-wrap: wrap; gap: 14px; padding: 8px 14px; background: rgba(2, 10, 14, 0.78); border: 1px solid var(--border); border-radius: 999px; font-size: 0.8rem; color: var(--text-2); }

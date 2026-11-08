@@ -15,6 +15,13 @@
     <nav class="w-regions" aria-label="Region">
       <button type="button" data-region="welt">Welt</button>
       <button type="button" data-region="europa" class="on">Europa</button>
+      <button type="button" data-region="asien">Asien</button>
+      <button type="button" data-region="afrika">Afrika</button>
+      <button type="button" data-region="nordamerika">Nordamerika</button>
+      <button type="button" data-region="suedamerika">Südamerika</button>
+      <button type="button" data-region="ozeanien">Ozeanien</button>
+      <button type="button" data-region="antarktis">Antarktis</button>
+      <span class="w-sep" aria-hidden="true"></span>
       <button type="button" data-region="ukraine">Ukraine</button>
       <button type="button" data-region="nahost">Nahost</button>
     </nav>
@@ -24,6 +31,7 @@
     <section class="w-globe-card" aria-label="Weltkugel">
       <div id="globe" class="w-globe"></div>
       <div class="w-toggles">
+        <label><input type="checkbox" id="tCont" checked /> Kontinente</label>
         <label><input type="checkbox" id="tCams" checked /> <span class="dot cam"></span> Live-Cams</label>
         <label><input type="checkbox" id="tEvents" checked /> <span class="dot ev"></span> Krisenmeldungen (24 h)</label>
         <label><input type="checkbox" id="tSpin" checked /> Drehen</label>
