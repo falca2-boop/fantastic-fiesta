@@ -20,6 +20,9 @@
     { name: 'France 24', id: 'UCQfwfsi5VrQ8yKZ-UWmAEFg' },
     { name: 'Sky News', id: 'UCoMdktPbSTixAyNGwb-UYkQ' },
     { name: 'Al Jazeera', id: 'UCNye-wNBqNL5ZzHSJj3l8Bg' },
+    { name: 'RO · Digi24', key: 'digi24' }, { name: 'RO · Antena 3 CNN', key: 'antena3' }, { name: 'RO · Realitatea Plus', key: 'realitatea' },
+    { name: 'RO · TVR Info', key: 'tvrinfo' }, { name: 'RO · Euronews', key: 'euronewsro' },
+    { name: 'RU · Dozhd', key: 'dozhd' }, { name: 'RU · Current Time', key: 'currenttime' }, { name: 'RU · DW', key: 'dwru' }, { name: 'RU · Россия 24 (Staatssender)', key: 'russia24' },
   ];
   const ALLOW = 'autoplay; encrypted-media; picture-in-picture; fullscreen';
   function playEmbed(src, openUrl, target) {
@@ -29,8 +32,24 @@
     box.appendChild(f);
     if (openUrl && !target) $('wOpenYt').href = openUrl;
   }
+  let streamToken = 0;
+  /** Sender ohne feste Kanal-ID: Jarvis sucht den gerade laufenden Livestream (braucht YOUTUBE_API_KEY). */
+  async function selectDynamic(c, i) {
+    for (const [n, b] of [...$('wTabs').children].entries()) b.classList.toggle('on', n === i);
+    const box = $('wVideo'); box.textContent = '';
+    const msg = el('div', 'w-video-msg', 'Suche den laufenden Livestream von ' + c.name + ' …'); box.appendChild(msg);
+    $('wOpenYt').href = 'https://www.youtube.com/results?search_query=' + encodeURIComponent(c.name.replace(/\(.*\)/, '') + ' live') + '&sp=EgJAAQ%3D%3D';
+    const token = ++streamToken;
+    try {
+      const r = await api('/api/world/stream?key=' + encodeURIComponent(c.key));
+      if (token !== streamToken) return;
+      if (r.live) playEmbed('https://www.youtube-nocookie.com/embed/' + r.live.videoId + '?autoplay=1&mute=1&rel=0', 'https://www.youtube.com/watch?v=' + r.live.videoId);
+      else msg.textContent = r.error === 'nokey' ? 'Für diesen Sender fehlt YOUTUBE_API_KEY in der .env. Unten „In YouTube öffnen“ oder eigenen Link einfügen.' : c.name + ' sendet gerade keinen einbettbaren Livestream auf YouTube.';
+    } catch (e) { if (token === streamToken) msg.textContent = e.message; }
+  }
   function selectChannel(i) {
     const c = CHANNELS[i];
+    if (c.key) { selectDynamic(c, i); return; }
     for (const [n, b] of [...$('wTabs').children].entries()) b.classList.toggle('on', n === i);
     playEmbed('https://www.youtube-nocookie.com/embed/live_stream?channel=' + c.id + '&autoplay=1&mute=1&rel=0', 'https://www.youtube.com/channel/' + c.id + '/live');
   }

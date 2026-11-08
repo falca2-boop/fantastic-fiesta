@@ -56,3 +56,5 @@ body.welt { overflow: hidden; display: flex; flex-direction: column; }
   .w-regions { margin-left: 0; }
 }
 .w-fallback[hidden], .w-info[hidden] { display: none; }
+.w-video-msg { height: 100%; display: grid; place-items: center; padding: 18px; text-align: center; color: var(--text-2); font-size: 0.85rem; }
+.w-tabs { max-height: 92px; overflow: auto; }
