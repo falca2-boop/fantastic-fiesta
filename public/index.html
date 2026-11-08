@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="theme-color" content="#02080c" />
+  <meta name="theme-color" content="#000000" />
   <title>JARVIS</title>
   <link rel="stylesheet" href="style.css" />
 </head>
@@ -55,7 +55,9 @@
           <div class="heard" id="heard" aria-live="off"></div>
         </div>
       </section>
+    </main>
 
+    <div class="dock" aria-label="Gespräch und Übersicht">
       <section class="card chat" aria-label="Gespräch">
         <div class="banner" id="banner" role="alert"></div>
         <div class="messages" id="dialog" aria-live="polite"></div>
@@ -67,7 +69,6 @@
           <button class="mic-btn" id="micBtn" type="button" title="Sprechen (oder sag „Hey Jarvis“)" aria-label="Mikrofon"><svg class="i" style="stroke-width:2"><use href="#i-mic"/></svg></button>
         </form>
       </section>
-    </main>
 
     <aside class="side" aria-label="Übersicht">
       <section class="card" id="cardCost">
@@ -105,6 +106,7 @@
         <div class="card-b"><div class="sys" id="sysBox"></div></div>
       </section>
     </aside>
+    </div>
   </div>
 
   <!-- Zugang -->
