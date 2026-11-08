@@ -330,4 +330,17 @@ canvas#orb { width: 100%; height: 100%; display: block; cursor: pointer; pointer
 #cardCost .usage { margin-top: 0; padding-top: 0; border-top: 0; font-size: 0.88rem; }
 
 /* Niedrige Fenster: Beschreibung ausblenden, damit der Chat Platz behält */
-@media (max-height: 940px) and (min-width: 901px) { .hero p { display: none; } .hero .suggest { margin-top: 10px; } }
+@media (max-height: 940px) and (min-width: 901px) and (max-width: 1180px) { .hero p { display: none; } .hero .suggest { margin-top: 10px; } }
+
+/* Große Bildschirme: Orb-Kugel groß in der Mitte, Chat links, Übersicht rechts */
+@media (min-width: 1181px) {
+  .app { grid-template-columns: minmax(300px, 360px) minmax(0, 1fr) 340px; }
+  .main { display: contents; }
+  .chat { grid-column: 1; grid-row: 2; }
+  .hero { grid-column: 2; grid-row: 2; align-content: center; min-height: 0; --orb: clamp(300px, min(60vh, 38vw), 780px); padding: 10px 24px 24px; }
+  .hero::after { background: radial-gradient(60% 55% at 50% 38%, rgba(var(--accent-rgb), 0.14), transparent 70%); }
+  .side { grid-column: 3; grid-row: 2; }
+}
+.composer { min-width: 0; }
+.field { min-width: 0; }
+.mic-btn { flex: none; }
