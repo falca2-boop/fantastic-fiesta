@@ -108,7 +108,14 @@
     asien: { lat: 38, lng: 90, altitude: 1.9 }, afrika: { lat: 2, lng: 20, altitude: 1.9 }, nordamerika: { lat: 42, lng: -100, altitude: 1.9 },
     suedamerika: { lat: -15, lng: -60, altitude: 1.9 }, ozeanien: { lat: -25, lng: 140, altitude: 1.9 }, antarktis: { lat: -82, lng: 0, altitude: 2.0 }, welt: { lat: 20, lng: 10, altitude: 2.4 }, europa: { lat: 50, lng: 14, altitude: 1.15 }, ukraine: { lat: 49, lng: 32, altitude: 0.75 }, nahost: { lat: 31.5, lng: 38, altitude: 0.95 } };
   let globe = null, cams = [], events = [], countries = [], hoverCont = null, selectedCont = null, depth = 1;   // depth: 3D-Höhe (1 = Standard)
-  const SKINS = { satellit: 'vendor/earth-blue-marble.jpg', nacht: 'vendor/earth-night.jpg', dunkel: 'vendor/earth-dark.jpg' };
+  const SKINS = { satellit: 'vendor/earth-blue-marble.jpg', nacht: 'vendor/earth-night.jpg', dunkel: 'vendor/earth-dark.jpg', karte: 'vendor/earth-blue-marble.jpg', hd: 'vendor/earth-blue-marble.jpg' };
+  // Kachel-Karten laden beim Heranzoomen immer schärfere Bilder (Echtzeit-Streaming aus dem Netz)
+  const TILES = {
+    karte: { url: (x, y, l) => 'https://tile.openstreetmap.org/' + l + '/' + x + '/' + y + '.png', max: 18, credit: '© OpenStreetMap-Mitwirkende (Städte, Dörfer, Straßen)' },
+    hd: { url: (x, y, l) => 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/' + l + '/' + y + '/' + x, max: 17, credit: 'Bilder: Esri, Maxar, Earthstar Geographics' },
+  };
+  let skin = 'satellit', altitudeNow = 2.4;
+  const DETAIL_ALT = 0.35;   // darunter werden Kontinentflächen ausgeblendet, damit Städte und Dörfer sichtbar sind
   const pointAlt = (p) => (p.kind === 'cam' ? 0.02 * depth : 0.015 + Math.min(0.22, Math.log10(p.count + 1) * 0.07) * depth);
   const polyAlt = (f) => (f.properties.continent === hoverCont || f.properties.continent === selectedCont ? 0.028 : 0.006) * depth;
   const contByKey = Object.fromEntries(Object.entries(CONTINENTS).map(([n, c]) => [c.key, n]));
@@ -163,8 +170,87 @@
   }
   function refreshPolygons() {
     if (!globe) return;
-    globe.polygonsData($('tCont').checked ? countries : []);
-    globe.labelsData($('tCont').checked ? Object.entries(CONTINENTS).map(([name, c]) => ({ name, lat: c.label[0], lng: c.label[1], color: 'rgba(' + c.color + ',0.95)' })) : []);
+    const show = $('tCont').checked && altitudeNow > DETAIL_ALT;
+    globe.polygonsData(show ? countries : []);
+    globe.labelsData(show ? Object.entries(CONTINENTS).map(([name, c]) => ({ name, lat: c.label[0], lng: c.label[1], color: 'rgba(' + c.color + ',0.95)' })) : []);
+  }
+  function setSkin(name) {
+    if (!globe || !SKINS[name]) return;
+    skin = name;
+    globe.globeImageUrl(SKINS[name]);
+    const t = TILES[name];
+    if (t) { globe.globeTileEngineUrl(t.url).globeTileEngineMaxLevel(t.max); }
+    else { globe.globeTileEngineUrl(null); if (globe.globeTileEngineClearCache) globe.globeTileEngineClearCache(); }
+    $('wCredit').textContent = t ? t.credit : ''; $('wCredit').hidden = !t;
+    for (const x of document.querySelectorAll('.w-3d-row button')) x.classList.toggle('on', x.dataset.skin === name);
+  }
+
+  // Ort per Klick: nächste Stadt/Dorf (OpenStreetMap Nominatim, nur bei Klick). Dabei wird auf die Detail-Karte gezoomt.
+  let placeToken = 0;
+  async function inspectPlace(lat, lng, opts) {
+    const o = opts || {};
+    if (!TILES[skin]) setSkin('karte');
+    if (globe) {
+      const c = globe.controls(); c.autoRotate = false; $('tSpin').checked = false;
+      c.enableDamping = false;                                  // Schwung der Drehung stoppen, sonst landet der Flug neben dem Ziel
+      globe.pointOfView({ lat, lng, altitude: o.altitude || 0.12 }, 1600);
+      setTimeout(() => { c.enableDamping = true; }, 1900);
+    }
+    const box = $('wInfo'); box.textContent = ''; box.hidden = false;
+    const x = el('button', 'x', '×'); x.type = 'button'; x.setAttribute('aria-label', 'Schließen'); x.onclick = () => { box.hidden = true; };
+    const h = el('h3', '', o.title || 'Ort wird gesucht …'); const sub = el('div', 'sub', lat.toFixed(4) + '°, ' + lng.toFixed(4) + '°');
+    box.append(x, h, sub);
+    const token = ++placeToken;
+    try {
+      const r = await fetch('https://nominatim.openstreetmap.org/reverse?format=jsonv2&zoom=12&accept-language=de&lat=' + lat + '&lon=' + lng, { signal: AbortSignal.timeout(10000) });
+      const d = await r.json();
+      if (token !== placeToken) return;
+      if (d.error || !d.address) { h.textContent = o.title || 'Kein Ort an dieser Stelle'; sub.textContent += ' · Meer oder unbewohntes Gebiet'; return; }
+      const a = d.address;
+      const name = a.city || a.town || a.village || a.hamlet || a.suburb || a.municipality || a.county || d.name || 'Unbekannter Ort';
+      h.textContent = o.title || name;
+      const area = [a.state || a.region, a.country].filter(Boolean).join(', ');
+      sub.textContent = (area ? area + ' · ' : '') + lat.toFixed(4) + '°, ' + lng.toFixed(4) + '°';
+      box.appendChild(el('div', 'sub', 'Tipp: Mit dem Mausrad weiter hineinzoomen, bis einzelne Straßen und Häuser sichtbar sind.'));
+    } catch (e) { if (token === placeToken) h.textContent = o.title || 'Ort (Name gerade nicht abrufbar)'; }
+  }
+  async function searchPlace(q) {
+    status('Suche „' + q + '“ …');
+    try {
+      const r = await fetch('https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&accept-language=de&q=' + encodeURIComponent(q), { signal: AbortSignal.timeout(10000) });
+      const [d] = await r.json();
+      if (!d) { status('Nichts gefunden für „' + q + '“'); return; }
+      const big = ['country', 'state', 'region'].includes(d.addresstype);
+      inspectPlace(Number(d.lat), Number(d.lon), { title: d.display_name.split(',')[0], altitude: big ? 0.9 : 0.1 });
+      status('');
+    } catch (e) { status('Ortssuche gerade nicht erreichbar'); }
+  }
+
+  // Echtzeit-Sonne: Tag und Nacht folgen dem echten Sonnenstand (Licht über dem Subsolarpunkt)
+  function sunPosition(date) {
+    const d = date.getTime() / 86400000 + 2440587.5 - 2451545.0;        // Tage seit J2000
+    const g = (357.529 + 0.98560028 * d) * Math.PI / 180;
+    const q = 280.459 + 0.98564736 * d;
+    const L = (q + 1.915 * Math.sin(g) + 0.020 * Math.sin(2 * g)) * Math.PI / 180;
+    const e = (23.439 - 0.00000036 * d) * Math.PI / 180;
+    const dec = Math.asin(Math.sin(e) * Math.sin(L));
+    const ra = Math.atan2(Math.cos(e) * Math.sin(L), Math.cos(L));
+    const gmst = ((18.697374558 + 24.06570982441908 * d) % 24 + 24) % 24;   // Stunden
+    let lng = ra * 180 / Math.PI - gmst * 15; lng = ((lng + 540) % 360) - 180;
+    return { lat: dec * 180 / Math.PI, lng };
+  }
+  function applySun() {
+    if (!globe) return;
+    const on = $('tSun').checked;
+    const lights = globe.scene().children.filter((c) => c.isLight);
+    const dir = lights.find((l) => l.isDirectionalLight), amb = lights.find((l) => l.isAmbientLight);
+    if (!dir) return;
+    if (on) {
+      const p = sunPosition(new Date()); const c = globe.getCoords(p.lat, p.lng, 3);
+      dir.position.set(c.x, c.y, c.z); dir.intensity = 1.5;
+      if (amb) amb.intensity = 0.55;
+      window.__sun = p;
+    } else { dir.position.set(-300, 200, 400); dir.intensity = 1; if (amb) amb.intensity = 1; }
   }
   function refreshPoints() {
     if (!globe) return;
@@ -200,7 +286,10 @@
         .polygonsTransitionDuration(300)
         .polygonLabel((f) => '<b>' + esc(f.properties.name) + '</b><br><span style="opacity:.75">' + esc(f.properties.continent) + '</span>')
         .onPolygonHover((f) => { const n = f ? f.properties.continent : null; if (n !== hoverCont) { hoverCont = n; globe.polygonsData(globe.polygonsData()); } })
-        .onPolygonClick((f) => selectContinent(f.properties.continent))
+        .onPolygonClick((f, ev, c) => { if (c && Number.isFinite(c.lat)) inspectPlace(c.lat, c.lng); else selectContinent(f.properties.continent); })
+        .onGlobeClick(({ lat, lng }) => inspectPlace(lat, lng))
+        .onLabelClick((l) => selectContinent(l.name))
+        .onZoom((pov) => { const was = altitudeNow > DETAIL_ALT; altitudeNow = pov.altitude; if (was !== (altitudeNow > DETAIL_ALT)) refreshPolygons(); })
         .labelLat('lat').labelLng('lng').labelText('name').labelColor('color').labelSize(1.5).labelAltitude(0.03).labelDotRadius(0).labelResolution(2)
         .ringsData([]).ringColor(() => (t) => 'rgba(255,92,92,' + (1 - t) + ')').ringMaxRadius(3).ringPropagationSpeed(1.5).ringRepeatPeriod(1400)
         .ringLat('lat').ringLng('lng');
@@ -209,7 +298,7 @@
       const name = dbg ? String(gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL)) : '';
       const soft = /swiftshader|llvmpipe|software|softpipe/i.test(name);
       globe.renderer().setPixelRatio(soft ? 1 : Math.min(window.devicePixelRatio || 1, 1.75));
-      const c = globe.controls(); c.autoRotate = true; c.autoRotateSpeed = soft ? 0.25 : 0.45; c.enableDamping = true;
+      const c = globe.controls(); c.autoRotate = true; c.autoRotateSpeed = soft ? 0.25 : 0.45; c.enableDamping = true; c.minDistance = 100.4;
       const fit = () => globe.width(host.clientWidth).height(host.clientHeight);
       new ResizeObserver(fit).observe(host); fit();
       $('tSpin').addEventListener('change', () => { c.autoRotate = $('tSpin').checked; });
@@ -224,10 +313,10 @@
       }
       $('r3d').addEventListener('input', apply3d);
       for (const b of document.querySelectorAll('.w-3d-row button')) b.addEventListener('click', () => {
-        globe.globeImageUrl(SKINS[b.dataset.skin]);
-        for (const x of document.querySelectorAll('.w-3d-row button')) x.classList.toggle('on', x === b);
+        setSkin(b.dataset.skin);
       });
-      window.__welt = { globe, soft, apply3d, getDepth: () => depth, showInfo: (p) => showInfo(p), selectContinent: (n) => selectContinent(n) };
+      setTimeout(applySun, 300); setInterval(applySun, 60000); $('tSun').addEventListener('change', applySun);
+      window.__welt = { globe, soft, setSkin, inspectPlace, applySun, sunPosition, getSkin: () => skin, apply3d, getDepth: () => depth, showInfo: (p) => showInfo(p), selectContinent: (n) => selectContinent(n) };
     } catch (err) {
       globe = null; console.error('[Welt] Globus konnte nicht starten', err);
       $('wFallback').hidden = false; $('wFallback').textContent = 'Die 3D-Weltkugel braucht WebGL und startet hier nicht. Livestream und Schlagzeilen funktionieren trotzdem.';
@@ -252,6 +341,7 @@
   buildTabs(); selectChannel(0);
   initGlobe();
   for (const b of document.querySelectorAll('.w-regions button')) b.addEventListener('click', () => goto(b.dataset.region));
+  $('wSearch').addEventListener('submit', (e) => { e.preventDefault(); const q = $('wSearchQ').value.trim(); if (q) searchPlace(q); });
   $('tCont').addEventListener('change', refreshPolygons);
   $('tCams').addEventListener('change', refreshPoints); $('tEvents').addEventListener('change', refreshPoints);
   const region = new URLSearchParams(location.search).get('region');

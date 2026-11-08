@@ -32,6 +32,7 @@
       <div id="globe" class="w-globe"></div>
       <div class="w-toggles">
         <label><input type="checkbox" id="tCont" checked /> Kontinente</label>
+        <label title="Tag und Nacht nach dem echten Sonnenstand"><input type="checkbox" id="tSun" checked /> Echtzeit-Sonne</label>
         <label><input type="checkbox" id="tCams" checked /> <span class="dot cam"></span> Live-Cams</label>
         <label><input type="checkbox" id="tEvents" checked /> <span class="dot ev"></span> Krisenmeldungen (24 h)</label>
         <label><input type="checkbox" id="tSpin" checked /> Drehen</label>
@@ -39,11 +40,18 @@
       <div class="w-3d" aria-label="3D-Einstellungen">
         <div class="w-3d-row" role="group" aria-label="Darstellung">
           <button type="button" data-skin="satellit" class="on">Satellit</button>
+          <button type="button" data-skin="karte" title="Straßenkarte mit Städten und Dörfern">Städte &amp; Dörfer</button>
+          <button type="button" data-skin="hd" title="Hochaufgelöste Satellitenbilder beim Heranzoomen">Satellit HD</button>
           <button type="button" data-skin="nacht">Nacht</button>
           <button type="button" data-skin="dunkel">Dunkel</button>
         </div>
         <label class="w-3d-slider">3D-Höhe <input type="range" id="r3d" min="0" max="100" value="40" aria-label="3D-Höhe von Relief, Kontinenten und Säulen" /></label>
       </div>
+      <form class="w-search" id="wSearch" autocomplete="off">
+        <input id="wSearchQ" placeholder="Stadt oder Dorf suchen …" aria-label="Ort suchen" />
+        <button type="submit" aria-label="Suchen">Suchen</button>
+      </form>
+      <div class="w-credit" id="wCredit" hidden></div>
       <div class="w-fallback" id="wFallback" hidden></div>
       <aside class="w-info" id="wInfo" aria-live="polite" hidden></aside>
     </section>

@@ -22,6 +22,15 @@ const check = (n, ok, x = '') => out.push((ok ? 'OK   ' : 'FAIL ') + n + (x ? ' 
 try {
   const page = await b.newPage({ viewport: { width: 1400, height: 850 } });
   const errs = []; page.on('pageerror', (e) => errs.push(e.message));
+  const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==', 'base64');
+  let tileHits = 0;
+  await page.route(/tile\.openstreetmap\.org|arcgisonline\.com/, (route) => { tileHits++; route.fulfill({ body: PNG, contentType: 'image/png', headers: { 'access-control-allow-origin': '*' } }); });
+  await page.route(/nominatim\.openstreetmap\.org/, (route) => {
+    const u = route.request().url();
+    const body = u.includes('/search') ? [{ lat: '47.0707', lon: '15.4395', display_name: 'Graz, Steiermark, Österreich', addresstype: 'city' }]
+      : u.includes('lat=0&lon=0') ? { error: 'Unable to geocode' } : { name: 'Graz', address: { city: 'Graz', state: 'Steiermark', country: 'Österreich' } };
+    route.fulfill({ json: body, headers: { 'access-control-allow-origin': '*' } });
+  });
   await page.goto('http://127.0.0.1:8261/welt.html?region=ukraine'); await page.waitForTimeout(2500);
   if (process.env.SHOT) await page.screenshot({ path: process.env.SHOT });
   check('Weltkugel-Canvas ist da', (await page.locator('#globe canvas').count()) >= 1);
@@ -73,6 +82,25 @@ try {
   await page.locator('#r3d').fill('40');
   await page.click('.w-3d-row button[data-skin="nacht"]');
   check('Darstellung Nacht: Stadtlichter-Textur', (await page.evaluate(() => window.__welt.globe.globeImageUrl())).includes('earth-night.jpg') && (await page.locator('.w-3d-row button.on').textContent()) === 'Nacht');
+  await page.click('.w-3d-row button[data-skin="satellit"]');
+  // Städte & Dörfer: Kachelkarte, Ortsinfo per Klick, Suche, Echtzeit-Sonne
+  await page.click('.w-3d-row button[data-skin="karte"]'); await page.waitForTimeout(1200);
+  check('Städte & Dörfer: Kachel-Karte ist aktiv und zeigt die Quelle', (await page.evaluate(() => typeof window.__welt.globe.globeTileEngineUrl())) === 'function' && (await page.locator('#wCredit').textContent()).includes('OpenStreetMap'));
+  check('Städte & Dörfer: Kacheln werden geladen', tileHits > 0, String(tileHits));
+  await page.click('.w-3d-row button[data-skin="satellit"]');
+  check('Zurück zu Satellit: Kachel-Karte aus', (await page.evaluate(() => window.__welt.globe.globeTileEngineUrl())) == null && (await page.locator('#wCredit').isHidden()));
+  await page.evaluate(() => window.__welt.inspectPlace(47.0707, 15.4395));
+  await page.waitForFunction(() => window.__welt.globe.pointOfView().altitude < 0.2 && window.__welt.globe.polygonsData().length === 0, null, { timeout: 25000 }).catch(() => {});
+  check('Klick auf die Kugel: schaltet auf Städte & Dörfer und zoomt hinein', (await page.evaluate(() => window.__welt.getSkin())) === 'karte' && (await page.evaluate(() => window.__welt.globe.pointOfView().altitude)) < 0.2);
+  check('Klick auf die Kugel: Ortsname und Region werden angezeigt', (await page.locator('#wInfo h3').textContent()) === 'Graz' && (await page.locator('#wInfo .sub').first().textContent()).includes('Steiermark, Österreich'));
+  check('Nah herangezoomt: Kontinentflächen sind ausgeblendet', (await page.evaluate(() => window.__welt.globe.polygonsData().length)) === 0);
+  await page.evaluate(() => window.__welt.inspectPlace(0, 0)); await page.waitForTimeout(500);
+  check('Offenes Meer: freundlicher Hinweis statt Fehler', /Kein Ort/.test(await page.locator('#wInfo h3').textContent()));
+  await page.fill('#wSearchQ', 'Graz'); await page.press('#wSearchQ', 'Enter'); await page.waitForTimeout(800);
+  check('Ortssuche findet Graz und fliegt hin', (await page.locator('#wInfo h3').textContent()) === 'Graz');
+  const sun = await page.evaluate(() => window.__welt.sunPosition(new Date('2026-06-21T12:00:00Z')));
+  check('Echtzeit-Sonne: Sonnenwende 21.6. = 23,4° Nord, mittags über 0° Länge', Math.abs(sun.lat - 23.44) < 0.3 && Math.abs(sun.lng) < 4, JSON.stringify(sun));
+  check('Echtzeit-Sonne ist aktiv', typeof (await page.evaluate(() => window.__sun && window.__sun.lat)) === 'number');
   await page.click('.w-3d-row button[data-skin="satellit"]');
   await page.click('.w-regions button[data-region="nahost"]');
   check('Regionswechsel markiert Nahost', (await page.locator('.w-regions button.on').textContent()) === 'Nahost');
