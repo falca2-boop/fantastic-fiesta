@@ -180,3 +180,10 @@ Jarvis spricht dich mit „du“ an, warm, locker und mit Humor, fragt nach dein
 ## Oberfläche
 
 Die Orb-Kugel füllt fast den ganzen Bildschirm (Mitte, Kreis mit leuchtendem Rand). Darunter stehen Begrüßung, Vorschläge und die **letzte Antwort von Jarvis**, unten in der Mitte Eingabe und Mikrofon. Am linken Rand klappt der Reiter **Gespräch** den Chatverlauf auf (ein Zähler zeigt neue Antworten), am rechten Rand der Reiter **Übersicht** die Kästchen (Kosten, Aufgaben, Erinnerungen, Ziel, Notizen, Agenten, System). Schließen mit dem ×, mit Escape oder mit einem Klick auf die Kugel. Hintergrund: Schwarz. Farben stehen als Variablen oben in `public/style.css`.
+
+## Jarvis lernt von selbst
+
+- **Daumen hoch/runter** unter jeder Antwort (links im Gespräch). Das ist das wichtigste Signal.
+- **Tägliche Lernrunde** um 22:30 (Uhrzeit des Geräts, Jarvis muss laufen; ändern per `LEARN_TIME=21:00` oder Sprache: *„Lerne täglich um 21 Uhr“* / *„Schalte das Lernen aus“*; `JARVIS_LEARNING=off` schaltet sie ab; „Lerne jetzt aus heute“ startet sie sofort). Sie wertet dein Feedback und deine eigenen Nachrichten aus und aktualisiert **gelernte Vorlieben** (bis zu 12, fließen in jede Antwort ein), neue **Fakten** über dich, **Vorschläge für Agenten** und schreibt eine **Lernnotiz** in Obsidian. Kostet pro Tag nur wenige Cent und steht in der Kostenanzeige als „Lernrunde“.
+- **Du behältst die Kontrolle:** Alles Gelernte steht in der Karte „Gelernt“ (Übersicht rechts), jede Zeile lässt sich mit × löschen, oder sag *„Vergiss, dass ich Humor mag“*. Agenten ändern sich **nur nach deinem Ja**: *„Zeig die Vorschläge für die Agenten“*, dann *„Übernimm Vorschlag abc12“*.
+- **Schutz:** Gelernt wird nur aus dem, was du sagst und bewertest, nicht aus Webinhalten. Zugangsdaten, Links und Adressen werden nie übernommen. Code: `lib/learning.js`.

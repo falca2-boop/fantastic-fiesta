@@ -92,10 +92,12 @@ try {
   await page.click('#tabChat'); await page.waitForTimeout(500);
   check('Linker Reiter klappt das Gespräch auf (Zähler weg)', (await page.locator('#drawerChat.open').count()) === 1 && (await page.locator('#drawerChat').isVisible()) && (await page.locator('#chatBadge').isHidden()) && (await page.locator('#tabChat').getAttribute('aria-expanded')) === 'true');
   check('Aufgeklapptes Gespräch zeigt den Verlauf', (await page.locator('#drawerChat .msg.user .bubble').count()) >= 1);
+  await page.locator('#drawerChat .msg.jarvis .fb button').last().click(); await page.waitForTimeout(500);
+  check('Daumen unter der Antwort: Bewertung wird gespeichert und bedankt', (await page.locator('#drawerChat .fb-thanks').count()) === 1 && (await page.locator('#drawerChat .fb button.on').count()) === 1);
   await page.keyboard.press('Escape'); await page.waitForTimeout(500);
   check('Escape klappt das Gespräch wieder ein', (await page.locator('#drawerChat.open').count()) === 0);
   await page.click('#tabSide'); await page.waitForTimeout(500);
-  check('Rechter Reiter klappt die Übersicht mit den Kästchen auf', (await page.locator('#drawerSide.open').count()) === 1 && (await page.locator('#drawerSide #cardCost').isVisible()) && (await page.locator('#drawerSide #cardAgents').count()) === 1);
+  check('Rechter Reiter klappt die Übersicht mit den Kästchen auf', (await page.locator('#drawerSide.open').count()) === 1 && (await page.locator('#drawerSide #cardCost').isVisible()) && (await page.locator('#drawerSide #cardAgents').count()) === 1 && (await page.locator('#drawerSide #cardLearned').count()) === 1 && /Lernrunde täglich um 22:30/.test(await page.locator('#learnedInfo').textContent()));
   await page.click('#drawerSide .drawer-x'); await page.waitForTimeout(500);
   check('Schließen-Knopf klappt die Übersicht ein', (await page.locator('#drawerSide.open').count()) === 0);
   check('Keine Seitenfehler (Fall 1)', errs.length === 0, errs.join('|'));

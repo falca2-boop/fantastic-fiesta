@@ -162,6 +162,22 @@
   const loadChat = () => { try { return JSON.parse(localStorage.getItem(CHAT_KEY) || '[]'); } catch (e) { return []; } };
   const saveChat = (item) => { try { const l = loadChat(); l.push(item); localStorage.setItem(CHAT_KEY, JSON.stringify(l.slice(-60))); } catch (e) {} };
   const stampText = (ts) => { const d = new Date(ts); return d.toDateString() === new Date().toDateString() ? hhmm(d) : d.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' }) + ' ' + hhmm(d); };
+  // Daumen unter Antworten: Jarvis lernt daraus in der Lernrunde
+  function feedbackRow(reply) {
+    const row = el('div', 'fb'); const asked = lastUserText;
+    const mk = (rating, label, title) => {
+      const b = el('button', '', label); b.type = 'button'; b.title = title; b.setAttribute('aria-label', title);
+      b.addEventListener('click', async () => {
+        for (const x of row.querySelectorAll('button')) x.disabled = true;
+        b.classList.add('on');
+        try { await api('/api/feedback', { method: 'POST', body: JSON.stringify({ rating, user: asked, reply }) }); row.appendChild(el('span', 'fb-thanks', rating === 'up' ? 'Merke ich mir.' : 'Danke, ich lerne daraus.')); }
+        catch (e) { row.appendChild(el('span', 'fb-thanks', 'Konnte das nicht speichern.')); }
+      });
+      return b;
+    };
+    row.append(mk('up', '👍', 'Gute Antwort'), mk('down', '👎', 'Nicht gut'));
+    return row;
+  }
   /** opts: { save: false } für Begrüßung und Hinweise, { ts } beim Wiederherstellen */
   function addBubble(text, who, interim, opts) {
     const o = opts || {};
@@ -170,6 +186,7 @@
     const meta = el('div', 'meta');
     meta.append(el('span', '', who === 'user' ? 'Du' : 'Jarvis'), el('span', '', stampText(ts)));
     m.append(meta, el('div', 'bubble', text));
+    if (who === 'jarvis' && !interim && !o.restore && o.save !== false) m.appendChild(feedbackRow(text));
     dialog.appendChild(m);
     if (!interim && !o.restore) {
       if (window.Orb && window.Orb.burst) window.Orb.burst(who === 'user' ? 5 : 9);
@@ -286,6 +303,23 @@
       if (u.today.unpriced || u.month.unpriced) row('Hinweis', 'Preis für dieses Modell unbekannt, Kosten unvollständig', 'warn');
     }
 
+    // Gelernt
+    if (s.learned) {
+      const ll = $('learnedList'); ll.textContent = '';
+      $('learnedCount').textContent = s.learned.length;
+      s.learned.forEach((it) => {
+        const li = el('li', 'task'); const body = el('div', '', it.text); const x = el('button', 'learn-x', '×'); x.type = 'button'; x.title = 'Vergessen'; x.setAttribute('aria-label', 'Vergessen: ' + it.text);
+        x.addEventListener('click', async () => { try { renderState((await api('/api/learned/delete', { method: 'POST', body: JSON.stringify({ index: it.i }) })).state); } catch (e) {} });
+        li.append(body, x); ll.appendChild(li);
+      });
+      if (!s.learned.length) ll.appendChild(el('li', 'empty', 'Noch nichts. Bewerte Antworten mit 👍 und 👎, abends lerne ich daraus.'));
+      const info = $('learnedInfo'); info.textContent = '';
+      const L = s.learning || {};
+      info.append(el('div', '', L.time ? 'Lernrunde täglich um ' + L.time + ' Uhr' : 'Lernrunde aus'));
+      if (L.last) info.appendChild(el('div', '', 'Zuletzt: ' + L.last));
+      if (L.proposals) info.appendChild(el('div', 'warn', L.proposals + ' Verbesserungsvorschlag' + (L.proposals > 1 ? 'e' : '') + ' für Agenten, sag: „Zeig die Vorschläge für die Agenten.“'));
+    }
+
     // Agenten
     const al = $('agentList'); al.textContent = '';
     $('agentCount').textContent = (s.agents || []).length;
@@ -385,9 +419,11 @@
       setState('idle');
     }
   }
+  let lastUserText = '';
   function handleInput(text) {
     text = text.trim();
     if (!text) return;
+    lastUserText = text;
     addBubble(text, 'user');
     respond(text);
   }

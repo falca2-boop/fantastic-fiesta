@@ -448,3 +448,17 @@ canvas#bg { opacity: 0.38; }
   .drawer { top: 62px; bottom: 84px; width: 96vw; }
   .drawer-left { left: 2vw; } .drawer-right { right: 2vw; }
 }
+
+/* Feedback und Gelerntes */
+.fb { display: flex; align-items: center; gap: 4px; margin-top: 4px; opacity: 0.55; transition: opacity .15s; }
+.msg:hover .fb, .fb:focus-within { opacity: 1; }
+.fb button { background: none; border: 1px solid transparent; border-radius: 8px; padding: 1px 6px; font-size: 0.85rem; filter: grayscale(0.7); }
+.fb button:hover:not(:disabled) { border-color: var(--border-strong); filter: none; }
+.fb button.on { border-color: var(--accent); filter: none; }
+.fb button:disabled:not(.on) { opacity: 0.3; }
+.fb-thanks { font-size: 0.74rem; color: var(--muted); margin-left: 6px; }
+#learnedList .task { display: flex; justify-content: space-between; gap: 8px; font-size: 0.85rem; }
+.learn-x { background: none; border: 0; color: var(--muted); font-size: 1.1rem; line-height: 1; padding: 0 4px; border-radius: 6px; }
+.learn-x:hover { color: var(--danger); background: rgba(255, 92, 122, 0.12); }
+.learn-info { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border); font-size: 0.76rem; color: var(--muted); display: grid; gap: 3px; }
+.learn-info .warn { color: var(--warn); }

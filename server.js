@@ -12,6 +12,7 @@ import { loadEnvFile } from './lib/env.js';
 import { vaultDirFromEnv, recentNotes } from './lib/vault.js';
 import { listAgents } from './lib/agents.js';
 import { usageSummary } from './lib/usage.js';
+import { recordFeedback, learnedList, deleteLearnedAt, runLearning, learningConfig, startLearningScheduler } from './lib/learning.js';
 import { briefingConfig, takeBriefing, runBriefing, startBriefingScheduler } from './lib/briefing.js';
 import { loadNews, loadEvents, findLiveCam } from './lib/world.js';
 import { mailConfigFromEnv, startMailWatcher, takeMailAlerts } from './lib/mail.js';
@@ -76,6 +77,8 @@ export function createServer(opts = {}) {
         : d.notes.slice(-4).reverse().map(n => ({ title: '', text: n.text.slice(0, 160), ts: n.ts })),
       factCount: d.facts.length,
       usage: usageSummary(store),
+      learned: learnedList(store),
+      learning: { time: learningConfig(store).time, last: d.learning ? d.learning.summary : '', proposals: (d.agentProposals || []).length },
       agents: listAgents(store).map(({ name, role, builtin }) => ({ name, role: role.slice(0, 140), builtin })),
       tasks: d.tasks.filter(t => !t.done).map(({ id, text, due }) => ({ id, text, due })),
       reminders: d.reminders.filter(r => !r.fired).sort((a, b) => new Date(a.at) - new Date(b.at)).map(({ id, text, at }) => ({ id, text, at })),
@@ -112,6 +115,14 @@ export function createServer(opts = {}) {
 
         if ((pathname === '/api/state' || pathname === '/api/poll') && req.method === 'GET') lastUi = Date.now();
         if (pathname === '/api/state' && req.method === 'GET') return json(res, 200, publicState());
+        if (pathname === '/api/feedback' && req.method === 'POST') {
+          let b; try { b = JSON.parse(await readBody(req)); } catch (e) { return json(res, 400, { error: 'Ungültiges JSON.' }); }
+          try { recordFeedback(store, { rating: b.rating, user: b.user, reply: b.reply }); return json(res, 200, { ok: true }); } catch (e) { return json(res, 400, { error: e.message }); }
+        }
+        if (pathname === '/api/learned/delete' && req.method === 'POST') {
+          let b; try { b = JSON.parse(await readBody(req)); } catch (e) { return json(res, 400, { error: 'Ungültiges JSON.' }); }
+          return json(res, 200, { ok: deleteLearnedAt(store, Number(b.index)), state: publicState() });
+        }
         if (pathname === '/api/world/news' && req.method === 'GET') {
           try { return json(res, 200, { items: await loadNews(cfg.fetchFn) }); } catch (e) { return json(res, 502, { error: e.message }); }
         }
@@ -202,6 +213,8 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   if (store.vaultDir) console.log('Obsidian-Vault: ' + store.vaultDir);
   if (cfg.mail) { startMailWatcher({ store, config: cfg.mail }); console.log('Mail-Überwachung aktiv für ' + cfg.mail.imap.user); }
   if (cfg.provider === 'anthropic' && cfg.apiKey) {
+    startLearningScheduler({ store, getRun: () => ({ now }) => runLearning({ store, apiKey: cfg.apiKey, model: cfg.model, fetchFn: cfg.fetchFn, now }) });
+    const lc = learningConfig(store); if (lc.time) console.log('Tägliche Lernrunde um ' + lc.time + ' Uhr');
     startBriefingScheduler({ store, getRun: () => ({ topics, now }) => runBriefing({ store, apiKey: cfg.apiKey, model: cfg.model, fetchFn: cfg.fetchFn, baseUrl: cfg.baseUrl, topics, now }) });
     const bc = briefingConfig(store); if (bc.time) console.log('Morgenbriefing täglich um ' + bc.time + ' Uhr');
   }
