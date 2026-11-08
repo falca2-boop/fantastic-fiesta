@@ -150,7 +150,7 @@ Bibliotheken liegen unter `public/vendor/` (globe.gl, three.js, NASA-Texturen; M
 
 ### Agent „firmensucher“ (Firmen ohne Webseite oder ohne Chat-Assistent)
 
-*„Hey Jarvis, beauftrage den Firmensucher: Friseure in Graz ohne Webseite.“* oder *„… Restaurants in Linz, die keinen Chat-Assistenten auf ihrer Webseite haben.“* Der Agent liefert eine Liste mit Name, Adresse, Telefon, Mail, dem Grund und einer Angebotsidee. Mit „Speichere die Liste als Notiz“ landet sie in Obsidian.
+*„Hey Jarvis, beauftrage den Firmensucher: Friseure in Graz ohne Webseite.“* oder *„… Restaurants in Linz, die keinen Chat-Assistenten auf ihrer Webseite haben.“* Der Agent liefert standardmäßig **3 bis 5 Treffer** (mehr nur auf Wunsch, z. B. „zehn Treffer“) als Liste mit Name, Adresse, Telefon, Mail, dem Grund und einer Angebotsidee. Mit „Speichere die Liste als Notiz“ landet sie in Obsidian.
 
 - **Ohne Webseite:** Betriebe mit Namen in OpenStreetMap (öffentliche Daten, ohne Schlüssel), bei denen weder Webseite noch Kontakt-Webseite eingetragen ist. Branchen u. a. friseur, restaurant, zahnarzt, bäckerei, elektriker, hotel (oder direkt `shop=hairdresser`).
 - **Ohne Chat-Assistent:** Betriebe mit Webseite, auf deren **Startseite** keine bekannte Chat-Software (Tidio, Intercom, Crisp, tawk.to, LiveChat, HubSpot, Userlike …) erkannt wird. Prüft nur die Startseite, Adressen im lokalen Netz werden nie angefragt.
@@ -160,5 +160,5 @@ Bibliotheken liegen unter `public/vendor/` (globe.gl, three.js, NASA-Texturen; M
 ### Weitere Agenten
 
 - **briefschreiber:** Entwirft pro Firma einen kurzen, ehrlichen, persönlichen Brief mit Angebot (Webseite, Chat-Assistent), mit Platzhalter `[Absender]`. Er schreibt nur Text und versendet nichts. Ablauf: erst den Firmensucher, dann *„Lass den Briefschreiber Briefe für diese Liste entwerfen.“*, dann *„Speichere die Briefe als Notiz.“*
-- **morgenbriefing:** Die wichtigsten Meldungen aus Welt, Europa und Wirtschaft/Technik mit Quellen. *„Gib mir mein Morgenbriefing, Schwerpunkt Technik.“* Es läuft auf Zuruf, nicht automatisch. Ein täglicher Zeitplan bräuchte einen Zeitgeber (z. B. n8n oder `cron`).
+- **morgenbriefing:** Die wichtigsten Meldungen aus Welt, Europa und Wirtschaft/Technik mit Quellen. *„Gib mir mein Morgenbriefing, Schwerpunkt Technik.“* Er läuft auf Zuruf und auf Wunsch **automatisch jeden Morgen**: *„Schick mir jeden Morgen um 7:30 das Briefing, Schwerpunkt Technik.“* (oder `MORNING_BRIEFING_TIME=07:30` in der `.env`; *„Schalte das Morgenbriefing aus“* beendet es). Zur Uhrzeit des Geräts erstellt Jarvis das Briefing, sagt es an, sobald die Seite offen ist, und legt es als Obsidian-Notiz ab. Jarvis muss dafür laufen; wird er später gestartet, holt er es bis zu 3 Stunden nach. Mit Claude als KI.
 - **marktbeobachter:** Recherchiert Preise, Konkurrenten oder Produkte per Websuche und vergleicht mit dem zuletzt in Obsidian gespeicherten Stand (Notiz „Markt: Thema“). Keine Anlageberatung.

@@ -295,6 +295,7 @@
     item(h.obsidian ? 'Obsidian verbunden' : 'Obsidian aus', h.obsidian ? 'ok' : 'warn');
     item(h.tools && h.tools.includes('open_universe') ? 'Obsidian-Graph: Jarvis verbunden' : 'Obsidian-Graph: nicht verbunden', h.tools && h.tools.includes('open_universe') ? 'ok' : 'warn');
     item(h.tools && h.tools.includes('open_website') ? 'Browser öffnen: bereit' : 'Server veraltet – neu starten', h.tools && h.tools.includes('open_website') ? 'ok' : 'bad');
+    item(h.briefing ? 'Morgenbriefing: täglich ' + h.briefing : 'Morgenbriefing aus', h.briefing ? 'ok' : 'warn');
     item(h.mailWatch ? 'Mail-Alarm aktiv' : 'Mail-Alarm aus', h.mailWatch ? 'ok' : 'warn');
   }
 
@@ -328,6 +329,11 @@
       const data = await api('/api/poll');
       renderState(data.state);
       data.fired.forEach(r => jarvisSay('Erinnerung: ' + r.text));
+      if (data.briefing) {
+        const text = 'Dein Morgenbriefing: ' + data.briefing.text;
+        jarvisSay(text);
+        if (window.Notification && Notification.permission === 'granted') { try { new Notification('JARVIS – Morgenbriefing', { body: data.briefing.text.slice(0, 180) }); } catch (e) {} }
+      }
       (data.mail || []).forEach((a) => {
         const text = 'Wichtige Mail von ' + a.from + (a.subject ? ': ' + a.subject : '.');
         jarvisSay(text);

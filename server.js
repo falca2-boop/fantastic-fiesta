@@ -11,6 +11,7 @@ import { DEFAULT_GEMINI_MODEL } from './lib/gemini.js';
 import { loadEnvFile } from './lib/env.js';
 import { vaultDirFromEnv, recentNotes } from './lib/vault.js';
 import { listAgents } from './lib/agents.js';
+import { briefingConfig, takeBriefing, runBriefing, startBriefingScheduler } from './lib/briefing.js';
 import { loadNews, loadEvents, findLiveCam } from './lib/world.js';
 import { mailConfigFromEnv, startMailWatcher, takeMailAlerts } from './lib/mail.js';
 
@@ -102,7 +103,7 @@ export function createServer(opts = {}) {
     try {
       const { pathname } = new URL(req.url, 'http://localhost');
 
-      if (pathname === '/api/health') return json(res, 200, { ok: true, tokenRequired: !!cfg.token, keyConfigured: !!cfg.apiKey, provider: cfg.provider, uiActive: uiActive(), mailWatch: !!cfg.mail, voice: !!cfg.voice, obsidian: !!store.vaultDir, liveCams: !!cfg.youtubeKey, tools: toolDefinitions({ webhookEnabled: !!cfg.webhookUrl, mailEnabled: !!cfg.mail, obsidianEnabled: !!store.vaultDir }).map(t => t.name), pid: process.pid });
+      if (pathname === '/api/health') return json(res, 200, { ok: true, tokenRequired: !!cfg.token, keyConfigured: !!cfg.apiKey, provider: cfg.provider, uiActive: uiActive(), mailWatch: !!cfg.mail, voice: !!cfg.voice, obsidian: !!store.vaultDir, liveCams: !!cfg.youtubeKey, briefing: briefingConfig(store).time, tools: toolDefinitions({ webhookEnabled: !!cfg.webhookUrl, mailEnabled: !!cfg.mail, obsidianEnabled: !!store.vaultDir }).map(t => t.name), pid: process.pid });
 
       if (pathname.startsWith('/api/')) {
         if (!authorized(req)) return json(res, 401, { error: 'Zugangs-Token fehlt oder ist falsch.' });
@@ -128,7 +129,7 @@ export function createServer(opts = {}) {
             return json(res, e.code === 'nokey' ? 200 : 502, { live: null, error: e.code === 'nokey' ? 'nokey' : 'YouTube gerade nicht erreichbar: ' + e.message });
           }
         }
-        if (pathname === '/api/poll' && req.method === 'GET') return json(res, 200, { fired: takeDueReminders(store).map(({ id, text }) => ({ id, text })), mail: takeMailAlerts(store), state: publicState() });
+        if (pathname === '/api/poll' && req.method === 'GET') return json(res, 200, { fired: takeDueReminders(store).map(({ id, text }) => ({ id, text })), mail: takeMailAlerts(store), briefing: takeBriefing(store), state: publicState() });
 
         if (pathname === '/api/tasks/complete' && req.method === 'POST') {
           let body;
@@ -198,5 +199,9 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   console.log('KI-Anbieter: ' + cfg.provider + ' (' + cfg.model + ')');
   if (store.vaultDir) console.log('Obsidian-Vault: ' + store.vaultDir);
   if (cfg.mail) { startMailWatcher({ store, config: cfg.mail }); console.log('Mail-Überwachung aktiv für ' + cfg.mail.imap.user); }
+  if (cfg.provider === 'anthropic' && cfg.apiKey) {
+    startBriefingScheduler({ store, getRun: () => ({ topics, now }) => runBriefing({ store, apiKey: cfg.apiKey, model: cfg.model, fetchFn: cfg.fetchFn, baseUrl: cfg.baseUrl, topics, now }) });
+    const bc = briefingConfig(store); if (bc.time) console.log('Morgenbriefing täglich um ' + bc.time + ' Uhr');
+  }
   server.listen(port, host, () => console.log(`JARVIS läuft auf http://${host}:${port}`));
 }

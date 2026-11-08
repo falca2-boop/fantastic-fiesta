@@ -10,7 +10,7 @@
   "scripts": {
     "setup:mail": "node scripts/setup-mail.js",
     "start": "node server.js",
-    "test": "node --test test/jarvis.test.js test/mail.test.js test/clap.test.js test/wake.test.js test/world.test.js test/leads.test.js",
+    "test": "node --test test/jarvis.test.js test/mail.test.js test/clap.test.js test/wake.test.js test/world.test.js test/leads.test.js test/briefing.test.js",
     "setup": "node scripts/setup.js"
   },
   "dependencies": {
