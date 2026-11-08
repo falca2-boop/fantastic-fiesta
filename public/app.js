@@ -218,6 +218,16 @@
     if (!s) return;
     if (s.userName) { USER_NAME = s.userName; ADDRESS = s.address || s.userName; tickClock(); }
 
+    // Agenten
+    const al = $('agentList'); al.textContent = '';
+    $('agentCount').textContent = (s.agents || []).length;
+    (s.agents || []).forEach((a) => {
+      const li = el('li', 'task'); const body = el('div');
+      body.append(el('div', '', a.name + (a.builtin ? '' : ' · eigen')), el('div', 'sub', a.role));
+      li.appendChild(body); al.appendChild(li);
+    });
+    if (!(s.agents || []).length) al.appendChild(el('li', 'empty', 'Sag: „Erstelle mir einen Agenten, der …“'));
+
     // Aufgaben
     const tl = $('taskList'); tl.textContent = '';
     $('taskCount').textContent = s.tasks.length;

@@ -140,3 +140,10 @@ Im Kopf von Jarvis führt der Knopf **Welt** (oder „Hey Jarvis, zeig die Weltk
 - **Schlagzeilen:** DW, Tagesschau, BBC World, Al Jazeera (RSS, alle 5 Minuten). Jarvis kann sie auch vorlesen: „Was gibt es Neues in der Ukraine?“
 
 Bibliotheken liegen unter `public/vendor/` (globe.gl, three.js, NASA-Texturen; MIT). Test: `node test/e2e/welt.mjs`.
+
+
+## Agenten
+
+**In Jarvis:** Für größere Aufgaben beauftragt Jarvis Spezial-Agenten mit eigener Rolle und eigenen Werkzeugen (nur Claude als KI-Anbieter): `recherche` (Web), `nachrichten` (Schlagzeilen und Einordnung), `analyst` (Strategie), `notizen` (Obsidian), `planer` (Tagesplan). Sie dürfen nur lesen und recherchieren, nichts speichern, senden oder öffnen. Eigene Agenten legst du per Sprache an: *„Erstelle mir einen Agenten, der täglich die wichtigsten Tech-Nachrichten einordnet.“* (bis zu 8, mit „Zeig meine Agenten“ oder in der Karte „Agenten“ zu sehen, „Lösche den Agenten …“ entfernt sie). Code: `lib/agents.js`.
+
+**Für Claude Code:** Unter `.claude/agents/` liegen Helfer für die Entwicklung (`jarvis-tester`, `jarvis-reviewer`, `jarvis-doku`), siehe dort die README.

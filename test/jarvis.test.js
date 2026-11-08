@@ -308,3 +308,51 @@ test('Obsidian: Suche, Notiz lesen mit Verknüpfungen, Universum öffnen', async
   assert.match(out, /geöffnet/); assert.equal(opened, 'obsidian://knowledge-universe?vault=' + encodeURIComponent(path.basename(vault)) + '&note=Jarvis%20Plan');
   assert.equal(await runTool(new Store(null), 'open_universe', {}), 'Kein Obsidian-Vault verbunden.');
 });
+
+import { createAgent, deleteAgent, listAgents, runAgent, AGENT_TOOLS } from '../lib/agents.js';
+test('Agenten: eigene anlegen mit Prüfungen, löschen, eingebaute geschützt', () => {
+  const s = new Store(null);
+  assert.ok(listAgents(s).some((a) => a.name === 'recherche' && a.builtin));
+  assert.match(createAgent(s, { name: 'X', role: 'zu kurz' }), /Ungültiger Name/);
+  assert.match(createAgent(s, { name: 'Recherche', role: 'Eine ausreichend lange Rollenbeschreibung hier.' }), /gibt es schon/);
+  assert.match(createAgent(s, { name: 'Mailer', role: 'Sendet Mails an Leute und antwortet kurz.', tools: ['external_action'] }), /nicht haben/);
+  assert.match(createAgent(s, { name: 'Kurz', role: 'kurz' }), /zu kurz/);
+  assert.match(createAgent(s, { name: 'Börsen-Beobachter', role: 'Beobachtet Aktienkurse per Websuche und fasst sie knapp zusammen.', tools: ['web_search'] }), /angelegt/);
+  assert.deepEqual(s.data.agents.map((a) => a.name), ['Börsen-Beobachter']);
+  assert.match(deleteAgent(s, 'recherche'), /nicht löschen/);
+  assert.match(deleteAgent(s, 'börsen-beobachter'), /gelöscht/);
+  for (let i = 0; i < 8; i++) createAgent(s, { name: 'Agent' + i, role: 'Eine ausreichend lange Rollenbeschreibung hier.' });
+  assert.match(createAgent(s, { name: 'Neunter', role: 'Eine ausreichend lange Rollenbeschreibung hier.' }), /8 eigene/);
+  assert.ok(!AGENT_TOOLS.some((t) => ['external_action', 'add_task', 'add_note', 'open_website', 'ask_agent', 'create_agent', 'set_reminder'].includes(t)));
+});
+
+test('Agenten: runAgent bekommt nur erlaubte Werkzeuge, führt Werkzeugaufrufe aus und gibt Text zurück', async () => {
+  const s = new Store(null); s.data.tasks.push({ id: 't1', text: 'Zahnarzt', done: false });
+  const bodies = [];
+  const fetchFn = async (url, o) => {
+    const body = JSON.parse(o.body); bodies.push(body);
+    if (bodies.length === 1) return { ok: true, status: 200, json: async () => ({ stop_reason: 'tool_use', content: [{ type: 'tool_use', id: 'u1', name: 'list_tasks', input: {} }, { type: 'tool_use', id: 'u2', name: 'add_task', input: { text: 'böse' } }] }) };
+    return { ok: true, status: 200, json: async () => ({ stop_reason: 'end_turn', content: [{ type: 'text', text: 'Plan: Zahnarzt um 9 Uhr.' }] }) };
+  };
+  const out = await runAgent({ store: s, name: 'Planer', task: 'Plane meinen Tag', apiKey: 'k', model: 'm', fetchFn });
+  assert.equal(out, 'Plan: Zahnarzt um 9 Uhr.');
+  assert.deepEqual(bodies[0].tools.map((t) => t.name).sort(), ['list_notes', 'list_tasks']);
+  assert.match(bodies[0].system, /Spezial-Agent „planer“/);
+  const results = bodies[1].messages.at(-1).content;
+  assert.match(results[0].content, /Zahnarzt/);
+  assert.match(results[1].content, /nicht benutzen/);
+  assert.equal(s.data.tasks.length, 1);
+  await assert.rejects(runAgent({ store: s, name: 'gibtsnicht', task: 'x', apiKey: 'k', model: 'm', fetchFn }), /Unbekannter Agent/);
+});
+
+test('Jarvis: ask_agent läuft über den Agent-Runner, Agenten-Werkzeuge werden angeboten', async () => {
+  const s = new Store(null);
+  const out = await runTool(s, 'ask_agent', { agent: 'recherche', task: 'Was ist X?' }, { agentRunner: async (a, t) => `[${a}] ${t}` });
+  assert.equal(out, '[recherche] Was ist X?');
+  assert.match(await runTool(s, 'ask_agent', { agent: 'nix', task: 'y' }, { agentRunner: async () => '' }), /Vorhanden: recherche/);
+  assert.match(await runTool(s, 'ask_agent', { agent: 'recherche', task: 'y' }), /nicht verfügbar/);
+  assert.match(await runTool(s, 'create_agent', { name: 'Kochbuch', role: 'Beantwortet Kochfragen kurz und nennt immer Zutaten.', tools: ['web_search'] }), /angelegt/);
+  assert.match(await runTool(s, 'list_agents', {}), /Kochbuch \(eigen\)/);
+  const names = (await import('../lib/tools.js')).toolDefinitions({}).map((t) => t.name);
+  for (const n of ['ask_agent', 'create_agent', 'list_agents', 'delete_agent']) assert.ok(names.includes(n));
+});
