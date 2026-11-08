@@ -597,9 +597,9 @@
   function onFirstGesture(ev) {
     try { if (window.Notification && Notification.permission === 'default') Notification.requestPermission(); } catch (e) {}
     // Klick auf Mikro/Orb startet das Hören selbst
-    if (ev && ev.target && (ev.target === micBtn || micBtn.contains(ev.target) || ev.target === orbCanvas)) return;
-    if (pendingGreet) { pendingGreet = false; armAfterSpeech = true; if (recognition && !listening) startListening(); speak(greetText()); }
-    else if (recognition && !listening) startListening();     // das automatische Hören ging nicht (z. B. Mikrofon noch nicht erlaubt)
+    const ownClick = !!(ev && ev.target && (ev.target === micBtn || micBtn.contains(ev.target) || ev.target === orbCanvas));   // Mikro/Orb starten das Hören selbst
+    if (pendingGreet) { pendingGreet = false; armAfterSpeech = true; if (recognition && !listening && !ownClick) startListening(); speak(greetText()); }   // der Klick schaltet den Ton frei: Begrüßung nachholen
+    else if (!ownClick && recognition && !listening) startListening();     // das automatische Hören ging nicht (z. B. Mikrofon noch nicht erlaubt)
   }
 
   async function boot(afterToken) {
