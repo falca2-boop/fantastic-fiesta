@@ -8,6 +8,7 @@
     "node": ">=20"
   },
   "scripts": {
+    "setup:mail": "node scripts/setup-mail.js",
     "start": "node server.js",
     "test": "node --test test/jarvis.test.js test/mail.test.js test/clap.test.js test/wake.test.js",
     "setup": "node scripts/setup.js"

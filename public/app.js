@@ -318,6 +318,11 @@
       const data = await api('/api/poll');
       renderState(data.state);
       data.fired.forEach(r => jarvisSay('Erinnerung: ' + r.text));
+      (data.mail || []).forEach((a) => {
+        const text = 'Wichtige Mail von ' + a.from + (a.subject ? ': ' + a.subject : '.');
+        jarvisSay(text);
+        if (window.Notification && Notification.permission === 'granted') { try { new Notification('JARVIS – Mail', { body: text }); } catch (e) {} }
+      });
       if (data.fired.length && window.Notification && Notification.permission === 'granted') {
         data.fired.forEach(r => { try { new Notification('JARVIS', { body: r.text }); } catch (e) {} });
       }

@@ -10,7 +10,7 @@ import { takeDueReminders } from './lib/tools.js';
 import { DEFAULT_GEMINI_MODEL } from './lib/gemini.js';
 import { loadEnvFile } from './lib/env.js';
 import { vaultDirFromEnv, recentNotes } from './lib/vault.js';
-import { mailConfigFromEnv, startMailWatcher } from './lib/mail.js';
+import { mailConfigFromEnv, startMailWatcher, takeMailAlerts } from './lib/mail.js';
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
 const PUBLIC_DIR = path.join(ROOT, 'public');
@@ -104,7 +104,7 @@ export function createServer(opts = {}) {
 
         if ((pathname === '/api/state' || pathname === '/api/poll') && req.method === 'GET') lastUi = Date.now();
         if (pathname === '/api/state' && req.method === 'GET') return json(res, 200, publicState());
-        if (pathname === '/api/poll' && req.method === 'GET') return json(res, 200, { fired: takeDueReminders(store).map(({ id, text }) => ({ id, text })), state: publicState() });
+        if (pathname === '/api/poll' && req.method === 'GET') return json(res, 200, { fired: takeDueReminders(store).map(({ id, text }) => ({ id, text })), mail: takeMailAlerts(store), state: publicState() });
 
         if (pathname === '/api/tasks/complete' && req.method === 'POST') {
           let body;
