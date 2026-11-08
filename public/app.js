@@ -61,6 +61,7 @@
   }
   const followMs = () => window.JARVIS_FOLLOW_MS || 15000;   // so lange gilt nach einer Antwort jede Äußerung als Folgefrage
   function keepListening() { armedUntil = Date.now() + followMs(); showHeard('Ich höre weiter zu – sag einfach etwas, oder „Hey Jarvis“.', 'wake'); }
+  window.__disarm = () => { armedUntil = 0; };     // nur für Tests: Folgefenster sofort schließen
   let armAfterSpeech = false;     // nach der Begrüßung sofort einen Befehl ohne "Hey Jarvis" annehmen
   function doneSpeaking() {
     setState(listening ? 'listening' : 'idle');
@@ -134,6 +135,28 @@
   }
 
   const hhmm = (d) => d.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+  // ---------- Aufklappbare Leisten (links Gespräch, rechts Übersicht) ----------
+  const drawerOpen = (id) => !!$(id) && $(id).classList.contains('open');
+  function setDrawer(id, open) {
+    const d = $(id), tab = $(id === 'drawerChat' ? 'tabChat' : 'tabSide'); if (!d || !tab) return;
+    d.classList.toggle('open', open); d.setAttribute('aria-hidden', String(!open)); tab.setAttribute('aria-expanded', String(open));
+    if (open && id === 'drawerChat') { unread = 0; $('chatBadge').hidden = true; dialog.scrollTop = dialog.scrollHeight; }
+    if (open) { const other = id === 'drawerChat' ? 'drawerSide' : 'drawerChat'; if (window.innerWidth <= 900 && drawerOpen(other)) setDrawer(other, false); }
+  }
+  let unread = 0;
+  function bumpUnread() { unread++; const b = $('chatBadge'); b.textContent = String(unread); b.hidden = false; }
+  // Letzte Antwort bleibt über der Kugel sichtbar, auch wenn das Gespräch eingeklappt ist
+  function showLiveReply(text) {
+    const plain = String(text).split('<<SPRICH>>')[0].replace(/^#+\s*/gm, '').replace(/\*\*/g, '').replace(/\s+/g, ' ').trim();
+    const el2 = $('liveReply'); if (el2) el2.textContent = plain.length > 240 ? plain.slice(0, 237) + ' …' : plain;
+  }
+  $('tabChat').addEventListener('click', () => setDrawer('drawerChat', true));
+  $('tabSide').addEventListener('click', () => setDrawer('drawerSide', true));
+  for (const x of document.querySelectorAll('[data-close]')) x.addEventListener('click', () => setDrawer(x.dataset.close, false));
+  $('liveReply').addEventListener('click', () => setDrawer('drawerChat', true));
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { setDrawer('drawerChat', false); setDrawer('drawerSide', false); } });
+  document.querySelector('.main').addEventListener('click', (e) => { if (e.target.closest('.suggest, .live-reply')) return; setDrawer('drawerChat', false); setDrawer('drawerSide', false); });
+
   // Chatverlauf bleibt über Neuladen erhalten (im Browser gespeichert, die letzten 60 Nachrichten)
   const CHAT_KEY = 'jarvis.chat';
   const loadChat = () => { try { return JSON.parse(localStorage.getItem(CHAT_KEY) || '[]'); } catch (e) { return []; } };
@@ -148,7 +171,11 @@
     meta.append(el('span', '', who === 'user' ? 'Du' : 'Jarvis'), el('span', '', stampText(ts)));
     m.append(meta, el('div', 'bubble', text));
     dialog.appendChild(m);
-    if (!interim && !o.restore) { if (window.Orb && window.Orb.burst) window.Orb.burst(who === 'user' ? 5 : 9); if (o.save !== false) saveChat({ who, text, ts }); }
+    if (!interim && !o.restore) {
+      if (window.Orb && window.Orb.burst) window.Orb.burst(who === 'user' ? 5 : 9);
+      if (o.save !== false) saveChat({ who, text, ts });
+      if (who === 'jarvis') { showLiveReply(text); if (o.save !== false && !drawerOpen('drawerChat')) bumpUnread(); }
+    }
     while (dialog.children.length > 60) dialog.removeChild(dialog.firstChild);
     dialog.scrollTop = dialog.scrollHeight;
     return { node: m.querySelector('.bubble'), remove: () => m.remove(), set textContent(t) { m.querySelector('.bubble').textContent = t; } };

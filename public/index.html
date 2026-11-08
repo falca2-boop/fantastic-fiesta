@@ -52,25 +52,33 @@
             <button type="button" data-q="Welche Notizen habe ich?">Meine Notizen</button>
             <button type="button" data-q="Was gibt es Neues in den Nachrichten?">Nachrichten</button>
           </div>
+          <div class="live-reply" id="liveReply" aria-live="polite"></div>
           <div class="heard" id="heard" aria-live="off"></div>
         </div>
       </section>
     </main>
 
-    <div class="dock" aria-label="Gespräch und Übersicht">
-      <section class="card chat" aria-label="Gespräch">
+    <!-- Unten in der Mitte: Eingabe und Mikrofon (immer sichtbar) -->
+    <form class="composer bar" id="composer" autocomplete="off">
+      <div class="field">
+    <input id="textInput" placeholder="Was soll ich für dich erledigen?" aria-label="Nachricht an Jarvis" />
+    <button class="icon-btn send" type="submit" title="Senden" aria-label="Senden"><svg class="i"><use href="#i-send"/></svg></button>
+      </div>
+      <button class="mic-btn" id="micBtn" type="button" title="Sprechen (oder sag „Hey Jarvis“)" aria-label="Mikrofon"><svg class="i" style="stroke-width:2"><use href="#i-mic"/></svg></button>
+    </form>
+
+    <!-- Links aufklappbar: Gespräch -->
+    <button class="tab tab-left" id="tabChat" type="button" aria-expanded="false" aria-controls="drawerChat"><svg class="i"><use href="#i-note"/></svg><span>Gespräch</span><b class="badge" id="chatBadge" hidden>0</b></button>
+    <section class="drawer drawer-left chat" id="drawerChat" aria-label="Gespräch" aria-hidden="true">
+      <div class="drawer-h"><span>Gespräch</span><button class="drawer-x" type="button" data-close="drawerChat" aria-label="Schließen">×</button></div>
         <div class="banner" id="banner" role="alert"></div>
         <div class="messages" id="dialog" aria-live="polite"></div>
-        <form class="composer" id="composer" autocomplete="off">
-          <div class="field">
-            <input id="textInput" placeholder="Was soll ich für dich erledigen?" aria-label="Nachricht an Jarvis" />
-            <button class="icon-btn send" type="submit" title="Senden" aria-label="Senden"><svg class="i"><use href="#i-send"/></svg></button>
-          </div>
-          <button class="mic-btn" id="micBtn" type="button" title="Sprechen (oder sag „Hey Jarvis“)" aria-label="Mikrofon"><svg class="i" style="stroke-width:2"><use href="#i-mic"/></svg></button>
-        </form>
-      </section>
+    </section>
 
-    <aside class="side" aria-label="Übersicht">
+    <!-- Rechts aufklappbar: Übersicht -->
+    <button class="tab tab-right" id="tabSide" type="button" aria-expanded="false" aria-controls="drawerSide"><svg class="i"><use href="#i-list"/></svg><span>Übersicht</span></button>
+    <aside class="drawer drawer-right side" id="drawerSide" aria-label="Übersicht" aria-hidden="true">
+      <div class="drawer-h"><span>Übersicht</span><button class="drawer-x" type="button" data-close="drawerSide" aria-label="Schließen">×</button></div>
       <section class="card" id="cardCost">
         <div class="card-h"><svg class="i"><use href="#i-bolt"/></svg>Kosten</div>
         <div class="card-b"><div class="usage" id="usageBox" aria-live="polite"></div></div>
@@ -106,7 +114,6 @@
         <div class="card-b"><div class="sys" id="sysBox"></div></div>
       </section>
     </aside>
-    </div>
   </div>
 
   <!-- Zugang -->

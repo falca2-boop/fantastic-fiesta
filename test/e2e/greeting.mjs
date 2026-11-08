@@ -13,7 +13,7 @@ const b = await chromium.launch();
 const out = [];
 const check = (n, ok, x = '') => out.push((ok ? 'OK   ' : 'FAIL ') + n + (x ? '  ' + x : ''));
 const mocks = (blocked) => `
-  window.__spoken = []; window.__recs = []; window.__blocked = ${blocked}; window.JARVIS_FOLLOW_MS = 1500;
+  window.__spoken = []; window.__recs = []; window.__blocked = ${blocked}; window.JARVIS_FOLLOW_MS = 15000;
   class SR { constructor() { window.__recs.push(this); this.starts = 0; } start() { this.starts++; this.running = true; this.onstart && this.onstart(); } stop() { this.running = false; setTimeout(() => this.onend && this.onend(), 0); } abort() { this.stop(); } }
   window.SpeechRecognition = window.webkitSpeechRecognition = SR;
   class U { constructor(t) { this.text = t; } }
@@ -36,6 +36,13 @@ try {
   await page.evaluate(() => { const r = window.__recs[0]; const res = [[{ transcript: 'Wie spät ist es' }]]; res[0].isFinal = true; r.onresult({ resultIndex: 0, results: res }); });
   await page.waitForTimeout(800);
   check('Der erste Befehl wird ohne "Hey Jarvis" angenommen', (await page.locator('.msg.user .bubble').allTextContents()).includes('Wie spät ist es'));
+  // Neues Layout: Orb fast bildschirmfüllend in der Mitte, Gespräch links und Übersicht rechts zum Aufklappen
+  const orbBox = await page.locator('#orb').boundingBox();
+  check('Orb-Kugel ist riesig: mindestens 70 % der Fensterhöhe', orbBox.height >= 0.7 * 800, JSON.stringify(orbBox));
+  check('Orb-Kugel liegt in der horizontalen Mitte', Math.abs((orbBox.x + orbBox.width / 2) - 640) < 6, String(orbBox.x + orbBox.width / 2));
+  check('Gespräch und Übersicht sind eingeklappt', !(await page.locator('#drawerChat.open').count()) && !(await page.locator('#drawerSide.open').count()) && (await page.locator('#drawerChat').isHidden()));
+  check('Eingabe und Mikrofon sind unten in der Mitte sichtbar', await page.locator('#composer').isVisible() && await page.locator('#micBtn').isVisible());
+  check('Die letzte Antwort steht über der Kugel, auch bei eingeklapptem Gespräch', (await page.locator('#liveReply').textContent()).length > 0 && await page.locator('#liveReply').isVisible());
   const sayNow = (t) => page.evaluate((t) => { const r = window.__recs[0]; const res = [[{ transcript: t }]]; res[0].isFinal = true; r.onresult({ resultIndex: 0, results: res }); }, t);
   await sayNow('Und morgen?'); await page.waitForTimeout(500);
   check('Nach einer Antwort geht das Gespräch weiter: Folgefrage ohne „Hey Jarvis“ wird angenommen', (await page.locator('.msg.user .bubble').allTextContents()).includes('Und morgen?'));
@@ -47,7 +54,7 @@ try {
   // Wake-Word: ohne "Jarvis" ignorieren, nur "Hey Jarvis" -> zuhören, danach Befehl; Variante mit Befehl im selben Satz
   const say = (t) => page.evaluate((t) => { const r = window.__recs[0]; const res = [[{ transcript: t }]]; res[0].isFinal = true; r.onresult({ resultIndex: 0, results: res }); }, t);
   await page.waitForTimeout(300);
-  await page.waitForTimeout(2800);
+  await page.evaluate(() => window.__disarm()); await page.waitForTimeout(300);
   const userCount = async () => (await page.locator('.msg.user .bubble').allTextContents());
   await say('Das Wetter ist schön'); await page.waitForTimeout(400);
   check('Sprache ohne "Jarvis" wird ignoriert', !(await userCount()).includes('Das Wetter ist schön'));
@@ -80,6 +87,17 @@ try {
   check('Chatverlauf bleibt nach dem Neuladen erhalten', (await page.locator('.chat-sep').count()) === 2 && (await page.locator('.msg.user .bubble').allTextContents()).includes('Wie spät ist es') && (await page.locator('.msg.user .bubble').allTextContents()).includes('Plane meinen Tag'));
   check('Wiederhergestellte Analyse bleibt formatiert', (await page.locator('.bubble.rich h4').count()) >= 1);
   check('Begrüßung wird nicht als Verlauf gespeichert (nur die neue)', (await page.locator('.msg.jarvis .bubble', { hasText: /^Hey Boss\.$/ }).count()) === 1);
+  await sayNow('Und jetzt?'); await page.waitForTimeout(1000);
+  check('Neue Antwort bei eingeklapptem Gespräch zeigt einen Zähler am linken Reiter', (await page.locator('#chatBadge').isVisible()) && Number(await page.locator('#chatBadge').textContent()) >= 1);
+  await page.click('#tabChat'); await page.waitForTimeout(500);
+  check('Linker Reiter klappt das Gespräch auf (Zähler weg)', (await page.locator('#drawerChat.open').count()) === 1 && (await page.locator('#drawerChat').isVisible()) && (await page.locator('#chatBadge').isHidden()) && (await page.locator('#tabChat').getAttribute('aria-expanded')) === 'true');
+  check('Aufgeklapptes Gespräch zeigt den Verlauf', (await page.locator('#drawerChat .msg.user .bubble').count()) >= 1);
+  await page.keyboard.press('Escape'); await page.waitForTimeout(500);
+  check('Escape klappt das Gespräch wieder ein', (await page.locator('#drawerChat.open').count()) === 0);
+  await page.click('#tabSide'); await page.waitForTimeout(500);
+  check('Rechter Reiter klappt die Übersicht mit den Kästchen auf', (await page.locator('#drawerSide.open').count()) === 1 && (await page.locator('#drawerSide #cardCost').isVisible()) && (await page.locator('#drawerSide #cardAgents').count()) === 1);
+  await page.click('#drawerSide .drawer-x'); await page.waitForTimeout(500);
+  check('Schließen-Knopf klappt die Übersicht ein', (await page.locator('#drawerSide.open').count()) === 0);
   check('Keine Seitenfehler (Fall 1)', errs.length === 0, errs.join('|'));
   await ctx.close();
 
