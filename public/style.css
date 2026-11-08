@@ -72,6 +72,8 @@ svg.i { width: 18px; height: 18px; stroke: currentColor; fill: none; stroke-widt
 
 .spacer { flex: 1; }
 
+a.chip { text-decoration: none; color: var(--text-2); }
+a.chip:hover { color: var(--text); border-color: var(--accent); }
 .chip {
   display: inline-flex; align-items: center; gap: 8px;
   padding: 7px 13px;

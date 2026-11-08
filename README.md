@@ -123,3 +123,15 @@ gesprochen, solange ein Tab offen ist, sonst beim nächsten Öffnen nachgeholt. 
 ## Obsidian-Plugin: Knowledge Universe
 
 Im Ordner [`obsidian-knowledge-universe/`](obsidian-knowledge-universe/README.md) liegt ein eigenständiges Obsidian-Plugin, das den Vault als 3D-Partikel-Universum darstellt (Three.js). Installation und Bedienung stehen dort.
+
+
+## Welt-Ansicht (Nachrichten, Livestream, Weltkugel)
+
+Im Kopf von Jarvis führt der Knopf **Welt** (oder „Hey Jarvis, zeig die Weltkugel“) zu `/welt.html`. Die Jarvis-Kugel auf der Startseite bleibt unverändert.
+
+- **Weltkugel** (realistische Erde, lokal mitgeliefert, drehbar, Region-Knöpfe Welt/Europa/Ukraine/Nahost): cyanfarbene Punkte sind Live-Cams, rote Punkte sind **Krisenmeldungen der letzten 24 Stunden** (GDELT, öffentlich, ohne Schlüssel, alle 10 Minuten aktualisiert). Klick auf einen Punkt zeigt Details und Quellen.
+- **Live-Cams:** Mit `YOUTUBE_API_KEY` (kostenlos) sucht Jarvis beim Klick automatisch ein **gerade laufendes, einbettbares** Live-Video zum Ort (Ergebnis 3 Stunden zwischengespeichert). Ohne Schlüssel öffnet der Knopf die YouTube-Live-Suche. Eigene Orte oder feste Cams: `public/world/cams.json` (`"youtube": "<Video-ID>"`).
+- **Livestream:** Euronews, DW, France 24, Sky News, Al Jazeera (offizielle YouTube-Live-Kanäle) oder ein eigener YouTube-Link.
+- **Schlagzeilen:** DW, Tagesschau, BBC World, Al Jazeera (RSS, alle 5 Minuten). Jarvis kann sie auch vorlesen: „Was gibt es Neues in der Ukraine?“
+
+Bibliotheken liegen unter `public/vendor/` (globe.gl, three.js, NASA-Texturen; MIT). Test: `node test/e2e/welt.mjs`.

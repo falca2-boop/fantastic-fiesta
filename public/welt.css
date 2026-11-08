@@ -1,0 +1,57 @@
+/* Welt-Ansicht. Nutzt die Farben aus style.css. Die Jarvis-Kugel auf der Startseite bleibt unberührt. */
+body.welt { overflow: hidden; }
+.w-top { display: flex; align-items: center; gap: 18px; padding: 12px 20px; height: 56px; border-bottom: 1px solid var(--border); background: rgba(2, 10, 14, 0.7); }
+.w-back { color: var(--accent-2); text-decoration: none; font-size: 0.9rem; padding: 6px 12px; border: 1px solid var(--border-strong); border-radius: 999px; }
+.w-back:hover { background: rgba(var(--accent-rgb), 0.1); }
+.w-title { font-weight: 700; letter-spacing: 0.3em; font-size: 0.95rem; }
+.w-status { font-weight: 400; letter-spacing: 0; font-size: 0.75rem; color: var(--muted); margin-left: 8px; }
+.w-regions { margin-left: auto; display: flex; gap: 6px; }
+.w-regions button { background: var(--surface); border: 1px solid var(--border); border-radius: 999px; padding: 6px 14px; font-size: 0.85rem; color: var(--text-2); }
+.w-regions button:hover, .w-regions button.on { border-color: var(--accent); color: var(--text); background: rgba(var(--accent-rgb), 0.12); }
+
+.w-main { display: grid; grid-template-columns: minmax(0, 1fr) 420px; gap: 14px; padding: 14px; height: calc(100vh - 56px); }
+.w-globe-card { position: relative; border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; background: #01060a; min-height: 0; }
+.w-globe { position: absolute; inset: 0; }
+.w-toggles { position: absolute; left: 14px; bottom: 14px; display: flex; flex-wrap: wrap; gap: 14px; padding: 8px 14px; background: rgba(2, 10, 14, 0.78); border: 1px solid var(--border); border-radius: 999px; font-size: 0.8rem; color: var(--text-2); }
+.w-toggles label { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
+.w-toggles .dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
+.dot.cam { background: #3df0ff; box-shadow: 0 0 8px #3df0ff; }
+.dot.ev { background: #ff5c5c; box-shadow: 0 0 8px #ff5c5c; }
+.w-fallback { position: absolute; inset: 0; display: grid; place-items: center; padding: 30px; text-align: center; color: var(--text-2); }
+.w-info { position: absolute; right: 14px; top: 14px; width: min(340px, 70%); max-height: calc(100% - 90px); overflow: auto; padding: 14px 16px; background: rgba(3, 14, 20, 0.92); border: 1px solid var(--border-strong); border-radius: 14px; font-size: 0.88rem; }
+.w-info h3 { font-size: 1rem; margin-bottom: 2px; }
+.w-info .sub { color: var(--muted); font-size: 0.78rem; margin-bottom: 8px; }
+.w-info a { color: var(--accent-2); display: block; margin: 5px 0; text-decoration: none; }
+.w-info a:hover { text-decoration: underline; }
+.w-info .x { float: right; background: none; border: 0; color: var(--muted); font-size: 1.1rem; }
+.w-info iframe { width: 100%; aspect-ratio: 16 / 9; border: 0; border-radius: 10px; margin: 8px 0; background: #000; }
+
+.w-side { display: flex; flex-direction: column; gap: 14px; min-height: 0; }
+.w-card { border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); padding: 12px; min-height: 0; }
+.w-card-h { font-size: 0.72rem; letter-spacing: 0.16em; text-transform: uppercase; color: var(--accent); margin-bottom: 8px; }
+.w-tabs { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+.w-tabs button { background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px; padding: 4px 10px; font-size: 0.78rem; color: var(--text-2); }
+.w-tabs button.on { border-color: var(--accent); color: var(--text); }
+.w-video { aspect-ratio: 16 / 9; background: #000; border-radius: 10px; overflow: hidden; }
+.w-video iframe { width: 100%; height: 100%; border: 0; display: block; }
+.w-video-foot { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; font-size: 0.8rem; }
+.w-video-foot a { color: var(--accent-2); }
+.w-custom { display: flex; gap: 6px; }
+.w-custom input { flex: 1; min-width: 0; background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px; padding: 6px 10px; font-size: 0.8rem; }
+.w-custom button { background: rgba(var(--accent-rgb), 0.15); border: 1px solid var(--border-strong); border-radius: 8px; padding: 6px 12px; font-size: 0.8rem; }
+.w-news { flex: 1; overflow: hidden; display: flex; flex-direction: column; }
+.w-list { list-style: none; overflow: auto; flex: 1; }
+.w-list li { padding: 7px 0; border-top: 1px solid var(--border); font-size: 0.85rem; line-height: 1.35; }
+.w-list li:first-child { border-top: 0; }
+.w-list a { color: var(--text); text-decoration: none; }
+.w-list a:hover { color: var(--accent-2); }
+.w-list .src { display: block; color: var(--muted); font-size: 0.72rem; margin-top: 2px; }
+
+@media (max-width: 980px) {
+  body.welt { overflow: auto; }
+  .w-main { grid-template-columns: 1fr; height: auto; }
+  .w-globe-card { height: 60vh; }
+  .w-top { flex-wrap: wrap; height: auto; }
+  .w-regions { margin-left: 0; }
+}
+.w-fallback[hidden], .w-info[hidden] { display: none; }

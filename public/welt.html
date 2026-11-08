@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#02080c" />
+  <title>JARVIS – Welt</title>
+  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="welt.css" />
+</head>
+<body class="welt">
+  <header class="w-top">
+    <a class="w-back" href="/" title="Zurück zu Jarvis">← Jarvis</a>
+    <div class="w-title">WELT <span id="wStatus" class="w-status" role="status" aria-live="polite">lädt …</span></div>
+    <nav class="w-regions" aria-label="Region">
+      <button type="button" data-region="welt">Welt</button>
+      <button type="button" data-region="europa" class="on">Europa</button>
+      <button type="button" data-region="ukraine">Ukraine</button>
+      <button type="button" data-region="nahost">Nahost</button>
+    </nav>
+  </header>
+
+  <main class="w-main">
+    <section class="w-globe-card" aria-label="Weltkugel">
+      <div id="globe" class="w-globe"></div>
+      <div class="w-toggles">
+        <label><input type="checkbox" id="tCams" checked /> <span class="dot cam"></span> Live-Cams</label>
+        <label><input type="checkbox" id="tEvents" checked /> <span class="dot ev"></span> Krisenmeldungen (24 h)</label>
+        <label><input type="checkbox" id="tSpin" checked /> Drehen</label>
+      </div>
+      <div class="w-fallback" id="wFallback" hidden></div>
+      <aside class="w-info" id="wInfo" aria-live="polite" hidden></aside>
+    </section>
+
+    <aside class="w-side">
+      <section class="w-card" aria-label="Nachrichten-Livestream">
+        <div class="w-card-h">Livestream Nachrichten</div>
+        <div class="w-tabs" id="wTabs" role="tablist"></div>
+        <div class="w-video" id="wVideo"></div>
+        <div class="w-video-foot">
+          <a id="wOpenYt" href="#" target="_blank" rel="noopener noreferrer">In YouTube öffnen</a>
+          <form id="wCustom" class="w-custom" autocomplete="off">
+            <input id="wCustomUrl" placeholder="Eigenen YouTube-Link einfügen" aria-label="Eigener YouTube-Link" />
+            <button type="submit">Abspielen</button>
+          </form>
+        </div>
+      </section>
+
+      <section class="w-card w-news" aria-label="Schlagzeilen">
+        <div class="w-card-h">Schlagzeilen <span id="wNewsAge" class="w-status"></span></div>
+        <ul id="wNews" class="w-list"></ul>
+      </section>
+    </aside>
+  </main>
+
+  <script src="vendor/globe.gl.min.js"></script>
+  <script src="welt.js"></script>
+</body>
+</html>

@@ -1,0 +1,125 @@
+{
+ "hinweis": "Live-Cams werden automatisch gesucht (YouTube-Daten-API, braucht YOUTUBE_API_KEY in der .env). Eigene feste Cam: \"youtube\": \"<Video-ID>\" eintragen. Ohne Gewähr, Cams können offline sein.",
+ "cams": [
+  {
+   "name": "Berlin",
+   "land": "Deutschland",
+   "lat": 52.52,
+   "lng": 13.405,
+   "art": "city",
+   "suche": "https://www.youtube.com/results?search_query=Berlin%20live%20cam&sp=EgJAAQ%3D%3D",
+   "youtube": "",
+   "suchtext": "Berlin live webcam"
+  },
+  {
+   "name": "Paris",
+   "land": "Frankreich",
+   "lat": 48.857,
+   "lng": 2.352,
+   "art": "city",
+   "suche": "https://www.youtube.com/results?search_query=Paris%20live%20cam&sp=EgJAAQ%3D%3D",
+   "youtube": "",
+   "suchtext": "Paris live webcam"
+  },
+  {
+   "name": "London",
+   "land": "Großbritannien",
+   "lat": 51.507,
+   "lng": -0.128,
+   "art": "city",
+   "suche": "https://www.youtube.com/results?search_query=London%20live%20cam&sp=EgJAAQ%3D%3D",
+   "youtube": "",
+   "suchtext": "London live webcam"
+  },
+  {
+   "name": "Rom",
+   "land": "Italien",
+   "lat": 41.903,
+   "lng": 12.496,
+   "art": "city",
+   "suche": "https://www.youtube.com/results?search_query=Rom%20live%20cam&sp=EgJAAQ%3D%3D",
+   "youtube": "",
+   "suchtext": "Rom live webcam"
+  },
+  {
+   "name": "Wien",
+   "land": "Österreich",
+   "lat": 48.208,
+   "lng": 16.373,
+   "art": "city",
+   "suche": "https://www.youtube.com/results?search_query=Wien%20live%20cam&sp=EgJAAQ%3D%3D",
+   "youtube": "",
+   "suchtext": "Wien live webcam"
+  },
+  {
+   "name": "Warschau",
+   "land": "Polen",
+   "lat": 52.23,
+   "lng": 21.012,
+   "art": "city",
+   "suche": "https://www.youtube.com/results?search_query=Warschau%20live%20cam&sp=EgJAAQ%3D%3D",
+   "youtube": "",
+   "suchtext": "Warschau live webcam"
+  },
+  {
+   "name": "Istanbul",
+   "land": "Türkei",
+   "lat": 41.009,
+   "lng": 28.978,
+   "art": "city",
+   "suche": "https://www.youtube.com/results?search_query=Istanbul%20live%20cam&sp=EgJAAQ%3D%3D",
+   "youtube": "",
+   "suchtext": "Istanbul live webcam"
+  },
+  {
+   "name": "Kyjiw",
+   "land": "Ukraine",
+   "lat": 50.45,
+   "lng": 30.523,
+   "art": "krise",
+   "suche": "https://www.youtube.com/results?search_query=Kyjiw%20live%20cam&sp=EgJAAQ%3D%3D",
+   "youtube": "",
+   "suchtext": "Kyjiw live webcam"
+  },
+  {
+   "name": "Odesa",
+   "land": "Ukraine",
+   "lat": 46.482,
+   "lng": 30.723,
+   "art": "krise",
+   "suche": "https://www.youtube.com/results?search_query=Odesa%20live%20cam&sp=EgJAAQ%3D%3D",
+   "youtube": "",
+   "suchtext": "Odesa live webcam"
+  },
+  {
+   "name": "Charkiw",
+   "land": "Ukraine",
+   "lat": 49.994,
+   "lng": 36.231,
+   "art": "krise",
+   "suche": "https://www.youtube.com/results?search_query=Charkiw%20live%20cam&sp=EgJAAQ%3D%3D",
+   "youtube": "",
+   "suchtext": "Charkiw live webcam"
+  },
+  {
+   "name": "Jerusalem",
+   "land": "Israel",
+   "lat": 31.768,
+   "lng": 35.214,
+   "art": "krise",
+   "suche": "https://www.youtube.com/results?search_query=Jerusalem%20live%20cam&sp=EgJAAQ%3D%3D",
+   "youtube": "",
+   "suchtext": "Jerusalem live webcam"
+  },
+  {
+   "name": "Tel Aviv",
+   "land": "Israel",
+   "lat": 32.085,
+   "lng": 34.782,
+   "art": "krise",
+   "suche": "https://www.youtube.com/results?search_query=Tel%20Aviv%20live%20cam&sp=EgJAAQ%3D%3D",
+   "youtube": "",
+   "suchtext": "Tel Aviv live webcam"
+  }
+ ]
+}

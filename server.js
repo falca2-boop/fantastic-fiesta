@@ -10,11 +10,12 @@ import { takeDueReminders } from './lib/tools.js';
 import { DEFAULT_GEMINI_MODEL } from './lib/gemini.js';
 import { loadEnvFile } from './lib/env.js';
 import { vaultDirFromEnv, recentNotes } from './lib/vault.js';
+import { loadNews, loadEvents, findLiveCam } from './lib/world.js';
 import { mailConfigFromEnv, startMailWatcher, takeMailAlerts } from './lib/mail.js';
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
 const PUBLIC_DIR = path.join(ROOT, 'public');
-const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml', '.ico': 'image/x-icon' };
+const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml', '.ico': 'image/x-icon', '.json': 'application/json; charset=utf-8', '.jpg': 'image/jpeg', '.png': 'image/png' };
 
 const isLoopback = (h) => ['127.0.0.1', '::1', 'localhost'].includes(h);
 
@@ -30,6 +31,8 @@ export function createServer(opts = {}) {
     address: opts.address ?? env.JARVIS_ADDRESS ?? '',
     webhookUrl: opts.webhookUrl ?? env.N8N_WEBHOOK_URL ?? '',
     fetchFn: opts.fetchFn ?? fetch,
+    baseUrl: opts.baseUrl ?? '',
+    youtubeKey: opts.youtubeKey ?? env.YOUTUBE_API_KEY ?? '',
     mail: opts.mail === undefined ? mailConfigFromEnv(env) : opts.mail,
     voice: opts.voice === undefined
       ? (env.ELEVENLABS_API_KEY && env.ELEVENLABS_VOICE_ID
@@ -88,7 +91,7 @@ export function createServer(opts = {}) {
     if (file !== PUBLIC_DIR && !file.startsWith(PUBLIC_DIR + path.sep)) { res.writeHead(403); return res.end('Forbidden'); }
     fs.readFile(file, (err, buf) => {
       if (err) { res.writeHead(404); return res.end('Not found'); }
-      res.writeHead(200, { 'Content-Type': MIME[path.extname(file)] || 'application/octet-stream', 'Cache-Control': 'no-cache' });
+      res.writeHead(200, { 'Content-Type': MIME[path.extname(file)] || 'application/octet-stream', 'Cache-Control': file.includes(path.sep + 'vendor' + path.sep) ? 'public, max-age=604800' : 'no-cache' });
       res.end(buf);
     });
   };
@@ -97,13 +100,32 @@ export function createServer(opts = {}) {
     try {
       const { pathname } = new URL(req.url, 'http://localhost');
 
-      if (pathname === '/api/health') return json(res, 200, { ok: true, tokenRequired: !!cfg.token, keyConfigured: !!cfg.apiKey, provider: cfg.provider, uiActive: uiActive(), mailWatch: !!cfg.mail, voice: !!cfg.voice, obsidian: !!store.vaultDir, tools: toolDefinitions({ webhookEnabled: !!cfg.webhookUrl, mailEnabled: !!cfg.mail, obsidianEnabled: !!store.vaultDir }).map(t => t.name), pid: process.pid });
+      if (pathname === '/api/health') return json(res, 200, { ok: true, tokenRequired: !!cfg.token, keyConfigured: !!cfg.apiKey, provider: cfg.provider, uiActive: uiActive(), mailWatch: !!cfg.mail, voice: !!cfg.voice, obsidian: !!store.vaultDir, liveCams: !!cfg.youtubeKey, tools: toolDefinitions({ webhookEnabled: !!cfg.webhookUrl, mailEnabled: !!cfg.mail, obsidianEnabled: !!store.vaultDir }).map(t => t.name), pid: process.pid });
 
       if (pathname.startsWith('/api/')) {
         if (!authorized(req)) return json(res, 401, { error: 'Zugangs-Token fehlt oder ist falsch.' });
 
         if ((pathname === '/api/state' || pathname === '/api/poll') && req.method === 'GET') lastUi = Date.now();
         if (pathname === '/api/state' && req.method === 'GET') return json(res, 200, publicState());
+        if (pathname === '/api/world/news' && req.method === 'GET') {
+          try { return json(res, 200, { items: await loadNews(cfg.fetchFn) }); } catch (e) { return json(res, 502, { error: e.message }); }
+        }
+        if (pathname === '/api/world/events' && req.method === 'GET') {
+          try { return json(res, 200, { points: await loadEvents(cfg.fetchFn) }); } catch (e) { return json(res, 502, { error: 'Krisenmeldungen gerade nicht erreichbar.' }); }
+        }
+        if (pathname === '/api/world/cam' && req.method === 'GET') {
+          // Nur Cams aus world/cams.json (kein freier Suchtext, schützt das YouTube-Kontingent)
+          const name = new URL(req.url, 'http://localhost').searchParams.get('name') || '';
+          let list = []; try { list = JSON.parse(fs.readFileSync(path.join(PUBLIC_DIR, 'world', 'cams.json'), 'utf8')).cams || []; } catch (e) { /* leer */ }
+          const cam = list.find((c) => c.name === name);
+          if (!cam) return json(res, 404, { error: 'Unbekannte Cam.' });
+          try {
+            const found = await findLiveCam({ query: cam.suchtext || cam.name + ' live cam', key: cfg.youtubeKey, fetchFn: cfg.fetchFn });
+            return json(res, 200, { live: found });
+          } catch (e) {
+            return json(res, e.code === 'nokey' ? 200 : 502, { live: null, error: e.code === 'nokey' ? 'nokey' : 'YouTube gerade nicht erreichbar: ' + e.message });
+          }
+        }
         if (pathname === '/api/poll' && req.method === 'GET') return json(res, 200, { fired: takeDueReminders(store).map(({ id, text }) => ({ id, text })), mail: takeMailAlerts(store), state: publicState() });
 
         if (pathname === '/api/tasks/complete' && req.method === 'POST') {
@@ -121,7 +143,7 @@ export function createServer(opts = {}) {
           const message = typeof body.message === 'string' ? body.message.trim() : '';
           if (!message || message.length > 4000) return json(res, 400, { error: 'Nachricht fehlt oder ist zu lang.' });
           const offsetMinutes = Number.isFinite(body.offsetMinutes) ? Math.max(-840, Math.min(840, body.offsetMinutes)) : 0;
-          const reply = await enqueue(() => chat({ store, message, offsetMinutes, apiKey: cfg.apiKey, model: cfg.model, provider: cfg.provider, userName: cfg.userName, address: cfg.address, webhookUrl: cfg.webhookUrl, mailEnabled: !!cfg.mail, fetchFn: cfg.fetchFn }));
+          const reply = await enqueue(() => chat({ store, message, offsetMinutes, apiKey: cfg.apiKey, model: cfg.model, provider: cfg.provider, userName: cfg.userName, address: cfg.address, webhookUrl: cfg.webhookUrl, mailEnabled: !!cfg.mail, baseUrl: cfg.baseUrl, fetchFn: cfg.fetchFn }));
           return json(res, 200, { reply, state: publicState() });
         }
         if (pathname === '/api/speak' && req.method === 'POST') {
@@ -165,7 +187,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   loadEnvFile(path.join(ROOT, '.env'));
   const host = process.env.HOST || '127.0.0.1';
   const port = Number(process.env.PORT) || 8000;
-  const { server, cfg, store } = createServer();
+  const { server, cfg, store } = createServer({ baseUrl: `http://${host === '0.0.0.0' ? '127.0.0.1' : host}:${port}` });
   if (!isLoopback(host) && !cfg.token) {
     console.error('Abbruch: Der Server ist von außen erreichbar (HOST=' + host + '), aber JARVIS_TOKEN ist nicht gesetzt.');
     process.exit(1);
