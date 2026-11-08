@@ -66,6 +66,10 @@ npm start                # → http://127.0.0.1:8000 in Chrome oder Edge
 
 Das Mikrofon funktioniert auf `localhost` und über `https://`.
 
+## Ein Klick statt Befehle (Linux/Chromebook)
+
+`bash scripts/install-launcher.sh` legt ein **Jarvis**-Symbol im Startmenü an (Linux-Apps). Ein Klick startet Jarvis, falls er nicht läuft, und öffnet ihn im Browser (Port 8001). Der Key und alle Einstellungen kommen aus der `.env`. Im Terminal gehen auch `jarvis-start` und `jarvis-stop`.
+
 ## Im Netz betreiben (z. B. Render, Railway, Fly.io)
 
 Der Server braucht einen dauerhaft laufenden Node-Prozess, deshalb reicht Vercel/GitHub Pages nicht.
