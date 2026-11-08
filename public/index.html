@@ -5,285 +5,269 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>JARVIS</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Anton&family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
   <style>
     :root {
-      --accent: #38d9ff;
-      --accent-dim: #1a6b8f;
-      --bg: #04070d;
+      --accent: #7fb2ff;
+      --accent-2: #38d9ff;
+      --bg: #05070c;
+      --panel: rgba(18, 24, 36, 0.62);
+      --line: rgba(160, 190, 235, 0.16);
+      --text: #e8eef8;
+      --dim: #8a97ab;
+      --mute: #566277;
       --danger: #ff5c7a;
-      --ok: #55ffa8;
+      --font-display: "Anton", "Bebas Neue", "Arial Narrow", Impact, sans-serif;
+      --font-body: "Inter", "Segoe UI", system-ui, sans-serif;
+      --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
     }
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    html, body {
-      height: 100%;
-      background: var(--bg);
-      color: #cfe9ff;
-      font-family: "Segoe UI", "Helvetica Neue", system-ui, sans-serif;
-      overflow: hidden;
-    }
+    html, body { height: 100%; background: var(--bg); color: var(--text); font-family: var(--font-body); overflow: hidden; }
     body {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
       background:
-        radial-gradient(circle at 50% 40%, rgba(56,217,255,0.08), transparent 60%),
-        radial-gradient(circle at 50% 120%, rgba(56,217,255,0.10), transparent 55%),
+        radial-gradient(ellipse at 50% 45%, rgba(70, 110, 190, 0.14), transparent 60%),
         var(--bg);
     }
-    /* subtle grid */
-    body::before {
-      content: "";
-      position: fixed;
-      inset: 0;
-      background-image:
-        linear-gradient(rgba(56,217,255,0.04) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(56,217,255,0.04) 1px, transparent 1px);
-      background-size: 46px 46px;
-      mask-image: radial-gradient(circle at 50% 45%, black, transparent 75%);
-      pointer-events: none;
+    canvas#stars { position: fixed; inset: 0; width: 100%; height: 100%; z-index: 0; pointer-events: none; }
+
+    /* ---------- Top bar ---------- */
+    .topbar {
+      position: fixed; top: 0; left: 0; right: 0; height: 44px; z-index: 5;
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0 28px; border-bottom: 1px solid var(--line);
+      font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.28em; text-transform: uppercase; color: var(--dim);
+    }
+    .topbar .brand { color: var(--text); }
+    .topbar .state { color: var(--accent); }
+
+    /* ---------- Layout ---------- */
+    .layout {
+      position: fixed; inset: 44px 0 0 0; z-index: 2;
+      display: grid; grid-template-columns: minmax(280px, 1fr) minmax(0, 1.5fr) minmax(300px, 440px);
+      align-items: stretch;
+    }
+    .col-left { padding: 40px 28px 150px 60px; display: flex; flex-direction: column; justify-content: center; gap: 22px; min-width: 0; }
+    .col-right { padding: 24px 28px 150px 24px; border-left: 1px solid var(--line); display: flex; flex-direction: column; gap: 14px; overflow-y: auto; scrollbar-width: none; }
+    .col-right::-webkit-scrollbar { display: none; }
+
+    .eyebrow { font-size: 14px; line-height: 1.55; color: var(--dim); max-width: 420px; }
+    .eyebrow::before { content: ""; display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: #fff; margin-right: 12px; box-shadow: 0 0 8px #fff; vertical-align: middle; }
+    h1 { font-family: var(--font-display); font-weight: 400; text-transform: uppercase; font-size: clamp(44px, 6.2vw, 96px); line-height: 0.96; letter-spacing: 0.005em; }
+    h1 .dim { color: rgba(232, 238, 248, 0.45); display: block; }
+    .lead { font-size: 18px; line-height: 1.6; color: var(--dim); font-weight: 300; max-width: 440px; }
+    .lead strong { color: var(--text); font-weight: 500; }
+
+    .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+    .chip { font-size: 12px; color: var(--dim); border: 1px solid var(--line); border-radius: 999px; padding: 5px 12px; background: rgba(255,255,255,0.02); }
+    .chip b { color: var(--text); font-weight: 500; }
+
+    .goal-line { font-size: 14px; color: var(--dim); max-width: 440px; display: none; }
+    .goal-line.show { display: block; }
+    .goal-line .lbl { font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.3em; text-transform: uppercase; color: var(--mute); display: block; margin-bottom: 4px; }
+    .goal-line strong { color: var(--text); font-weight: 500; }
+
+    /* ---------- Orb stage ---------- */
+    .col-center { position: relative; display: flex; align-items: center; justify-content: center; min-width: 0; padding-bottom: 90px; }
+    .stage { position: relative; width: min(100%, 68vh, 760px); aspect-ratio: 1; }
+    canvas#orb { width: 100%; height: 100%; cursor: pointer; display: block; }
+    .wordmark {
+      position: absolute; left: 0; right: 0; bottom: -6px; text-align: center; pointer-events: none;
+      font-family: var(--font-display); font-size: clamp(34px, 5vw, 76px); letter-spacing: 0.22em; color: rgba(232,238,248,0.92); line-height: 1;
+      text-shadow: 0 0 30px rgba(127,178,255,0.35);
     }
 
-    .stage {
-      position: relative;
-      width: min(70vw, 70vh, 560px);
-      aspect-ratio: 1;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      z-index: 2;
+    /* ---------- Widgets ---------- */
+    .card {
+      position: relative; background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 16px 18px;
+      backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
     }
-    canvas#orb {
-      width: 100%;
-      height: 100%;
-      cursor: pointer;
-      filter: drop-shadow(0 0 40px rgba(56,217,255,0.35));
-    }
+    .card .lbl { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.3em; text-transform: uppercase; color: var(--dim); }
+    .card .row { display: flex; justify-content: space-between; align-items: baseline; }
+    .card .count { font-family: var(--font-mono); font-size: 12px; letter-spacing: 0.15em; color: var(--dim); }
+    .big { font-family: var(--font-display); font-size: 54px; line-height: 1; margin-top: 8px; }
+    .big small { font-family: var(--font-mono); font-size: 14px; color: var(--accent); margin-left: 4px; }
+    .big .of { font-size: 22px; color: var(--mute); font-family: var(--font-display); }
+    .card.hero { border-radius: 4px; }
+    .card.hero::before, .card.hero::after { content: ""; position: absolute; width: 14px; height: 14px; border: 1px solid var(--accent); opacity: .7; }
+    .card.hero::before { top: -1px; left: -1px; border-right: 0; border-bottom: 0; }
+    .card.hero::after { bottom: -1px; right: -1px; border-left: 0; border-top: 0; }
 
-    .hud-top {
-      position: fixed;
-      top: 28px;
-      left: 0; right: 0;
-      text-align: center;
-      z-index: 3;
-      pointer-events: none;
-    }
-    .hud-top .brand {
-      font-size: 13px;
-      letter-spacing: 8px;
-      color: var(--accent);
-      opacity: 0.8;
-    }
-    .state-label {
-      margin-top: 6px;
-      font-size: 12px;
-      letter-spacing: 3px;
-      text-transform: uppercase;
-      color: #6f8aa0;
-      min-height: 16px;
-    }
+    .bar { display: flex; gap: 3px; margin-top: 14px; height: 22px; }
+    .bar i { flex: 1; border-radius: 2px; background: rgba(255,255,255,0.06); transition: background .5s, box-shadow .5s; }
+    .bar i.on { background: linear-gradient(180deg, #c6dcff, #6f9fe8); box-shadow: 0 0 10px rgba(127,178,255,0.35); }
+    .scale { display: flex; justify-content: space-between; margin-top: 8px; font-family: var(--font-mono); font-size: 11px; color: var(--mute); }
 
-    /* Goal panel */
-    .goal-panel {
-      position: fixed;
-      top: 90px;
-      left: 50%;
-      transform: translateX(-50%);
-      z-index: 3;
-      background: rgba(8,18,28,0.55);
-      border: 1px solid rgba(56,217,255,0.25);
-      border-radius: 14px;
-      padding: 12px 22px;
-      backdrop-filter: blur(8px);
-      text-align: center;
-      max-width: 90vw;
-      opacity: 0;
-      transition: opacity .4s;
-    }
-    .goal-panel.show { opacity: 1; }
-    .goal-panel .lbl {
-      font-size: 10px; letter-spacing: 3px; color: #5f7a90; text-transform: uppercase;
-    }
-    .goal-panel .goal-text {
-      margin-top: 4px; font-size: 18px; color: #eafaff;
-    }
-    .goal-panel .goal-amount { color: var(--accent); font-weight: 600; }
+    .plan { display: flex; gap: 16px; align-items: center; margin-top: 12px; }
+    .ring { position: relative; width: 84px; height: 84px; flex: none; }
+    .ring svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+    .ring .track { stroke: rgba(255,255,255,0.08); }
+    .ring .fill { stroke: var(--accent); transition: stroke-dashoffset .8s ease; filter: drop-shadow(0 0 4px rgba(127,178,255,.6)); }
+    .ring .num { position: absolute; inset: 0; display: grid; place-items: center; font-family: var(--font-display); font-size: 26px; }
+    .ring .num small { font-family: var(--font-mono); font-size: 11px; color: var(--mute); margin-left: 2px; align-self: end; padding-bottom: 28px; }
+    .plan ul { list-style: none; display: flex; flex-direction: column; gap: 10px; flex: 1; min-width: 0; }
+    .plan li { display: flex; gap: 12px; align-items: center; font-size: 14px; min-width: 0; }
+    .plan li .dot { width: 20px; height: 20px; border-radius: 50%; border: 1.5px solid rgba(255,255,255,0.35); flex: none; }
+    .plan li time { font-family: var(--font-mono); font-size: 12px; color: var(--dim); flex: none; }
+    .plan li span.t { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .empty { font-size: 13px; color: var(--mute); }
 
-    .side-panel { position: fixed; top: 90px; right: 24px; z-index: 3; width: min(300px, 40vw); display: none; flex-direction: column; gap: 6px; }
-    .side-panel.show { display: flex; }
-    .side-panel .lbl { font-size: 10px; letter-spacing: 3px; color: #5f7a90; text-transform: uppercase; margin-top: 8px; }
-    .side-panel .item { font-size: 13px; color: #bfe3f5; background: rgba(10,22,34,0.6); border: 1px solid rgba(56,217,255,0.14); border-radius: 8px; padding: 6px 10px; }
+    .two { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    .days { display: flex; justify-content: space-between; margin-top: 14px; font-family: var(--font-mono); font-size: 10px; color: var(--mute); }
+    .days div { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+    .days .d { width: 12px; height: 12px; border-radius: 50%; border: 1.5px solid rgba(255,255,255,0.3); }
+    .days .d.on { background: #fff; border-color: #fff; box-shadow: 0 0 8px rgba(255,255,255,0.5); }
+    .days .today { color: var(--text); }
 
-    /* Transcript / dialog */
+    .goal-card .title { font-size: 17px; font-weight: 500; margin-top: 10px; line-height: 1.35; }
+    .goal-card .sub { font-size: 13px; color: var(--dim); margin-top: 4px; }
+
+    /* ---------- Dialog + controls ---------- */
     .dialog {
-      position: fixed;
-      bottom: 130px;
-      left: 50%;
-      transform: translateX(-50%);
-      width: min(760px, 90vw);
-      z-index: 3;
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-      max-height: 34vh;
-      overflow: hidden;
-      -webkit-mask-image: linear-gradient(transparent, black 22%);
-      mask-image: linear-gradient(transparent, black 22%);
+      position: fixed; bottom: 118px; left: 60px; width: min(560px, 34vw); z-index: 4;
+      display: flex; flex-direction: column; gap: 8px; max-height: 30vh; overflow: hidden;
+      -webkit-mask-image: linear-gradient(transparent, black 25%); mask-image: linear-gradient(transparent, black 25%);
+      pointer-events: none;
     }
-    .bubble {
-      align-self: flex-start;
-      max-width: 85%;
-      padding: 10px 16px;
-      border-radius: 14px;
-      font-size: 15px;
-      line-height: 1.45;
-      animation: rise .35s ease both;
-    }
-    .bubble.user {
-      align-self: flex-end;
-      background: rgba(56,217,255,0.14);
-      border: 1px solid rgba(56,217,255,0.3);
-      color: #eafaff;
-    }
-    .bubble.jarvis {
-      background: rgba(10,22,34,0.7);
-      border: 1px solid rgba(56,217,255,0.16);
-      color: #bfe3f5;
-    }
+    .bubble { align-self: flex-start; max-width: 92%; padding: 9px 14px; border-radius: 12px; font-size: 14px; line-height: 1.45; animation: rise .35s ease both; }
+    .bubble.user { background: rgba(127,178,255,0.14); border: 1px solid rgba(127,178,255,0.3); }
+    .bubble.jarvis { background: var(--panel); border: 1px solid var(--line); color: #cdd8ea; }
     .bubble.interim { opacity: .55; font-style: italic; }
-    @keyframes rise { from { opacity: 0; transform: translateY(12px);} to {opacity:1; transform:none;} }
+    @keyframes rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
 
-    /* Controls */
     .controls {
-      position: fixed;
-      bottom: 42px;
-      left: 50%;
-      transform: translateX(-50%);
-      z-index: 4;
-      display: flex;
-      align-items: center;
-      gap: 18px;
+      position: fixed; bottom: 36px; left: 50%; transform: translateX(-50%); z-index: 6;
+      display: flex; align-items: center; gap: 14px;
     }
     .mic-btn {
-      width: 68px; height: 68px;
-      border-radius: 50%;
-      border: 1px solid rgba(56,217,255,0.4);
-      background: rgba(10,26,38,0.8);
-      color: var(--accent);
-      cursor: pointer;
-      display: grid; place-items: center;
-      transition: all .2s;
-      position: relative;
+      width: 64px; height: 64px; border-radius: 50%; border: 1px solid rgba(127,178,255,0.45);
+      background: rgba(14, 22, 36, 0.85); color: var(--accent); cursor: pointer; display: grid; place-items: center; transition: all .2s;
     }
-    .mic-btn:hover { background: rgba(20,44,60,0.9); }
-    .mic-btn.active {
-      background: var(--accent);
-      color: #04121a;
-      box-shadow: 0 0 0 0 rgba(56,217,255,0.6);
-      animation: micpulse 1.6s infinite;
-    }
-    @keyframes micpulse {
-      0% { box-shadow: 0 0 0 0 rgba(56,217,255,0.55); }
-      100% { box-shadow: 0 0 0 22px rgba(56,217,255,0); }
-    }
-    .mic-btn svg { width: 28px; height: 28px; }
+    .mic-btn:hover { background: rgba(24, 38, 60, 0.95); }
+    .mic-btn.active { background: var(--accent); color: #04101f; animation: micpulse 1.6s infinite; }
+    @keyframes micpulse { 0% { box-shadow: 0 0 0 0 rgba(127,178,255,0.55); } 100% { box-shadow: 0 0 0 22px rgba(127,178,255,0); } }
+    .mic-btn svg { width: 26px; height: 26px; }
     .text-input {
-      background: rgba(8,18,28,0.7);
-      border: 1px solid rgba(56,217,255,0.25);
-      border-radius: 24px;
-      padding: 14px 20px;
-      color: #eafaff;
-      font-size: 15px;
-      width: min(420px, 60vw);
-      outline: none;
+      background: rgba(12, 18, 30, 0.8); border: 1px solid var(--line); border-radius: 999px; padding: 14px 22px;
+      color: var(--text); font: inherit; font-size: 15px; width: min(420px, 56vw); outline: none;
     }
-    .text-input::placeholder { color: #4f6b80; }
+    .text-input::placeholder { color: var(--mute); }
     .text-input:focus { border-color: var(--accent); }
+    .hint { position: fixed; bottom: 10px; left: 0; right: 0; text-align: center; font-size: 11px; color: var(--mute); z-index: 3; pointer-events: none; }
 
-    .hint {
-      position: fixed;
-      bottom: 14px;
-      left: 0; right: 0;
-      text-align: center;
-      font-size: 11px;
-      color: #40566a;
-      z-index: 3;
-    }
-    .unsupported {
-      position: fixed; inset: 0; display: none;
-      align-items: center; justify-content: center;
-      background: rgba(4,7,13,0.9); z-index: 20; text-align: center; padding: 30px;
-    }
-
-    /* API Key Setup */
-    .api-overlay {
-      position: fixed; inset: 0;
-      background: rgba(4,7,13,0.97);
-      z-index: 30;
-      display: flex; align-items: center; justify-content: center;
-      flex-direction: column; gap: 18px; padding: 30px;
-      text-align: center;
-    }
-    .api-overlay h2 { color: var(--accent); letter-spacing: 4px; font-size: 18px; }
-    .api-overlay p { color: #7fa0b5; font-size: 14px; max-width: 420px; line-height: 1.6; }
-    .api-overlay input {
-      background: rgba(8,18,28,0.8);
-      border: 1px solid rgba(56,217,255,0.35);
-      border-radius: 10px;
-      padding: 14px 20px;
-      color: #eafaff;
-      font-size: 15px;
-      width: min(380px, 90vw);
-      outline: none;
-      letter-spacing: 1px;
-    }
+    .unsupported { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; background: rgba(5,7,12,0.92); z-index: 20; text-align: center; padding: 30px; }
+    .api-overlay { position: fixed; inset: 0; background: rgba(5,7,12,0.97); z-index: 30; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 18px; padding: 30px; text-align: center; }
+    .api-overlay h2 { color: var(--accent); letter-spacing: 0.3em; font-size: 16px; font-family: var(--font-mono); font-weight: 500; }
+    .api-overlay p { color: var(--dim); font-size: 14px; max-width: 420px; line-height: 1.6; }
+    .api-overlay input { background: rgba(12,18,30,0.8); border: 1px solid var(--line); border-radius: 10px; padding: 14px 20px; color: var(--text); font-size: 15px; width: min(380px, 90vw); outline: none; letter-spacing: 1px; }
     .api-overlay input:focus { border-color: var(--accent); }
-    .api-overlay button {
-      background: var(--accent);
-      color: #04121a;
-      border: none;
-      border-radius: 10px;
-      padding: 13px 36px;
-      font-size: 15px;
-      font-weight: 700;
-      cursor: pointer;
-      letter-spacing: 2px;
+    .api-overlay button { background: var(--accent); color: #04101f; border: none; border-radius: 10px; padding: 13px 36px; font-size: 14px; font-weight: 700; cursor: pointer; letter-spacing: 0.2em; }
+
+    /* ---------- Responsive ---------- */
+    @media (max-width: 1100px) {
+      .layout { grid-template-columns: 1fr minmax(280px, 380px); }
+      .col-center { grid-column: 1 / 2; grid-row: 1; position: absolute; inset: 0; opacity: .5; z-index: 0; }
+      .col-left, .col-right { position: relative; z-index: 1; }
+      .dialog { width: min(520px, 55vw); }
     }
-    .api-overlay .skip-btn {
-      background: transparent;
-      color: #4f6b80;
-      font-size: 12px;
-      padding: 6px 12px;
-      font-weight: 400;
-      letter-spacing: 1px;
+    @media (max-width: 760px) {
+      body, html { overflow-y: auto; }
+      .layout { position: relative; inset: auto; display: flex; flex-direction: column; margin-top: 44px; min-height: 100vh; }
+      .col-center { position: relative; inset: auto; opacity: 1; order: 1; padding: 0; }
+      .stage { width: min(88vw, 60vh); }
+      .col-left { order: 0; padding: 28px 20px 8px; }
+      .col-right { order: 2; border-left: 0; padding: 12px 20px 190px; overflow: visible; }
+      h1 { font-size: 52px; }
+      .topbar { padding: 0 16px; letter-spacing: 0.16em; }
+      .topbar .brand { letter-spacing: 0.3em; }
+      #dateLabel { display: none; }
+      .dialog { left: 16px; right: 16px; width: auto; bottom: 108px; }
+      .controls { width: calc(100vw - 32px); }
+      .text-input { width: 100%; flex: 1; }
+      .hint { display: none; }
     }
-    .api-overlay .api-hint {
-      font-size: 11px; color: #3a5060;
-    }
+    @media (prefers-reduced-motion: reduce) { .bubble { animation: none; } }
   </style>
 </head>
 <body>
-  <div class="hud-top">
+  <canvas id="stars"></canvas>
+
+  <div class="topbar">
     <div class="brand">J · A · R · V · I · S</div>
-    <div class="state-label" id="stateLabel">Bereit</div>
+    <div class="state" id="stateLabel">Bereit</div>
+    <div id="dateLabel">—</div>
   </div>
 
-  <div class="goal-panel" id="goalPanel">
-    <div class="lbl">Aktuelles Ziel</div>
-    <div class="goal-text" id="goalText"></div>
-  </div>
+  <main class="layout">
+    <section class="col-left">
+      <p class="eyebrow" id="eyebrow">Dein persönlicher Assistent · antwortet per Sprache · Daten auf deinem eigenen Server</p>
+      <h1>Sag<br>Hey<br>Jarvis.<span class="dim">Er erledigt<br>den Rest.</span></h1>
+      <p class="lead">JARVIS hört zu, sucht live im Netz, verwaltet <strong>Aufgaben, Notizen und Erinnerungen</strong> und zeigt dir, was dabei rauskommt.</p>
+      <div class="chips">
+        <span class="chip"><b>Hey Jarvis</b> · Wake-Word</span>
+        <span class="chip">Websuche</span>
+        <span class="chip">Erinnerungen</span>
+        <span class="chip">E-Mail-Alarm</span>
+      </div>
+      <div class="goal-line" id="goalPanel"><span class="lbl">Aktuelles Ziel</span><span id="goalText"></span></div>
+    </section>
 
-  <div class="stage">
-    <canvas id="orb"></canvas>
-  </div>
+    <section class="col-center">
+      <div class="stage">
+        <canvas id="orb"></canvas>
+        <div class="wordmark">JARVIS</div>
+      </div>
+    </section>
 
-  <div class="side-panel" id="sidePanel"></div>
+    <aside class="col-right" id="sidePanel">
+      <div class="card hero">
+        <div class="row"><span class="lbl">Heute · Erledigt</span><span class="count" id="doneCount">0/0</span></div>
+        <div class="big"><span id="donePct">0</span><small>%</small></div>
+        <div class="bar" id="doneBar"></div>
+        <div class="scale"><span>0</span><span>25</span><span>50</span><span>75</span><span>100</span></div>
+      </div>
+
+      <div class="card">
+        <span class="lbl">Heute geplant</span>
+        <div class="plan">
+          <div class="ring" id="planRing">
+            <svg viewBox="0 0 100 100"><circle class="track" cx="50" cy="50" r="42" fill="none" stroke-width="7"/><circle class="fill" cx="50" cy="50" r="42" fill="none" stroke-width="7" stroke-linecap="round" stroke-dasharray="263.9" stroke-dashoffset="263.9"/></svg>
+            <div class="num"><span id="planNum">0</span></div>
+          </div>
+          <ul id="planList"><li class="empty">Nichts geplant. Sag: „Erinnere mich um 15 Uhr …“</li></ul>
+        </div>
+      </div>
+
+      <div class="two">
+        <div class="card">
+          <span class="lbl">Aufgaben</span>
+          <div class="plan" style="margin-top:10px;justify-content:center">
+            <div class="ring" id="taskRing">
+              <svg viewBox="0 0 100 100"><circle class="track" cx="50" cy="50" r="42" fill="none" stroke-width="7"/><circle class="fill" cx="50" cy="50" r="42" fill="none" stroke-width="7" stroke-linecap="round" stroke-dasharray="263.9" stroke-dashoffset="263.9"/></svg>
+              <div class="num"><span id="taskNum">0</span></div>
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <span class="lbl">Diese Woche</span>
+          <div class="big"><span id="weekNum">0</span><span class="of"> Termine</span></div>
+          <div class="days" id="weekDays"></div>
+        </div>
+      </div>
+
+      <div class="card goal-card">
+        <span class="lbl">Nächstes</span>
+        <div class="title" id="nextTitle">Keine offenen Aufgaben</div>
+        <div class="sub" id="nextSub">Sag „Neue Aufgabe …“, um eine anzulegen.</div>
+      </div>
+    </aside>
+  </main>
 
   <div class="dialog" id="dialog"></div>
 
   <div class="controls">
     <input class="text-input" id="textInput" placeholder="Was soll ich für dich erledigen?" />
-    <button class="mic-btn" id="micBtn" title="Sprechen">
+    <button class="mic-btn" id="micBtn" title="Sprechen" aria-label="Sprechen">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
         <path d="M12 2a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/>
         <path d="M5 11a7 7 0 0 0 14 0"/>
@@ -297,16 +281,16 @@
   <!-- Zugang -->
   <div class="api-overlay" id="apiOverlay" style="display:none">
     <h2>JARVIS · ZUGANG</h2>
-    <p>Gib deinen <strong style="color:#eafaff">Zugangs-Token</strong> ein. Er steht in der Server-Einstellung <code>JARVIS_TOKEN</code>.</p>
+    <p>Gib deinen <strong style="color:#fff">Zugangs-Token</strong> ein. Er steht in der Server-Einstellung <code>JARVIS_TOKEN</code>.</p>
     <input type="password" id="tokenInput" placeholder="Zugangs-Token" autocomplete="off" />
     <button id="tokenSaveBtn">ENTSPERREN</button>
-    <div class="api-hint" id="tokenError" style="color:#ff5c7a"></div>
+    <div style="font-size:12px;color:#ff5c7a" id="tokenError"></div>
   </div>
 
   <div class="unsupported" id="unsupported">
     <div>
       <h2 style="color:var(--accent)">Spracherkennung nicht verfügbar</h2>
-      <p style="margin-top:10px;max-width:420px;color:#9fc">Dein Browser unterstützt die Web Speech API nicht.
+      <p style="margin-top:10px;max-width:420px;color:var(--dim)">Dein Browser unterstützt die Web Speech API nicht.
       Nutze Chrome oder Edge — du kannst aber trotzdem über das Textfeld mit JARVIS sprechen.</p>
     </div>
   </div>

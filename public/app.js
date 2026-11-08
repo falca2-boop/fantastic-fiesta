@@ -2,7 +2,7 @@
 (function () {
   const $ = (id) => document.getElementById(id);
   const micBtn = $('micBtn'), textInput = $('textInput'), dialog = $('dialog'), stateLabel = $('stateLabel');
-  const goalPanel = $('goalPanel'), goalText = $('goalText'), sidePanel = $('sidePanel');
+  const goalPanel = $('goalPanel'), goalText = $('goalText');
   const unsupported = $('unsupported'), orbCanvas = $('orb');
   const apiOverlay = $('apiOverlay'), tokenInput = $('tokenInput'), tokenSaveBtn = $('tokenSaveBtn'), tokenError = $('tokenError');
 
@@ -125,34 +125,108 @@
 
   const fmtTime = (iso) => new Date(iso).toLocaleString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
 
+  // ---------- Widgets ----------
+  const RING = 263.9;                       // Umfang des SVG-Rings (r=42)
+  const setRing = (id, frac) => {
+    const el = document.querySelector('#' + id + ' .fill');
+    if (el) el.style.strokeDashoffset = String(RING * (1 - Math.max(0, Math.min(1, frac))));
+  };
+  const SEGMENTS = 20;
+  const bar = $('doneBar');
+  for (let i = 0; i < SEGMENTS; i++) bar.appendChild(document.createElement('i'));
+  const dayKey = (d) => d.getFullYear() + '-' + d.getMonth() + '-' + d.getDate();
+  const clock = (d) => d.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+
   function renderState(s) {
     if (!s) return;
     if (s.userName) USER_NAME = s.userName;
+
+    // Ziel
     if (s.goal) {
       goalText.textContent = '';
-      const label = document.createTextNode('Ziel: ');
       const strong = document.createElement('strong');
-      strong.style.color = '#eafaff';
-      strong.textContent = s.goal.text.slice(0, 80);
-      goalText.append(label, strong);
-      if (s.goal.realisierbarkeit != null) {
-        const sp = document.createElement('span');
-        sp.style.cssText = 'font-size:11px;color:#6f8aa0;letter-spacing:2px';
-        sp.textContent = ` · ${s.goal.realisierbarkeit}% realisierbar`;
-        goalText.appendChild(sp);
-      }
+      strong.textContent = s.goal.text.slice(0, 90);
+      goalText.appendChild(strong);
+      if (s.goal.realisierbarkeit != null) goalText.append(` · ${s.goal.realisierbarkeit}% realisierbar`);
       goalPanel.classList.add('show');
+    } else goalPanel.classList.remove('show');
+
+    // Erledigt-Quote
+    const done = s.stats ? s.stats.done : 0;
+    const total = s.stats ? s.stats.total : s.tasks.length;
+    const pct = total ? Math.round((done / total) * 100) : 0;
+    $('donePct').textContent = pct;
+    $('doneCount').textContent = `${done}/${total}`;
+    [...bar.children].forEach((el, i) => el.classList.toggle('on', i < Math.round((pct / 100) * SEGMENTS)));
+
+    // Heute geplant (Erinnerungen von heute)
+    const now = new Date(), today = dayKey(now);
+    const todays = s.reminders.filter(r => dayKey(new Date(r.at)) === today);
+    const list = $('planList');
+    list.textContent = '';
+    if (!todays.length) {
+      const li = document.createElement('li'); li.className = 'empty'; li.textContent = 'Heute nichts geplant.'; list.appendChild(li);
     }
-    sidePanel.textContent = '';
-    const section = (title, items) => {
-      if (!items.length) return;
-      const h = document.createElement('div'); h.className = 'lbl'; h.textContent = title; sidePanel.appendChild(h);
-      items.forEach(t => { const d = document.createElement('div'); d.className = 'item'; d.textContent = t; sidePanel.appendChild(d); });
-    };
-    section('Aufgaben', s.tasks.map(t => '▸ ' + t.text + (t.due ? ` (${t.due})` : '')));
-    section('Erinnerungen', s.reminders.map(r => '⏰ ' + fmtTime(r.at) + ' · ' + r.text));
-    sidePanel.classList.toggle('show', !!(s.tasks.length || s.reminders.length));
+    todays.slice(0, 4).forEach(r => {
+      const li = document.createElement('li');
+      const dot = document.createElement('span'); dot.className = 'dot';
+      const t = document.createElement('time'); t.textContent = clock(new Date(r.at));
+      const tx = document.createElement('span'); tx.className = 't'; tx.textContent = r.text;
+      li.append(dot, t, tx); list.appendChild(li);
+    });
+    $('planNum').textContent = todays.length;
+    setRing('planRing', todays.length ? Math.min(1, todays.length / 4) : 0);
+
+    // Offene Aufgaben
+    $('taskNum').textContent = s.tasks.length;
+    setRing('taskRing', total ? s.tasks.length / total : 0);
+
+    // Diese Woche: Termine Mo–So
+    const monday = new Date(now); monday.setHours(0, 0, 0, 0);
+    monday.setDate(monday.getDate() - ((monday.getDay() + 6) % 7));
+    const sunday = new Date(monday); sunday.setDate(sunday.getDate() + 7);
+    const week = s.reminders.filter(r => { const d = new Date(r.at); return d >= monday && d < sunday; });
+    $('weekNum').textContent = week.length;
+    const days = $('weekDays'); days.textContent = '';
+    ['M', 'D', 'M', 'D', 'F', 'S', 'S'].forEach((ch, i) => {
+      const day = new Date(monday); day.setDate(monday.getDate() + i);
+      const wrap = document.createElement('div');
+      if (dayKey(day) === today) wrap.className = 'today';
+      const dot = document.createElement('span'); dot.className = 'd' + (week.some(r => dayKey(new Date(r.at)) === dayKey(day)) ? ' on' : '');
+      const l = document.createElement('span'); l.textContent = ch;
+      wrap.append(l, dot); days.appendChild(wrap);
+    });
+
+    // Nächstes
+    const next = s.tasks[0];
+    $('nextTitle').textContent = next ? next.text : 'Keine offenen Aufgaben';
+    $('nextSub').textContent = next ? (next.due ? 'Fällig: ' + next.due : 'Ohne Fälligkeit') : 'Sag „Neue Aufgabe …“, um eine anzulegen.';
   }
+
+  // ---------- Datum + Sternenhimmel ----------
+  function tickDate() {
+    $('dateLabel').textContent = new Date().toLocaleDateString('de-DE', { weekday: 'short', day: 'numeric', month: 'short' }).replace(/\./g, '');
+  }
+  tickDate(); setInterval(tickDate, 60000);
+
+  (function stars() {
+    const c = $('stars'), g = c.getContext('2d');
+    let pts = [];
+    const size = () => {
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      c.width = innerWidth * dpr; c.height = innerHeight * dpr;
+      g.setTransform(dpr, 0, 0, dpr, 0, 0);
+      pts = Array.from({ length: Math.round(innerWidth * innerHeight / 9000) }, () => ({ x: Math.random() * innerWidth, y: Math.random() * innerHeight, r: Math.random() * 1.2 + 0.2, p: Math.random() * 6.28 }));
+    };
+    size(); addEventListener('resize', size);
+    const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const draw = (t) => {
+      g.clearRect(0, 0, innerWidth, innerHeight);
+      pts.forEach(p => { g.globalAlpha = 0.25 + 0.5 * (0.5 + 0.5 * Math.sin(p.p + t / 1800)); g.fillStyle = '#cfe0ff'; g.beginPath(); g.arc(p.x, p.y, p.r, 0, 6.283); g.fill(); });
+      if (!reduce) requestAnimationFrame(draw);
+    };
+    requestAnimationFrame(draw);
+  })();
 
   // ---------- Gespräch ----------
   async function respond(text) {
