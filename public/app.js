@@ -247,6 +247,10 @@
       const u = s.usage, box = $('usageBox'); box.textContent = '';
       const usd = (x) => '≈ ' + x.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' $';
       const row = (label, value, cls) => { const d = el('div', 'urow' + (cls ? ' ' + cls : '')); d.append(el('span', '', label), el('span', '', value)); box.appendChild(d); };
+      const chip = $('costChip');
+      chip.textContent = usd(u.today.cost) + ' heute';
+      chip.classList.toggle('bad', !!u.limitReached);
+      chip.classList.toggle('warn', !u.limitReached && !!u.limit && u.today.cost >= u.limit * 0.8);
       row('Heute', u.today.calls ? usd(u.today.cost) + ' · ' + u.today.tokens.toLocaleString('de-DE') + ' Token' : 'noch nichts verbraucht', u.limitReached ? 'bad' : '');
       if (u.today.searches) row('Websuchen heute', String(u.today.searches));
       row('Dieser Monat', usd(u.month.cost));

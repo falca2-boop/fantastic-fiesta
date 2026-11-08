@@ -34,6 +34,7 @@
       </div>
       <div class="spacer"></div>
       <div class="chip" id="stateChip" role="status" aria-live="polite"><span class="dot ok" id="stateDot"></span><span id="stateText">Bereit</span></div>
+      <div class="chip cost" id="costChip" title="Geschätzte Kosten heute (aus den echten API-Antworten)">≈ 0,00 $</div>
       <a class="chip" href="welt.html" id="worldLink" title="Weltkugel, Livestream und Nachrichten">Welt</a>
       <div class="chip clock" id="clock">--:--</div>
     </header>
@@ -69,6 +70,11 @@
     </main>
 
     <aside class="side" aria-label="Übersicht">
+      <section class="card" id="cardCost">
+        <div class="card-h"><svg class="i"><use href="#i-bolt"/></svg>Kosten</div>
+        <div class="card-b"><div class="usage" id="usageBox" aria-live="polite"></div></div>
+      </section>
+
       <section class="card" id="cardTasks">
         <div class="card-h"><svg class="i"><use href="#i-list"/></svg>Aufgaben<span class="count" id="taskCount">0</span></div>
         <div class="card-b"><ul class="list" id="taskList"></ul></div>
@@ -96,7 +102,7 @@
 
       <section class="card" id="cardSys">
         <div class="card-h"><svg class="i"><use href="#i-chip"/></svg>System</div>
-        <div class="card-b"><div class="sys" id="sysBox"></div><div class="usage" id="usageBox" aria-live="polite"></div></div>
+        <div class="card-b"><div class="sys" id="sysBox"></div></div>
       </section>
     </aside>
   </div>

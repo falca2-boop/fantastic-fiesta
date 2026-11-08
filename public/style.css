@@ -324,3 +324,8 @@ canvas#orb { width: 100%; height: 100%; display: block; cursor: pointer; }
 .usage .urow.warn span:last-child { color: var(--warn); }
 
 .chat-sep { text-align: center; color: var(--muted); font-size: 0.72rem; letter-spacing: 0.14em; text-transform: uppercase; padding: 8px 0; }
+
+.chip.cost { color: var(--accent-2); border-color: var(--border-strong); font-variant-numeric: tabular-nums; }
+.chip.cost.warn { color: var(--warn); border-color: rgba(255, 194, 71, 0.5); }
+.chip.cost.bad { color: var(--danger); border-color: rgba(255, 92, 122, 0.5); }
+#cardCost .usage { margin-top: 0; padding-top: 0; border-top: 0; font-size: 0.88rem; }

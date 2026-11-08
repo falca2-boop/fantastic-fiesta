@@ -42,6 +42,7 @@ try {
   check('Nach der Antwort zeigt Jarvis „Ich höre weiter zu“', /weiter zu/.test(await page.locator('#heard').textContent()));
   await page.waitForTimeout(500);
   check('Kostenanzeige im Kasten System zeigt den echten Verbrauch (zwei Antworten: ≈ 0,02 $, 10.200 Token)', /Heute.*≈ 0,02 \$ · 10\.200 Token/.test((await page.locator('#usageBox').textContent()).replace(/\s+/g, ' ')), (await page.locator('#usageBox').textContent()).replace(/\s+/g, ' '));
+  check('Kosten stehen oben rechts als Chip und in der Karte „Kosten“ ganz oben rechts', /≈ 0,02 \$ heute/.test(await page.locator('#costChip').textContent()) && (await page.locator('.side .card').first().getAttribute('id')) === 'cardCost' && (await page.locator('#cardCost #usageBox').count()) === 1);
   check('Es wird nur einmal begrüßt', (await page.evaluate(() => window.__spoken.filter((t) => t === 'Hey Boss.').length)) === 1);
   // Wake-Word: ohne "Jarvis" ignorieren, nur "Hey Jarvis" -> zuhören, danach Befehl; Variante mit Befehl im selben Satz
   const say = (t) => page.evaluate((t) => { const r = window.__recs[0]; const res = [[{ transcript: t }]]; res[0].isFinal = true; r.onresult({ resultIndex: 0, results: res }); }, t);
