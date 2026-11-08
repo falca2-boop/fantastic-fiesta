@@ -14,6 +14,9 @@ OBSIDIAN_BIN="${OBSIDIAN_BIN:-/opt/Obsidian/obsidian}"
 CONFIG="${OBSIDIAN_CONFIG:-$HOME/.config/obsidian/obsidian.json}"
 DRY="${KU_DRY:-0}"                       # 1 = Obsidian weder schließen noch starten (für Tests)
 NAME="$(basename "$VAULT")"
+# Nur Prozesse, deren Befehl mit dem Obsidian-Programm BEGINNT (trifft weder dieses Skript noch eine Shell, die den Pfad nur als Text enthält)
+OBS_RE="^${OBSIDIAN_BIN}( |\$)"
+obsidian_running() { pgrep -f "$OBS_RE" >/dev/null 2>&1; }
 
 echo "Vault: $VAULT"
 mkdir -p "$VAULT/.obsidian"
@@ -29,11 +32,11 @@ cp "$HERE/main.js" "$HERE/manifest.json" "$HERE/styles.css" "$DEST/"
 echo "1/4 Plugin installiert."
 
 # 2) Obsidian schließen, damit es die Dateien nicht überschreibt
-if [ "$DRY" != "1" ] && pgrep -f "$OBSIDIAN_BIN" >/dev/null 2>&1; then
+if [ "$DRY" != "1" ] && obsidian_running; then
   echo "Schließe Obsidian ..."
-  pkill -TERM -f "$OBSIDIAN_BIN" || true
-  for _ in 1 2 3 4 5 6 7 8 9 10; do pgrep -f "$OBSIDIAN_BIN" >/dev/null 2>&1 || break; sleep 1; done
-  pkill -KILL -f "$OBSIDIAN_BIN" 2>/dev/null || true
+  pkill -TERM -f "$OBS_RE" || true
+  for _ in 1 2 3 4 5 6 7 8 9 10; do obsidian_running || break; sleep 1; done
+  pkill -KILL -f "$OBS_RE" 2>/dev/null || true
   sleep 1
 fi
 
