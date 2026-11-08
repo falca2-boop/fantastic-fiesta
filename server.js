@@ -81,7 +81,7 @@ export function createServer(opts = {}) {
       learning: { time: learningConfig(store).time, last: d.learning ? d.learning.summary : '', proposals: (d.agentProposals || []).length },
       agents: listAgents(store).map(({ name, role, builtin }) => ({ name, role: role.slice(0, 140), builtin })),
       tasks: d.tasks.filter(t => !t.done).map(({ id, text, due }) => ({ id, text, due })),
-      reminders: d.reminders.filter(r => !r.fired).sort((a, b) => new Date(a.at) - new Date(b.at)).map(({ id, text, at }) => ({ id, text, at })),
+      reminders: d.reminders.filter(r => !r.fired).sort((a, b) => new Date(a.at) - new Date(b.at)).map(({ id, text, at, repeat }) => ({ id, text, at, repeat: repeat || '' })),
     };
   };
 
@@ -142,7 +142,7 @@ export function createServer(opts = {}) {
             return json(res, e.code === 'nokey' ? 200 : 502, { live: null, error: e.code === 'nokey' ? 'nokey' : 'YouTube gerade nicht erreichbar: ' + e.message });
           }
         }
-        if (pathname === '/api/poll' && req.method === 'GET') return json(res, 200, { fired: takeDueReminders(store).map(({ id, text }) => ({ id, text })), mail: takeMailAlerts(store), briefing: takeBriefing(store), state: publicState() });
+        if (pathname === '/api/poll' && req.method === 'GET') return json(res, 200, { fired: takeDueReminders(store).map(({ id, text, at, late }) => ({ id, text, at, late })), mail: takeMailAlerts(store), briefing: takeBriefing(store), state: publicState() });
 
         if (pathname === '/api/tasks/complete' && req.method === 'POST') {
           let body;

@@ -187,3 +187,11 @@ Die Orb-Kugel füllt fast den ganzen Bildschirm (Mitte, Kreis mit leuchtendem Ra
 - **Tägliche Lernrunde** um 22:30 (Uhrzeit des Geräts, Jarvis muss laufen; ändern per `LEARN_TIME=21:00` oder Sprache: *„Lerne täglich um 21 Uhr“* / *„Schalte das Lernen aus“*; `JARVIS_LEARNING=off` schaltet sie ab; „Lerne jetzt aus heute“ startet sie sofort). Sie wertet dein Feedback und deine eigenen Nachrichten aus und aktualisiert **gelernte Vorlieben** (bis zu 12, fließen in jede Antwort ein), neue **Fakten** über dich, **Vorschläge für Agenten** und schreibt eine **Lernnotiz** in Obsidian. Kostet pro Tag nur wenige Cent und steht in der Kostenanzeige als „Lernrunde“.
 - **Du behältst die Kontrolle:** Alles Gelernte steht in der Karte „Gelernt“ (Übersicht rechts), jede Zeile lässt sich mit × löschen, oder sag *„Vergiss, dass ich Humor mag“*. Agenten ändern sich **nur nach deinem Ja**: *„Zeig die Vorschläge für die Agenten“*, dann *„Übernimm Vorschlag abc12“*.
 - **Schutz:** Gelernt wird nur aus dem, was du sagst und bewertest, nicht aus Webinhalten. Zugangsdaten, Links und Adressen werden nie übernommen. Code: `lib/learning.js`.
+
+## Notizen und Erinnerungen merken
+
+- **Merken:** *„Merk dir, dass Anna Dienstag Zeit hat“* (Fakt), *„Notiere: Angebot für Projekt Alpha bis Freitag“* (Notiz, mit Obsidian im Vault), *„Erinnere mich morgen um 9 an den Zahnarzt“* (Erinnerung).
+- **Wiederholen:** *„Erinnere mich jeden Tag um 9 ans Postfach“*, *„werktags um 8“*, *„jeden Montag …“* legt **eine** wiederholende Erinnerung an (kein Mehrfach-Eintragen mehr). Sie rückt nach dem Sprechen auf den nächsten Termin, in der Karte steht „↻ täglich“.
+- **Nachschlagen:** Jarvis kennt offene Erinnerungen und die letzten Notizen ständig; *„Was hatte ich zu Projekt Alpha notiert?“* durchsucht alle Notizen (`search_notes`), *„Welche Erinnerungen habe ich?“* zeigt sie mit den zuletzt ausgesprochenen (`list_reminders`).
+- **Verpasst:** War Jarvis zur Erinnerungszeit nicht erreichbar, kommt sie beim nächsten Öffnen mit „(eigentlich um 09:00 fällig)“. Erinnerungen werden immer gesprochen, auch wenn der Satz gleich lautet.
+- **Aufräumen:** *„Lösche die Erinnerung Postfach“* (sofort), *„Lösche die Notiz mit der Milch“* (Jarvis fragt vorher nach; gelöscht wird nur in den Jarvis-Notizen, nie in deinen eigenen Obsidian-Notizen).

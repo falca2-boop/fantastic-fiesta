@@ -355,7 +355,7 @@
     s.reminders.forEach((r) => {
       const li = el('li', 'rem');
       const t = el('time', '', new Date(r.at).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }));
-      t.appendChild(el('small', '', relTime(r.at)));
+      t.appendChild(el('small', '', relTime(r.at) + (r.repeat ? ' · ↻ ' + ({ taeglich: 'täglich', werktags: 'werktags', woechentlich: 'wöchentlich' }[r.repeat] || '') : '')));
       t.title = fmtTime(r.at);
       li.append(t, el('span', '', r.text));
       rl.appendChild(li);
@@ -433,7 +433,11 @@
     try {
       const data = await api('/api/poll');
       renderState(data.state);
-      data.fired.forEach(r => jarvisSay('Erinnerung: ' + r.text));
+      data.fired.forEach(r => {
+        // Erinnerungen werden immer gesprochen, auch wenn der Satz schon einmal vorkam (z. B. täglich); verpasste mit Hinweis
+        const text = 'Erinnerung: ' + r.text + (r.late > 5 ? ' (eigentlich um ' + hhmm(new Date(r.at)) + ' fällig)' : '');
+        addBubble(text, 'jarvis'); armAfterSpeech = true; speak(text);
+      });
       if (data.briefing) {
         const text = 'Dein Morgenbriefing: ' + data.briefing.text;
         jarvisSay(text);

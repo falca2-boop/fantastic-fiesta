@@ -371,3 +371,66 @@ test('Persönlichkeit: Jarvis ist Freund auf Du-Basis und antwortet immer', asyn
   const p = systemPrompt(new Store(null), { userName: 'Augustin', address: 'Boss', now: Date.now(), offsetMinutes: 0 });
   assert.match(p, /guter Freund/); assert.match(p, /„du“/); assert.match(p, /IMMER/); assert.match(p, /ehrlich/); assert.match(p, /eine KI/);
 });
+
+import { nextOccurrence } from '../lib/tools.js';
+import { systemPrompt } from '../lib/agent.js';
+test('Merken: wiederholende Erinnerungen, verspätet melden, löschen, Notizen suchen/löschen, Prompt kennt Offenes', async () => {
+  const s = new Store(null);
+  const t0 = Date.now();
+  const at = new Date(t0 + 3600e3).toISOString();
+  assert.match(await runTool(s, 'set_reminder', { text: 'Postfach prüfen', at, repeat: 'taeglich' }, { now: t0 }), /täglich/);
+  assert.match(await runTool(s, 'set_reminder', { text: 'postfach prüfen', at: new Date(t0 + 7200e3).toISOString(), repeat: 'taeglich' }, { now: t0 }), /schon/);   // keine Dubletten
+  assert.equal(s.data.reminders.length, 1);
+  assert.match(await runTool(s, 'list_reminders', {}), /Postfach prüfen.*täglich/);
+  // Jarvis war aus: Erinnerung 3 Stunden zu spät -> kommt mit Verspätung, rückt auf nächsten Tag
+  const later = t0 + 4 * 3600e3;
+  const due = takeDueReminders(s, later);
+  assert.equal(due.length, 1); assert.ok(due[0].late >= 179);
+  assert.equal(s.data.reminders.length, 1); assert.equal(s.data.reminders[0].fired, false);
+  assert.ok(new Date(s.data.reminders[0].at).getTime() > later);
+  assert.equal(takeDueReminders(s, later).length, 0);
+  // Werktage überspringen Wochenende (Freitag -> Montag)
+  const fri = new Date(2026, 10, 6, 9, 0).toISOString(); const nxt = nextOccurrence(fri, 'werktags', new Date(2026, 10, 6, 10, 0).getTime());
+  assert.equal(nxt.getDay(), 1); assert.equal(nxt.getHours(), 9);
+  assert.equal(nextOccurrence(fri, 'woechentlich', new Date(2026, 10, 6, 10, 0).getTime()).getDate(), 13);
+  // einmalige: nach dem Sprechen ausgesprochen, bleibt in der Liste der letzten
+  await runTool(s, 'set_reminder', { text: 'Zahnarzt anrufen', at: new Date(t0 + 60e3).toISOString() }, { now: t0 });
+  takeDueReminders(s, t0 + 120e3);
+  assert.match(await runTool(s, 'list_reminders', {}), /Zuletzt ausgesprochen:\nZahnarzt anrufen/);
+  assert.match(await runTool(s, 'cancel_reminder', { text: 'postfach' }), /gelöscht: Postfach prüfen/); assert.match(await runTool(s, 'cancel_reminder', { text: 'postfach' }), /Keine passende/);
+  // Notizen: suchen, mehrdeutig, Löschen nur nach Bestätigung
+  await runTool(s, 'add_note', { text: 'Idee: Webseite für Friseur Anna bauen' }); await runTool(s, 'add_note', { text: 'Einkaufen: Milch und Brot' });
+  assert.match(await runTool(s, 'search_notes', { query: 'friseur anna' }), /Webseite für Friseur Anna/);
+  assert.match(await runTool(s, 'search_notes', { query: 'gibtesnicht' }), /Keine Notiz/);
+  assert.match(await runTool(s, 'delete_note', { note: 'milch' }), /Bestätige zuerst/); assert.equal(s.data.notes.length, 2);
+  assert.match(await runTool(s, 'delete_note', { note: 'milch', confirmed: true }), /gelöscht/); assert.equal(s.data.notes.length, 1);
+  await runTool(s, 'set_reminder', { text: 'Steuer machen', at: new Date(t0 + 86400e3).toISOString() }, { now: t0 });
+  const p = systemPrompt(s, { userName: 'A', now: t0, offsetMinutes: 0 });
+  assert.match(p, /Offene Erinnerungen: .*Steuer machen/); assert.match(p, /Zuletzt gemerkte Notizen: Idee: Webseite für Friseur Anna/);
+});
+
+test('Merken mit Obsidian: Notizen suchen und löschen (nur im Jarvis-Ordner, ohne Pfadtricks)', async () => {
+  const vault = fs.mkdtempSync(path.join(os.tmpdir(), 'vault-'));
+  const s = new Store(null, { vaultDir: vault });
+  await runTool(s, 'add_note', { text: 'Projekt Alpha: Angebot bis Freitag schicken' });
+  fs.writeFileSync(path.join(vault, 'Wichtig.md'), 'darf nie gelöscht werden');
+  assert.match(await runTool(s, 'search_notes', { query: 'alpha angebot' }), /Projekt Alpha/);
+  assert.match(await runTool(s, 'delete_note', { note: 'alpha' }), /Bestätige zuerst/);
+  assert.match(await runTool(s, 'delete_note', { note: 'alpha', confirmed: true }), /Notiz gelöscht/);
+  assert.equal(fs.readdirSync(path.join(vault, 'Jarvis', 'Notizen')).length, 0);
+  assert.ok(fs.existsSync(path.join(vault, 'Wichtig.md')));                          // fremde Notizen bleiben
+  assert.match(await runTool(s, 'delete_note', { note: 'wichtig', confirmed: true }), /Keine passende/);
+  const { deleteVaultNote } = await import('../lib/vault.js');
+  assert.equal(deleteVaultNote(vault, '../../Wichtig'), false); assert.equal(deleteVaultNote(vault, '..'), false);
+});
+
+test('API /api/poll meldet verpasste Erinnerungen mit Verspätung, wiederholende bleiben im Zustand mit Wiederholung', async () => {
+  const s = new Store(null);
+  s.data.reminders.push({ id: 'r1', text: 'Postfach prüfen', at: new Date(Date.now() - 45 * 60000).toISOString(), fired: false, repeat: 'taeglich' });
+  const { server } = createServer({ store: s, apiKey: 'k', fetchFn: async () => ({ ok: false, status: 500 }), voice: null, mail: null });
+  await new Promise((r) => server.listen(0, '127.0.0.1', r));
+  const poll = await (await fetch('http://127.0.0.1:' + server.address().port + '/api/poll')).json();
+  assert.equal(poll.fired.length, 1); assert.ok(poll.fired[0].late >= 44);
+  assert.deepEqual(poll.state.reminders.map((r) => [r.text, r.repeat]), [['Postfach prüfen', 'taeglich']]);   // nächster Termin schon eingetragen
+  server.close();
+});
