@@ -144,6 +144,14 @@ export class UniverseView extends ItemView {
     await leaf.openFile(file);
   }
 
+  /** Von außen (z. B. Jarvis): beste Übereinstimmung mit dem Suchtext ansteuern und markieren. Gibt true zurück, wenn gefunden. */
+  focusQuery(query: string): boolean {
+    const hit = this.search(query)[0];
+    if (hit === undefined) return false;
+    this.renderer?.focusNode(hit); this.renderer?.setSelected(hit);
+    return true;
+  }
+
   private search(query: string): number[] {
     const data = this.data;
     if (!data) return [];

@@ -290,3 +290,21 @@ test('doppelte Erinnerungen werden nicht angelegt und beim Laden bereinigt', asy
   const out = await runTool(s, 'set_reminder', { text: 'Postfach prüfen', at });
   assert.match(out, /schon/); assert.equal(s.data.reminders.length, 1);
 });
+
+test('Obsidian: Suche, Notiz lesen mit Verknüpfungen, Universum öffnen', async () => {
+  const vault = fs.mkdtempSync(path.join(os.tmpdir(), 'SecondBrain-'));
+  fs.mkdirSync(path.join(vault, '10-PROJEKTE')); fs.mkdirSync(path.join(vault, '.obsidian'));
+  fs.writeFileSync(path.join(vault, '10-PROJEKTE', 'Jarvis Plan.md'), '---\ntags: x\n---\n# Jarvis Plan\nZiel: Assistent bauen #projekt\nSiehe [[Ideen]] und [[Budget|Geld]].');
+  fs.writeFileSync(path.join(vault, 'Ideen.md'), 'Idee: Sprachsteuerung. Zurück zu [[Jarvis Plan]].');
+  fs.writeFileSync(path.join(vault, '.obsidian', 'versteckt.md'), 'Jarvis Plan geheim');
+  const s = new Store(null, { vaultDir: vault });
+  const found = await runTool(s, 'search_vault', { query: 'jarvis plan' });
+  assert.match(found, /Jarvis Plan/); assert.doesNotMatch(found, /versteckt/);
+  const note = await runTool(s, 'read_vault_note', { title: 'jarvis plan' });
+  assert.match(note, /Assistent bauen/); assert.match(note, /Verlinkt auf: Ideen, Budget/); assert.match(note, /Verlinkt von: Ideen/); assert.match(note, /Tags: projekt/);
+  assert.match(await runTool(s, 'read_vault_note', { title: 'gibtesnicht' }), /Keine passende/);
+  let opened;
+  const out = await runTool(s, 'open_universe', { note: 'Jarvis Plan' }, { openUrl: async (u) => { opened = u; return true; } });
+  assert.match(out, /geöffnet/); assert.equal(opened, 'obsidian://knowledge-universe?vault=' + encodeURIComponent(path.basename(vault)) + '&note=Jarvis%20Plan');
+  assert.equal(await runTool(new Store(null), 'open_universe', {}), 'Kein Obsidian-Vault verbunden.');
+});

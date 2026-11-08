@@ -11,6 +11,20 @@ export default class KnowledgeUniversePlugin extends Plugin {
     this.registerView(VIEW_TYPE_UNIVERSE, (leaf: WorkspaceLeaf) => new UniverseView(leaf, this));
     this.addRibbonIcon('orbit', 'Knowledge Universe öffnen', () => void this.activateView());
     this.addCommand({ id: 'open-knowledge-universe', name: 'Knowledge Universe öffnen', callback: () => void this.activateView() });
+    // obsidian://knowledge-universe?note=<Titel>  (Jarvis nutzt das, um die Ansicht zu öffnen und eine Notiz anzusteuern)
+    this.registerObsidianProtocolHandler('knowledge-universe', (params) => {
+      void this.activateView().then(() => {
+        const note = (params.note || '').trim();
+        if (!note) return;
+        // Der Graph baut sich kurz nach dem Öffnen auf; ein paar Versuche genügen
+        let tries = 0;
+        const t = window.setInterval(() => {
+          const view = this.app.workspace.getLeavesOfType(VIEW_TYPE_UNIVERSE)[0]?.view as UniverseView | undefined;
+          if ((view && view.focusQuery(note)) || ++tries >= 10) window.clearInterval(t);
+        }, 600);
+        this.registerInterval(t);
+      });
+    });
     this.addSettingTab(new UniverseSettingTab(this.app, this));
   }
 
