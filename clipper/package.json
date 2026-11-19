@@ -1,0 +1,15 @@
+{
+  "name": "yt-clipper-agent",
+  "version": "1.0.0",
+  "description": "Claude Code agent that auto-clips the best moments from any YouTube video or live stream",
+  "type": "module",
+  "scripts": {
+    "clip": "node src/clip.js"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.55.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

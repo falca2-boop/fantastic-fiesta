@@ -349,4 +349,50 @@
     else window.addEventListener('pointerdown', greetOnce, { once: true });
   }
   boot(false);
+
+  // ---------- Clip-Terminal ----------
+  const clipTerminal = $('clipTerminal');
+  const termBody = $('termBody');
+
+  function termLine(html, cls) {
+    const d = document.createElement('div');
+    d.className = 'term-line';
+    d.innerHTML = html;
+    if (cls) d.classList.add(cls);
+    termBody.appendChild(d);
+  }
+
+  window.showClipTerminal = function(url, steps) {
+    termBody.innerHTML = '';
+    // prompt line
+    termLine(
+      `<span class="term-prompt">&gt;</span>` +
+      `<span class="term-cmd">clip this: <span style="color:var(--accent)">${url || ''}</span></span>` +
+      `<span class="term-cursor"></span>`
+    );
+    clipTerminal.classList.add('show');
+    if (!steps || !steps.length) return;
+    let i = 0;
+    function next() {
+      if (i >= steps.length) return;
+      const s = steps[i++];
+      if (s.type === 'bullet') {
+        termLine(
+          `<span class="term-bullet">●</span>` +
+          `<span class="term-txt">${s.text}</span>`
+        );
+      } else if (s.type === 'ok') {
+        termLine(
+          `<span class="term-check">✓</span>` +
+          `<span class="term-ok-line">${s.text}</span>`
+        );
+      }
+      if (i < steps.length) setTimeout(next, s.delay || 1200);
+    }
+    setTimeout(next, 400);
+  };
+
+  window.hideClipTerminal = function() {
+    clipTerminal.classList.remove('show');
+  };
 })();

@@ -260,6 +260,68 @@
     .api-overlay .api-hint {
       font-size: 11px; color: #3a5060;
     }
+
+    /* Terminal clipping panel */
+    .clip-terminal {
+      position: fixed;
+      top: 90px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 3;
+      width: min(560px, 90vw);
+      background: #111417;
+      border: 1px solid rgba(56,217,255,0.18);
+      border-radius: 12px;
+      overflow: hidden;
+      font-family: "SF Mono", "Fira Mono", "Consolas", monospace;
+      box-shadow: 0 8px 40px rgba(0,0,0,0.6);
+      display: none;
+    }
+    .clip-terminal.show { display: block; }
+    .clip-terminal .term-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 16px;
+      background: #1a1e22;
+      border-bottom: 1px solid rgba(255,255,255,0.07);
+    }
+    .clip-terminal .term-dots {
+      display: flex; gap: 6px;
+    }
+    .clip-terminal .dot {
+      width: 12px; height: 12px; border-radius: 50%;
+    }
+    .clip-terminal .dot-r { background: #ff5f57; }
+    .clip-terminal .dot-y { background: #ffbd2e; }
+    .clip-terminal .dot-g { background: #28c840; }
+    .clip-terminal .term-label-left {
+      font-size: 11px; letter-spacing: 3px; color: #6f8aa0; text-transform: uppercase;
+    }
+    .clip-terminal .term-label-right {
+      font-size: 11px; letter-spacing: 3px; color: #e07040; text-transform: uppercase;
+    }
+    .clip-terminal .term-body {
+      padding: 18px 20px;
+      display: flex; flex-direction: column; gap: 10px;
+    }
+    .clip-terminal .term-line {
+      font-size: 14px; line-height: 1.5; display: flex; align-items: baseline; gap: 8px;
+    }
+    .clip-terminal .term-prompt { color: var(--accent); }
+    .clip-terminal .term-cmd { color: #eafaff; }
+    .clip-terminal .term-cursor {
+      display: inline-block; width: 2px; height: 1em;
+      background: var(--accent); vertical-align: middle;
+      animation: blink 1s step-end infinite;
+    }
+    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
+    .clip-terminal .term-bullet { color: #6f8aa0; }
+    .clip-terminal .term-txt { color: #9ab5c8; }
+    .clip-terminal .term-hi { color: #e07040; }
+    .clip-terminal .term-ok { color: #28c840; }
+    .clip-terminal .term-ok-line { color: var(--accent); font-weight: 600; }
+    .clip-terminal .term-check { color: #28c840; }
   </style>
 </head>
 <body>
@@ -271,6 +333,27 @@
   <div class="goal-panel" id="goalPanel">
     <div class="lbl">Aktuelles Ziel</div>
     <div class="goal-text" id="goalText"></div>
+  </div>
+
+  <div class="clip-terminal" id="clipTerminal">
+    <div class="term-bar">
+      <div style="display:flex;align-items:center;gap:14px">
+        <div class="term-dots">
+          <div class="dot dot-r"></div>
+          <div class="dot dot-y"></div>
+          <div class="dot dot-g"></div>
+        </div>
+        <span class="term-label-left">Claude Code</span>
+      </div>
+      <span class="term-label-right">Clipping Skill</span>
+    </div>
+    <div class="term-body" id="termBody">
+      <div class="term-line">
+        <span class="term-prompt">&gt;</span>
+        <span class="term-cmd" id="termCmd">clip this: <span style="color:var(--accent)"></span></span>
+        <span class="term-cursor"></span>
+      </div>
+    </div>
   </div>
 
   <div class="stage">
